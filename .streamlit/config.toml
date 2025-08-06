@@ -2,17 +2,24 @@
 developmentMode = false
 
 [server]
-headless = true
+port = 8501
 enableCORS = false
 enableXsrfProtection = false
 maxUploadSize = 200
 
 [browser]
 gatherUsageStats = false
+serverAddress = "0.0.0.0"
 
 [theme]
-primaryColor = "#00ff00"
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f0f2f6"
-textColor = "#262730"
+primaryColor = "#4caf50"
+backgroundColor = "#e8f5e8"
+secondaryBackgroundColor = "#c8e6c9"
+textColor = "#1b5e20"
+font = "sans serif"
+
+[client]
+caching = true
+displayEnabled = true
+showErrorDetails = false
 
