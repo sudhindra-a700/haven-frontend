@@ -1,7 +1,7 @@
 """
-HAVEN Workflow-Based Frontend - Single File Version
+HAVEN Workflow-Based Frontend - Single File Version with Enhanced Registration
 Complete implementation matching 90% of workflow diagrams
-No external imports required - all functionality in one file
+Enhanced registration with Individual/Organization account types
 """
 
 import streamlit as st
@@ -18,6 +18,17 @@ from datetime import datetime, timedelta
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# HAVEN Logo SVG
+HAVEN_LOGO_SVG = """
+<svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="60" height="60" rx="12" fill="#4CAF50"/>
+    <path d="M15 20h30v5H15z" fill="white"/>
+    <path d="M20 25h20v15H20z" fill="white" opacity="0.8"/>
+    <path d="M25 30h10v5H25z" fill="white"/>
+    <circle cx="30" cy="45" r="3" fill="white"/>
+</svg>
+"""
 
 # ============================================================================
 # AUTHENTICATION UTILITIES
@@ -198,9 +209,12 @@ class AuthenticationManager:
             demo_user = {
                 'id': f'user_{int(time.time())}',
                 'email': user_data['email'],
-                'first_name': user_data['first_name'],
-                'last_name': user_data['last_name'],
+                'first_name': user_data.get('first_name', user_data.get('full_name', '').split()[0]),
+                'last_name': user_data.get('last_name', ' '.join(user_data.get('full_name', '').split()[1:])),
                 'phone': user_data.get('phone', ''),
+                'account_type': user_data.get('account_type', 'individual'),
+                'organization_name': user_data.get('organization_name', ''),
+                'organization_type': user_data.get('organization_type', ''),
                 'verified': False
             }
             self._set_auth_session({'user': demo_user, 'token': 'demo_token'})
@@ -612,60 +626,79 @@ class WorkflowManager:
                         st.error(f"Facebook login failed: {result}")
     
     def render_register_page(self):
-        """Render registration page"""
-        st.markdown("### 👤 Create Your HAVEN Account")
+        """Render enhanced registration page with HAVEN logo and account types"""
+        # HAVEN Header with Logo
+        st.markdown(f"""
+        <div class="header-container" style="text-align: center; padding: 2rem; 
+                    background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%); 
+                    border-radius: 15px; margin-bottom: 2rem;">
+            <div class="header-logo" style="margin-bottom: 1rem;">
+                {HAVEN_LOGO_SVG}
+            </div>
+            <div class="header-subtitle" style="color: #2e7d32; font-size: 1.5rem; font-weight: 600;">
+                Help not just some people, but Help Humanity
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Language selector
         self.render_language_selector()
         
-        # Registration tabs
-        tab1, tab2 = st.tabs(["📧 Email Registration", "🔗 Social Registration"])
+        # Auth container
+        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
         
-        with tab1:
-            with st.form("email_register_form"):
-                st.markdown("#### 📧 Create Account with Email")
+        st.markdown("## Register for HAVEN")
+        
+        # Account type selection
+        account_type = st.selectbox("Account Type", ["Individual", "Organization"])
+        
+        if account_type == "Individual":
+            # Individual Registration Form
+            with st.form("individual_register"):
+                st.markdown("#### 👤 Individual Account Registration")
                 
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    first_name = st.text_input("First Name *", placeholder="Your first name")
-                    email = st.text_input("Email Address *", placeholder="your.email@example.com")
+                    full_name = st.text_input("Full Name *", placeholder="Enter your full name")
+                    email = st.text_input("Email *", placeholder="your.email@example.com")
                     password = st.text_input("Password *", type="password", placeholder="Create a strong password")
                 
                 with col2:
-                    last_name = st.text_input("Last Name *", placeholder="Your last name")
-                    phone = st.text_input("Phone Number", placeholder="+91 9876543210")
+                    phone = st.text_input("Phone Number *", placeholder="+91 9876543210")
                     confirm_password = st.text_input("Confirm Password *", type="password", placeholder="Confirm your password")
                 
+                address = st.text_area("Address", placeholder="Your complete address")
+                
+                # Terms and conditions
                 terms_accepted = st.checkbox("I agree to the Terms of Service and Privacy Policy *")
                 newsletter = st.checkbox("Subscribe to newsletter for updates")
                 
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    if st.form_submit_button("👤 Create Account", use_container_width=True):
-                        required_fields = [first_name, last_name, email, password, confirm_password]
-                        
-                        if not all(required_fields):
+                    if st.form_submit_button("👤 Register as Individual", use_container_width=True):
+                        if not all([full_name, email, phone, password, confirm_password]):
                             st.error("Please fill in all required fields marked with *")
                         elif password != confirm_password:
-                            st.error("Passwords do not match")
+                            st.error("Passwords do not match!")
                         elif not terms_accepted:
                             st.error("Please accept the Terms of Service")
                         else:
                             user_data = {
-                                'first_name': first_name,
-                                'last_name': last_name,
+                                'full_name': full_name,
                                 'email': email,
-                                'password': password,
                                 'phone': phone,
+                                'password': password,
+                                'address': address,
+                                'account_type': 'individual',
                                 'newsletter': newsletter
                             }
                             
                             success, result = auth_manager.register_user('email', user_data)
                             
                             if success:
-                                st.success(f"Welcome to HAVEN, {result.get('first_name', 'User')}!")
+                                st.success("Registration successful!")
                                 time.sleep(1)
                                 self.navigate_to('register', 'success')
                             else:
@@ -675,32 +708,122 @@ class WorkflowManager:
                     if st.form_submit_button("🔑 Sign In Instead", use_container_width=True):
                         self.navigate_to('register', 'login')
         
-        with tab2:
-            st.markdown("#### 🔗 Quick Registration with Social Media")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if st.button("🔴 Register with Google", use_container_width=True, key="google_register"):
-                    success, result = auth_manager.register_user('google', {})
-                    
-                    if success:
-                        st.success(f"Welcome to HAVEN, {result.get('first_name', 'User')}!")
-                        time.sleep(1)
-                        self.navigate_to('register', 'success')
-                    else:
-                        st.error(f"Google registration failed: {result}")
-            
-            with col2:
-                if st.button("🔵 Register with Facebook", use_container_width=True, key="facebook_register"):
-                    success, result = auth_manager.register_user('facebook', {})
-                    
-                    if success:
-                        st.success(f"Welcome to HAVEN, {result.get('first_name', 'User')}!")
-                        time.sleep(1)
-                        self.navigate_to('register', 'success')
-                    else:
-                        st.error(f"Facebook registration failed: {result}")
+        else:  # Organization
+            # Organization Registration Form
+            with st.form("organization_register"):
+                st.markdown("#### 🏢 Organization Account Registration")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    org_name = st.text_input("Organization Name *", placeholder="Enter organization name")
+                    email = st.text_input("Email *", placeholder="organization@example.com")
+                    org_type = st.selectbox("Organization Type *", ["", "NGO", "Startup", "Charity", "Foundation", "Trust"])
+                    password = st.text_input("Password *", type="password", placeholder="Create a strong password")
+                
+                with col2:
+                    phone = st.text_input("Phone Number *", placeholder="+91 9876543210")
+                    registration_number = st.text_input("Registration Number", placeholder="Official registration number")
+                    confirm_password = st.text_input("Confirm Password *", type="password", placeholder="Confirm your password")
+                
+                description = st.text_area("Organization Description *", placeholder="Describe your organization's mission and activities")
+                address = st.text_area("Address *", placeholder="Organization's complete address")
+                
+                # Additional organization fields
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    website = st.text_input("Website", placeholder="https://yourorganization.com")
+                    established_year = st.number_input("Established Year", min_value=1900, max_value=2024, value=2020)
+                
+                with col2:
+                    contact_person = st.text_input("Contact Person", placeholder="Primary contact person name")
+                    employee_count = st.selectbox("Employee Count", ["", "1-10", "11-50", "51-200", "200+"])
+                
+                # Terms and conditions
+                terms_accepted = st.checkbox("I agree to the Terms of Service and Privacy Policy *")
+                verification_consent = st.checkbox("I consent to organization verification process *")
+                newsletter = st.checkbox("Subscribe to newsletter for updates")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    if st.form_submit_button("🏢 Register as Organization", use_container_width=True):
+                        required_fields = [org_name, email, phone, org_type, password, confirm_password, description, address]
+                        
+                        if not all(required_fields):
+                            st.error("Please fill in all required fields marked with *")
+                        elif password != confirm_password:
+                            st.error("Passwords do not match!")
+                        elif not terms_accepted:
+                            st.error("Please accept the Terms of Service")
+                        elif not verification_consent:
+                            st.error("Please consent to the verification process")
+                        else:
+                            user_data = {
+                                'organization_name': org_name,
+                                'email': email,
+                                'phone': phone,
+                                'organization_type': org_type,
+                                'password': password,
+                                'description': description,
+                                'address': address,
+                                'website': website,
+                                'established_year': established_year,
+                                'contact_person': contact_person,
+                                'employee_count': employee_count,
+                                'registration_number': registration_number,
+                                'account_type': 'organization',
+                                'newsletter': newsletter
+                            }
+                            
+                            success, result = auth_manager.register_user('email', user_data)
+                            
+                            if success:
+                                st.success("Registration successful!")
+                                st.info("Your organization account will be verified within 24-48 hours.")
+                                time.sleep(1)
+                                self.navigate_to('register', 'success')
+                            else:
+                                st.error(f"Registration failed: {result}")
+                
+                with col2:
+                    if st.form_submit_button("🔑 Sign In Instead", use_container_width=True):
+                        self.navigate_to('register', 'login')
+        
+        # Social Registration Section
+        st.markdown("---")
+        st.markdown("#### 🔗 Quick Registration with Social Media")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("🔴 Register with Google", use_container_width=True, key="google_register"):
+                success, result = auth_manager.register_user('google', {'account_type': account_type.lower()})
+                
+                if success:
+                    st.success(f"Welcome to HAVEN, {result.get('first_name', 'User')}!")
+                    time.sleep(1)
+                    self.navigate_to('register', 'success')
+                else:
+                    st.error(f"Google registration failed: {result}")
+        
+        with col2:
+            if st.button("🔵 Register with Facebook", use_container_width=True, key="facebook_register"):
+                success, result = auth_manager.register_user('facebook', {'account_type': account_type.lower()})
+                
+                if success:
+                    st.success(f"Welcome to HAVEN, {result.get('first_name', 'User')}!")
+                    time.sleep(1)
+                    self.navigate_to('register', 'success')
+                else:
+                    st.error(f"Facebook registration failed: {result}")
+        
+        # Back to login button
+        if st.button("⬅️ Back to Login", use_container_width=True):
+            self.navigate_to('register', 'login')
+        
+        st.markdown('</div>', unsafe_allow_html=True)
     
     def render_authenticated_dashboard(self):
         """Render authenticated user dashboard"""
@@ -710,7 +833,11 @@ class WorkflowManager:
         col1, col2, col3 = st.columns([2, 1, 1])
         
         with col1:
-            st.markdown(f"### 🏠 Welcome back, {user_data.get('first_name', 'User')}!")
+            account_type = user_data.get('account_type', 'individual')
+            display_name = user_data.get('organization_name') if account_type == 'organization' else user_data.get('first_name', 'User')
+            st.markdown(f"### 🏠 Welcome back, {display_name}!")
+            if account_type == 'organization':
+                st.markdown(f"**Organization Type:** {user_data.get('organization_type', 'N/A')}")
         
         with col2:
             self.render_language_selector()
@@ -1079,6 +1206,22 @@ def main():
         padding: 1rem;
         border-radius: 10px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .header-container {
+        text-align: center;
+        padding: 2rem;
+        background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+        border-radius: 15px;
+        margin-bottom: 2rem;
+    }
+    
+    .auth-container {
+        background: white;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        margin: 1rem 0;
     }
     </style>
     """, unsafe_allow_html=True)
