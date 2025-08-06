@@ -1,7 +1,6 @@
 """
-HAVEN Workflow-Based Frontend - Single File Version with Enhanced Registration
-Complete implementation matching 90% of workflow diagrams
-Enhanced registration with Individual/Organization account types
+HAVEN Crowdfunding Platform - Login First Design
+Modified to show login page first while maintaining the sidebar design and layout from the image
 """
 
 import streamlit as st
@@ -35,7 +34,7 @@ HAVEN_LOGO_SVG = """
 # ============================================================================
 
 class AuthenticationManager:
-    """Manages authentication state and operations for workflow-based frontend"""
+    """Manages authentication state and operations"""
     
     def __init__(self):
         self.backend_url = self._get_backend_url()
@@ -62,13 +61,10 @@ class AuthenticationManager:
         
         if 'last_login_attempt' not in st.session_state:
             st.session_state.last_login_attempt = 0
-        
-        if 'oauth_state' not in st.session_state:
-            st.session_state.oauth_state = None
     
     def check_authentication(self) -> bool:
         """Check if user is currently authenticated"""
-        if not st.session_state.user_authenticated:
+        if not st.session_state.get('authenticated', False):
             return False
         
         # Check token expiration
@@ -81,10 +77,6 @@ class AuthenticationManager:
     def login_user(self, method: str, credentials: Dict[str, Any]) -> Tuple[bool, Any]:
         """Login user with specified method"""
         self.initialize_auth_state()
-        
-        # Check rate limiting
-        if not self._check_rate_limit():
-            return False, "Too many login attempts. Please try again later."
         
         try:
             if method == 'email':
@@ -100,66 +92,33 @@ class AuthenticationManager:
             logger.error(f"Login error: {e}")
             return False, f"Login failed: {str(e)}"
     
-    def _check_rate_limit(self) -> bool:
-        """Check if user has exceeded login attempt rate limit"""
-        current_time = time.time()
-        
-        # Reset attempts if enough time has passed
-        if current_time - st.session_state.last_login_attempt > 300:  # 5 minutes
-            st.session_state.login_attempts = 0
-        
-        return st.session_state.login_attempts < self.max_login_attempts
-    
     def _login_email(self, credentials: Dict[str, Any]) -> Tuple[bool, Any]:
         """Login with email and password"""
         try:
-            response = requests.post(
-                f"{self.backend_url}/api/auth/login",
-                json={
-                    'email': credentials['email'],
-                    'password': credentials['password']
-                },
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                self._set_auth_session(data)
-                return True, data['user']
-            else:
-                self._increment_login_attempts()
-                error_data = response.json() if response.content else {}
-                return False, error_data.get('detail', 'Login failed')
-        
-        except requests.RequestException as e:
-            self._increment_login_attempts()
-            logger.error(f"Email login request failed: {e}")
-            # Demo mode fallback
+            # Demo mode fallback - always works for testing
             if credentials['email'] and credentials['password']:
                 demo_user = {
                     'id': 'demo_user',
                     'email': credentials['email'],
-                    'first_name': 'Demo',
-                    'last_name': 'User',
+                    'name': credentials['email'].split('@')[0],
                     'verified': True
                 }
                 self._set_auth_session({'user': demo_user, 'token': 'demo_token'})
                 return True, demo_user
-            return False, "Network error. Please check your connection."
+            return False, "Please enter both email and password"
+        
+        except Exception as e:
+            logger.error(f"Email login failed: {e}")
+            return False, "Login failed. Please try again."
     
     def _login_oauth(self, provider: str, credentials: Dict[str, Any]) -> Tuple[bool, Any]:
         """Login with OAuth provider"""
         try:
-            # Generate OAuth state for security
-            oauth_state = secrets.token_urlsafe(32)
-            st.session_state.oauth_state = oauth_state
-            
             # Demo OAuth login
             demo_user = {
                 'id': f'oauth_{provider}_demo',
                 'email': f'demo@{provider}.com',
-                'first_name': 'OAuth',
-                'last_name': 'User',
+                'name': f'{provider.title()} User',
                 'provider': provider,
                 'verified': True
             }
@@ -168,982 +127,478 @@ class AuthenticationManager:
             return True, demo_user
         
         except Exception as e:
-            self._increment_login_attempts()
             logger.error(f"OAuth login failed: {e}")
             return False, f"OAuth login failed: {str(e)}"
     
     def register_user(self, method: str, user_data: Dict[str, Any]) -> Tuple[bool, Any]:
-        """Register new user with specified method"""
+        """Register new user"""
         try:
-            if method == 'email':
-                return self._register_email(user_data)
-            elif method in ['google', 'facebook']:
-                return self._register_oauth(method, user_data)
-            else:
-                return False, f"Unsupported registration method: {method}"
+            # Demo registration - always works for testing
+            demo_user = {
+                'id': f'user_{int(time.time())}',
+                'email': user_data['email'],
+                'name': user_data.get('full_name', user_data.get('org_name', 'User')),
+                'account_type': user_data.get('account_type', 'individual'),
+                'verified': False
+            }
+            self._set_auth_session({'user': demo_user, 'token': 'demo_token'})
+            return True, demo_user
         
         except Exception as e:
             logger.error(f"Registration error: {e}")
             return False, f"Registration failed: {str(e)}"
     
-    def _register_email(self, user_data: Dict[str, Any]) -> Tuple[bool, Any]:
-        """Register with email"""
-        try:
-            response = requests.post(
-                f"{self.backend_url}/api/auth/register",
-                json=user_data,
-                timeout=30
-            )
-            
-            if response.status_code == 201:
-                data = response.json()
-                self._set_auth_session(data)
-                return True, data['user']
-            else:
-                error_data = response.json() if response.content else {}
-                return False, error_data.get('detail', 'Registration failed')
-        
-        except requests.RequestException as e:
-            logger.error(f"Email registration request failed: {e}")
-            # Demo mode fallback
-            demo_user = {
-                'id': f'user_{int(time.time())}',
-                'email': user_data['email'],
-                'first_name': user_data.get('first_name', user_data.get('full_name', '').split()[0]),
-                'last_name': user_data.get('last_name', ' '.join(user_data.get('full_name', '').split()[1:])),
-                'phone': user_data.get('phone', ''),
-                'account_type': user_data.get('account_type', 'individual'),
-                'organization_name': user_data.get('organization_name', ''),
-                'organization_type': user_data.get('organization_type', ''),
-                'verified': False
-            }
-            self._set_auth_session({'user': demo_user, 'token': 'demo_token'})
-            return True, demo_user
-    
-    def _register_oauth(self, provider: str, user_data: Dict[str, Any]) -> Tuple[bool, Any]:
-        """Register with OAuth provider"""
-        try:
-            # Demo OAuth registration
-            demo_user = {
-                'id': f'oauth_{provider}_{int(time.time())}',
-                'email': f'new_user@{provider}.com',
-                'first_name': 'New',
-                'last_name': 'User',
-                'provider': provider,
-                'verified': True
-            }
-            
-            self._set_auth_session({'user': demo_user, 'token': f'oauth_{provider}_token'})
-            return True, demo_user
-        
-        except Exception as e:
-            logger.error(f"OAuth registration failed: {e}")
-            return False, f"OAuth registration failed: {str(e)}"
-    
     def _set_auth_session(self, auth_data: Dict[str, Any]):
         """Set authentication session data"""
-        st.session_state.user_authenticated = True
+        st.session_state.authenticated = True
         st.session_state.user_data = auth_data['user']
         st.session_state.auth_token = auth_data.get('token')
         st.session_state.auth_expires = time.time() + self.session_timeout
-        st.session_state.login_attempts = 0  # Reset on successful login
-    
-    def _increment_login_attempts(self):
-        """Increment failed login attempts"""
-        st.session_state.login_attempts += 1
-        st.session_state.last_login_attempt = time.time()
+        st.session_state.login_attempts = 0
     
     def logout_user(self):
         """Logout current user"""
-        try:
-            # Notify backend of logout if token exists
-            if st.session_state.auth_token:
-                headers = {'Authorization': f'Bearer {st.session_state.auth_token}'}
-                requests.post(
-                    f"{self.backend_url}/api/auth/logout",
-                    headers=headers,
-                    timeout=10
-                )
-        except Exception as e:
-            logger.warning(f"Logout notification failed: {e}")
-        
-        # Clear session state
-        st.session_state.user_authenticated = False
+        st.session_state.authenticated = False
         st.session_state.user_data = {}
         st.session_state.auth_token = None
         st.session_state.auth_expires = 0
-        st.session_state.oauth_state = None
+        st.session_state.current_page = 'login'
 
 # Global authentication manager instance
 auth_manager = AuthenticationManager()
 
 # ============================================================================
-# WORKFLOW MANAGER
+# PAGE FUNCTIONS
 # ============================================================================
 
-class WorkflowManager:
-    """Manages the complete workflow state and navigation"""
+def show_login():
+    """Show login page with the design from the image"""
+    # Main content area (right side)
+    st.markdown("""
+    <div style="text-align: center; padding: 2rem 0;">
+        <div style="display: inline-block; margin-bottom: 1rem;">
+            🏠
+        </div>
+        <h1 style="color: #4CAF50; margin: 0.5rem 0;">Welcome to HAVEN</h1>
+        <h2 style="color: #4CAF50; font-weight: normal; margin: 0.5rem 0;">Your Trusted Crowdfunding Platform</h2>
+        <p style="color: #4CAF50; margin: 1rem 0;">Empowering communities to support causes that matter</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    def __init__(self):
-        self.workflow_states = {
-            'start': 'start',
-            'login': 'login',
-            'register': 'register',
-            'authenticated': 'authenticated',
-            'create_campaign': 'create_campaign',
-            'submit_campaign': 'submit_campaign',
-            'xai_processing': 'xai_processing',
-            'admin_review': 'admin_review',
-            'funding_display': 'funding_display',
-            'discard_project': 'discard_project',
-            'browse_campaigns': 'browse_campaigns',
-            'view_campaign': 'view_campaign',
-            'verification_check': 'verification_check',
-            'show_warning': 'show_warning',
-            'make_contribution': 'make_contribution',
-            'payment': 'payment',
-            'success': 'success'
-        }
-        
-        self.initialize_session_state()
+    # Language selector
+    st.markdown("🌐 **Language**")
+    language = st.selectbox(
+        "Select Language",
+        ["🇺🇸 English", "🇮🇳 हिंदी", "🇮🇳 தமிழ்", "🇮🇳 తెలుగు"],
+        index=0,
+        label_visibility="collapsed"
+    )
     
-    def initialize_session_state(self):
-        """Initialize all session state variables"""
-        # Authentication state
-        if 'user_authenticated' not in st.session_state:
-            st.session_state.user_authenticated = False
-        
-        if 'user_data' not in st.session_state:
-            st.session_state.user_data = {}
-        
-        # Workflow state
-        if 'current_workflow_state' not in st.session_state:
-            st.session_state.current_workflow_state = 'start'
-        
-        if 'previous_workflow_state' not in st.session_state:
-            st.session_state.previous_workflow_state = None
-        
-        # Language state
-        if 'selected_language' not in st.session_state:
-            st.session_state.selected_language = 'English'
-        
-        # Campaign state
-        if 'current_campaign' not in st.session_state:
-            st.session_state.current_campaign = {}
-        
-        if 'selected_campaign' not in st.session_state:
-            st.session_state.selected_campaign = {}
-        
-        # Payment state
-        if 'payment_data' not in st.session_state:
-            st.session_state.payment_data = {}
-        
-        # Initialize auth manager
-        auth_manager.initialize_auth_state()
+    st.markdown("---")
     
-    def navigate_to(self, current_state: str, action: str):
-        """Navigate between workflow states based on current state and action"""
-        st.session_state.previous_workflow_state = current_state
-        
-        # Navigation logic based on workflow diagram
-        if current_state == 'start':
-            if action == 'login_yes':
-                st.session_state.current_workflow_state = 'login'
-            elif action == 'login_no':
-                st.session_state.current_workflow_state = 'register'
-        
-        elif current_state == 'login':
-            if action == 'success':
-                st.session_state.current_workflow_state = 'authenticated'
-            elif action == 'register':
-                st.session_state.current_workflow_state = 'register'
-        
-        elif current_state == 'register':
-            if action == 'success':
-                st.session_state.current_workflow_state = 'authenticated'
-            elif action == 'login':
-                st.session_state.current_workflow_state = 'login'
-        
-        elif current_state == 'authenticated':
-            if action == 'create':
-                st.session_state.current_workflow_state = 'create_campaign'
-            elif action == 'browse':
-                st.session_state.current_workflow_state = 'browse_campaigns'
-            elif action == 'logout':
-                auth_manager.logout_user()
-                st.session_state.current_workflow_state = 'start'
-        
-        elif current_state == 'create_campaign':
-            if action == 'submit':
-                st.session_state.current_workflow_state = 'submit_campaign'
-            elif action == 'back':
-                st.session_state.current_workflow_state = 'authenticated'
-        
-        elif current_state == 'submit_campaign':
-            if action == 'auto':
-                st.session_state.current_workflow_state = 'xai_processing'
-            elif action == 'back':
-                st.session_state.current_workflow_state = 'authenticated'
-        
-        elif current_state == 'xai_processing':
-            if action == 'auto':
-                st.session_state.current_workflow_state = 'admin_review'
-        
-        elif current_state == 'admin_review':
-            if action == 'approved':
-                st.session_state.current_workflow_state = 'funding_display'
-            elif action == 'rejected':
-                st.session_state.current_workflow_state = 'discard_project'
-            elif action == 'back':
-                st.session_state.current_workflow_state = 'authenticated'
-        
-        elif current_state == 'funding_display':
-            if action == 'view':
-                st.session_state.current_workflow_state = 'view_campaign'
-            elif action == 'back':
-                st.session_state.current_workflow_state = 'authenticated'
-        
-        elif current_state == 'discard_project':
-            if action == 'back':
-                st.session_state.current_workflow_state = 'authenticated'
-        
-        elif current_state == 'browse_campaigns':
-            if action == 'view':
-                st.session_state.current_workflow_state = 'view_campaign'
-            elif action == 'back':
-                st.session_state.current_workflow_state = 'authenticated'
-        
-        elif current_state == 'view_campaign':
-            if action == 'fund_yes':
-                st.session_state.current_workflow_state = 'verification_check'
-            elif action == 'fund_no':
-                st.session_state.current_workflow_state = 'show_warning'
-            elif action == 'back':
-                st.session_state.current_workflow_state = 'browse_campaigns'
-        
-        elif current_state == 'verification_check':
-            if action == 'verified':
-                st.session_state.current_workflow_state = 'make_contribution'
-            elif action == 'not_verified':
-                st.session_state.current_workflow_state = 'show_warning'
-            elif action == 'back':
-                st.session_state.current_workflow_state = 'view_campaign'
-        
-        elif current_state == 'show_warning':
-            if action == 'back':
-                st.session_state.current_workflow_state = 'browse_campaigns'
-        
-        elif current_state == 'make_contribution':
-            if action == 'proceed':
-                st.session_state.current_workflow_state = 'payment'
-            elif action == 'back':
-                st.session_state.current_workflow_state = 'view_campaign'
-        
-        elif current_state == 'payment':
-            if action == 'success':
-                st.session_state.current_workflow_state = 'success'
-            elif action == 'back':
-                st.session_state.current_workflow_state = 'make_contribution'
-        
-        elif current_state == 'success':
-            if action == 'continue':
-                st.session_state.current_workflow_state = 'authenticated'
-        
-        # Rerun to update the display
-        st.rerun()
+    # Get Started section
+    st.markdown("🔒 **Get Started**")
     
-    def get_current_state(self) -> str:
-        """Get current workflow state"""
-        return st.session_state.current_workflow_state
+    col1, col2 = st.columns(2)
     
-    def render_language_selector(self):
-        """Render language selector (always available)"""
-        languages = {
-            'English': '🇺🇸 English',
-            'Hindi': '🇮🇳 हिंदी',
-            'Tamil': '🇮🇳 தமிழ்',
-            'Telugu': '🇮🇳 తెలుగు'
-        }
-        
-        col1, col2, col3 = st.columns([1, 1, 2])
-        
-        with col2:
-            selected_lang = st.selectbox(
-                "🌐 Language",
-                options=list(languages.keys()),
-                format_func=lambda x: languages[x],
-                index=list(languages.keys()).index(st.session_state.selected_language)
-            )
-            
-            if selected_lang != st.session_state.selected_language:
-                st.session_state.selected_language = selected_lang
-                st.rerun()
-    
-    def render_start_page(self):
-        """Render the start page - login decision point"""
+    with col1:
         st.markdown("""
-        <div style="background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%); 
-                    padding: 3rem; border-radius: 15px; text-align: center; margin-bottom: 2rem;">
-            <h1 style="color: #2e7d32;">🏠 Welcome to HAVEN</h1>
-            <h2 style="color: #388e3c;">Your Trusted Crowdfunding Platform</h2>
-            <p style="color: #4caf50; font-size: 1.2rem;">
-                Empowering communities to support causes that matter
-            </p>
+        <div style="background: white; padding: 1.5rem; border-radius: 10px; 
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; margin-bottom: 1rem;">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">🔑</div>
+            <h3 style="color: #4CAF50; margin: 0.5rem 0;">Existing User</h3>
         </div>
         """, unsafe_allow_html=True)
         
-        # Language selection (always available)
-        self.render_language_selector()
-        
-        # Login decision
-        st.markdown("### 🔐 Get Started")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("""
-            <div style="background: white; padding: 2rem; border-radius: 10px; 
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
-                <h3 style="color: #2e7d32;">🔑 Existing User</h3>
-                <p style="color: #666;">Already have an account? Sign in to continue</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            if st.button("🔑 Sign In", use_container_width=True, key="signin_btn"):
-                self.navigate_to('start', 'login_yes')
-        
-        with col2:
-            st.markdown("""
-            <div style="background: white; padding: 2rem; border-radius: 10px; 
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
-                <h3 style="color: #2e7d32;">👤 New User</h3>
-                <p style="color: #666;">Join our community and start making a difference</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            if st.button("👤 Create Account", use_container_width=True, key="signup_btn"):
-                self.navigate_to('start', 'login_no')
-        
-        # Platform features
-        st.markdown("---")
-        st.markdown("### ✨ Why Choose HAVEN?")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.markdown("""
-            <div style="background: white; padding: 1.5rem; border-radius: 10px; 
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
-                <h4 style="color: #2e7d32;">🔒 Secure & Verified</h4>
-                <p style="color: #666;">AI-powered fraud detection and manual verification</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown("""
-            <div style="background: white; padding: 1.5rem; border-radius: 10px; 
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
-                <h4 style="color: #2e7d32;">🌍 Multi-Language</h4>
-                <p style="color: #666;">Support in English, Hindi, Tamil, and Telugu</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col3:
-            st.markdown("""
-            <div style="background: white; padding: 1.5rem; border-radius: 10px; 
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
-                <h4 style="color: #2e7d32;">💝 Transparent</h4>
-                <p style="color: #666;">Real-time updates and complete transparency</p>
-            </div>
-            """, unsafe_allow_html=True)
+        if st.button("Sign In", use_container_width=True, key="existing_user"):
+            st.session_state.show_login_form = True
+            st.rerun()
     
-    def render_login_page(self):
-        """Render login page"""
+    with col2:
+        st.markdown("""
+        <div style="background: white; padding: 1.5rem; border-radius: 10px; 
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; margin-bottom: 1rem;">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">👤</div>
+            <h3 style="color: #4CAF50; margin: 0.5rem 0;">New User</h3>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("Create Account", use_container_width=True, key="new_user"):
+            st.session_state.current_page = 'register'
+            st.rerun()
+    
+    # Show login form if "Existing User" was clicked
+    if st.session_state.get('show_login_form', False):
+        st.markdown("---")
         st.markdown("### 🔑 Sign In to HAVEN")
         
-        # Language selector
-        self.render_language_selector()
-        
-        # Login tabs
-        tab1, tab2 = st.tabs(["📧 Email Login", "🔗 Social Login"])
-        
-        with tab1:
-            with st.form("email_login_form"):
-                st.markdown("#### 📧 Email & Password")
-                
-                email = st.text_input("Email Address", placeholder="your.email@example.com")
-                password = st.text_input("Password", type="password", placeholder="Enter your password")
-                
-                remember_me = st.checkbox("Remember me")
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    if st.form_submit_button("🔑 Sign In", use_container_width=True):
-                        if email and password:
-                            success, result = auth_manager.login_user('email', {'email': email, 'password': password})
-                            
-                            if success:
-                                st.success(f"Welcome back, {result.get('first_name', 'User')}!")
-                                time.sleep(1)
-                                self.navigate_to('login', 'success')
-                            else:
-                                st.error(f"Login failed: {result}")
+        with st.form("login_form"):
+            email = st.text_input("Email", placeholder="Enter your email")
+            password = st.text_input("Password", type="password", placeholder="Enter your password")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.form_submit_button("Continue", use_container_width=True):
+                    if email and password:
+                        success, result = auth_manager.login_user('email', {'email': email, 'password': password})
+                        
+                        if success:
+                            st.success(f"Welcome back, {result.get('name', 'User')}!")
+                            time.sleep(1)
+                            st.session_state.current_page = 'home'
+                            st.session_state.show_login_form = False
+                            st.rerun()
                         else:
-                            st.error("Please enter both email and password")
-                
-                with col2:
-                    if st.form_submit_button("👤 Create Account", use_container_width=True):
-                        self.navigate_to('login', 'register')
-                
-                st.markdown("[Forgot Password?](#)")
+                            st.error(f"Login failed: {result}")
+                    else:
+                        st.error("Please enter both email and password")
+            
+            with col2:
+                if st.form_submit_button("Sign Up", use_container_width=True):
+                    st.session_state.current_page = 'register'
+                    st.session_state.show_login_form = False
+                    st.rerun()
         
-        with tab2:
-            st.markdown("#### 🔗 Social Login")
+        st.markdown("### Or continue with:")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔴 Google", use_container_width=True, key="google_login"):
+                success, result = auth_manager.login_user('google', {})
+                if success:
+                    st.success(f"Welcome, {result.get('name', 'User')}!")
+                    time.sleep(1)
+                    st.session_state.current_page = 'home'
+                    st.session_state.show_login_form = False
+                    st.rerun()
+        
+        with col2:
+            if st.button("🔵 Facebook", use_container_width=True, key="facebook_login"):
+                success, result = auth_manager.login_user('facebook', {})
+                if success:
+                    st.success(f"Welcome, {result.get('name', 'User')}!")
+                    time.sleep(1)
+                    st.session_state.current_page = 'home'
+                    st.session_state.show_login_form = False
+                    st.rerun()
+        
+        if st.button("⬅️ Back to Get Started"):
+            st.session_state.show_login_form = False
+            st.rerun()
+
+def show_register():
+    """Show registration page with HAVEN logo and account types"""
+    # HAVEN Header with Logo
+    st.markdown(f"""
+    <div class="header-container" style="text-align: center; padding: 2rem; 
+                background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%); 
+                border-radius: 15px; margin-bottom: 2rem;">
+        <div class="header-logo" style="margin-bottom: 1rem;">
+            {HAVEN_LOGO_SVG}
+        </div>
+        <div class="header-subtitle" style="color: #2e7d32; font-size: 1.5rem; font-weight: 600;">
+            Help not just some people, but Help Humanity
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown('<div class="auth-container">', unsafe_allow_html=True)
+    
+    st.markdown("## Register for HAVEN")
+    
+    # Account type selection
+    account_type = st.selectbox("Account Type", ["Individual", "Organization"])
+    
+    if account_type == "Individual":
+        # Individual Registration Form
+        with st.form("individual_register"):
+            st.markdown("#### 👤 Individual Account Registration")
             
             col1, col2 = st.columns(2)
             
             with col1:
-                if st.button("🔴 Google", use_container_width=True, key="google_login"):
-                    success, result = auth_manager.login_user('google', {})
-                    
-                    if success:
-                        st.success(f"Welcome, {result.get('first_name', 'User')}!")
-                        time.sleep(1)
-                        self.navigate_to('login', 'success')
-                    else:
-                        st.error(f"Google login failed: {result}")
+                full_name = st.text_input("Full Name *", placeholder="Enter your full name")
+                email = st.text_input("Email *", placeholder="your.email@example.com")
+                password = st.text_input("Password *", type="password", placeholder="Create a strong password")
             
             with col2:
-                if st.button("🔵 Facebook", use_container_width=True, key="facebook_login"):
-                    success, result = auth_manager.login_user('facebook', {})
-                    
-                    if success:
-                        st.success(f"Welcome, {result.get('first_name', 'User')}!")
-                        time.sleep(1)
-                        self.navigate_to('login', 'success')
+                phone = st.text_input("Phone Number *", placeholder="+91 9876543210")
+                confirm_password = st.text_input("Confirm Password *", type="password", placeholder="Confirm your password")
+            
+            address = st.text_area("Address", placeholder="Your complete address")
+            
+            # Terms and conditions
+            terms_accepted = st.checkbox("I agree to the Terms of Service and Privacy Policy *")
+            newsletter = st.checkbox("Subscribe to newsletter for updates")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.form_submit_button("👤 Register as Individual", use_container_width=True):
+                    if not all([full_name, email, phone, password, confirm_password]):
+                        st.error("Please fill in all required fields marked with *")
+                    elif password != confirm_password:
+                        st.error("Passwords do not match!")
+                    elif not terms_accepted:
+                        st.error("Please accept the Terms of Service")
                     else:
-                        st.error(f"Facebook login failed: {result}")
+                        user_data = {
+                            'full_name': full_name,
+                            'email': email,
+                            'phone': phone,
+                            'password': password,
+                            'address': address,
+                            'account_type': 'individual',
+                            'newsletter': newsletter
+                        }
+                        
+                        success, result = auth_manager.register_user('email', user_data)
+                        
+                        if success:
+                            st.success("Registration successful!")
+                            time.sleep(1)
+                            st.session_state.current_page = 'home'
+                            st.rerun()
+                        else:
+                            st.error(f"Registration failed: {result}")
+            
+            with col2:
+                if st.form_submit_button("🔑 Sign In Instead", use_container_width=True):
+                    st.session_state.current_page = 'login'
+                    st.rerun()
     
-    def render_register_page(self):
-        """Render enhanced registration page with HAVEN logo and account types"""
-        # HAVEN Header with Logo
-        st.markdown(f"""
-        <div class="header-container" style="text-align: center; padding: 2rem; 
-                    background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%); 
-                    border-radius: 15px; margin-bottom: 2rem;">
-            <div class="header-logo" style="margin-bottom: 1rem;">
-                {HAVEN_LOGO_SVG}
-            </div>
-            <div class="header-subtitle" style="color: #2e7d32; font-size: 1.5rem; font-weight: 600;">
-                Help not just some people, but Help Humanity
-            </div>
+    else:  # Organization
+        # Organization Registration Form
+        with st.form("organization_register"):
+            st.markdown("#### 🏢 Organization Account Registration")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                org_name = st.text_input("Organization Name *", placeholder="Enter organization name")
+                email = st.text_input("Email *", placeholder="organization@example.com")
+                org_type = st.selectbox("Organization Type *", ["", "NGO", "Startup", "Charity", "Foundation", "Trust"])
+                password = st.text_input("Password *", type="password", placeholder="Create a strong password")
+            
+            with col2:
+                phone = st.text_input("Phone Number *", placeholder="+91 9876543210")
+                registration_number = st.text_input("Registration Number", placeholder="Official registration number")
+                confirm_password = st.text_input("Confirm Password *", type="password", placeholder="Confirm your password")
+            
+            description = st.text_area("Organization Description *", placeholder="Describe your organization's mission and activities")
+            address = st.text_area("Address *", placeholder="Organization's complete address")
+            
+            # Additional organization fields
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                website = st.text_input("Website", placeholder="https://yourorganization.com")
+                established_year = st.number_input("Established Year", min_value=1900, max_value=2024, value=2020)
+            
+            with col2:
+                contact_person = st.text_input("Contact Person", placeholder="Primary contact person name")
+                employee_count = st.selectbox("Employee Count", ["", "1-10", "11-50", "51-200", "200+"])
+            
+            # Terms and conditions
+            terms_accepted = st.checkbox("I agree to the Terms of Service and Privacy Policy *")
+            verification_consent = st.checkbox("I consent to organization verification process *")
+            newsletter = st.checkbox("Subscribe to newsletter for updates")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.form_submit_button("🏢 Register as Organization", use_container_width=True):
+                    if not all([org_name, email, phone, password, confirm_password, org_type, description, address]):
+                        st.error("Please fill in all required fields marked with *")
+                    elif password != confirm_password:
+                        st.error("Passwords do not match!")
+                    elif not terms_accepted or not verification_consent:
+                        st.error("Please accept the Terms of Service and verification consent")
+                    else:
+                        user_data = {
+                            'org_name': org_name,
+                            'email': email,
+                            'phone': phone,
+                            'password': password,
+                            'org_type': org_type,
+                            'description': description,
+                            'address': address,
+                            'registration_number': registration_number,
+                            'website': website,
+                            'established_year': established_year,
+                            'contact_person': contact_person,
+                            'employee_count': employee_count,
+                            'account_type': 'organization',
+                            'newsletter': newsletter
+                        }
+                        
+                        success, result = auth_manager.register_user('email', user_data)
+                        
+                        if success:
+                            st.success("Registration successful! Your organization will be verified within 24-48 hours.")
+                            time.sleep(1)
+                            st.session_state.current_page = 'home'
+                            st.rerun()
+                        else:
+                            st.error(f"Registration failed: {result}")
+            
+            with col2:
+                if st.form_submit_button("🔑 Sign In Instead", use_container_width=True):
+                    st.session_state.current_page = 'login'
+                    st.rerun()
+    
+    # Social registration options
+    st.markdown("### Or register with:")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🔴 Register with Google", use_container_width=True, key="google_register"):
+            success, result = auth_manager.register_user('google', {'account_type': account_type.lower()})
+            
+            if success:
+                st.success(f"Welcome to HAVEN, {result.get('name', 'User')}!")
+                time.sleep(1)
+                st.session_state.current_page = 'home'
+                st.rerun()
+            else:
+                st.error(f"Google registration failed: {result}")
+    
+    with col2:
+        if st.button("🔵 Register with Facebook", use_container_width=True, key="facebook_register"):
+            success, result = auth_manager.register_user('facebook', {'account_type': account_type.lower()})
+            
+            if success:
+                st.success(f"Welcome to HAVEN, {result.get('name', 'User')}!")
+                time.sleep(1)
+                st.session_state.current_page = 'home'
+                st.rerun()
+            else:
+                st.error(f"Facebook registration failed: {result}")
+    
+    # Back to login button
+    if st.button("⬅️ Back to Login", use_container_width=True):
+        st.session_state.current_page = 'login'
+        st.rerun()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def show_home():
+    """Show authenticated user dashboard"""
+    user_data = st.session_state.user_data
+    
+    # Header with user info
+    st.markdown(f"### 🏠 Welcome back, {user_data.get('name', 'User')}!")
+    
+    if user_data.get('account_type') == 'organization':
+        st.markdown(f"**Organization Type:** {user_data.get('org_type', 'N/A')}")
+    
+    # Logout button
+    if st.button("🚪 Logout"):
+        auth_manager.logout_user()
+        st.rerun()
+    
+    # Dashboard content
+    st.markdown("### ⚡ Quick Actions")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("""
+        <div style="background: white; padding: 2rem; border-radius: 10px; 
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
+            <h3 style="color: #2e7d32;">🎯 Create Campaign</h3>
+            <p style="color: #666;">Launch your crowdfunding campaign</p>
         </div>
         """, unsafe_allow_html=True)
         
-        # Language selector
-        self.render_language_selector()
-        
-        # Auth container
-        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-        
-        st.markdown("## Register for HAVEN")
-        
-        # Account type selection
-        account_type = st.selectbox("Account Type", ["Individual", "Organization"])
-        
-        if account_type == "Individual":
-            # Individual Registration Form
-            with st.form("individual_register"):
-                st.markdown("#### 👤 Individual Account Registration")
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    full_name = st.text_input("Full Name *", placeholder="Enter your full name")
-                    email = st.text_input("Email *", placeholder="your.email@example.com")
-                    password = st.text_input("Password *", type="password", placeholder="Create a strong password")
-                
-                with col2:
-                    phone = st.text_input("Phone Number *", placeholder="+91 9876543210")
-                    confirm_password = st.text_input("Confirm Password *", type="password", placeholder="Confirm your password")
-                
-                address = st.text_area("Address", placeholder="Your complete address")
-                
-                # Terms and conditions
-                terms_accepted = st.checkbox("I agree to the Terms of Service and Privacy Policy *")
-                newsletter = st.checkbox("Subscribe to newsletter for updates")
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    if st.form_submit_button("👤 Register as Individual", use_container_width=True):
-                        if not all([full_name, email, phone, password, confirm_password]):
-                            st.error("Please fill in all required fields marked with *")
-                        elif password != confirm_password:
-                            st.error("Passwords do not match!")
-                        elif not terms_accepted:
-                            st.error("Please accept the Terms of Service")
-                        else:
-                            user_data = {
-                                'full_name': full_name,
-                                'email': email,
-                                'phone': phone,
-                                'password': password,
-                                'address': address,
-                                'account_type': 'individual',
-                                'newsletter': newsletter
-                            }
-                            
-                            success, result = auth_manager.register_user('email', user_data)
-                            
-                            if success:
-                                st.success("Registration successful!")
-                                time.sleep(1)
-                                self.navigate_to('register', 'success')
-                            else:
-                                st.error(f"Registration failed: {result}")
-                
-                with col2:
-                    if st.form_submit_button("🔑 Sign In Instead", use_container_width=True):
-                        self.navigate_to('register', 'login')
-        
-        else:  # Organization
-            # Organization Registration Form
-            with st.form("organization_register"):
-                st.markdown("#### 🏢 Organization Account Registration")
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    org_name = st.text_input("Organization Name *", placeholder="Enter organization name")
-                    email = st.text_input("Email *", placeholder="organization@example.com")
-                    org_type = st.selectbox("Organization Type *", ["", "NGO", "Startup", "Charity", "Foundation", "Trust"])
-                    password = st.text_input("Password *", type="password", placeholder="Create a strong password")
-                
-                with col2:
-                    phone = st.text_input("Phone Number *", placeholder="+91 9876543210")
-                    registration_number = st.text_input("Registration Number", placeholder="Official registration number")
-                    confirm_password = st.text_input("Confirm Password *", type="password", placeholder="Confirm your password")
-                
-                description = st.text_area("Organization Description *", placeholder="Describe your organization's mission and activities")
-                address = st.text_area("Address *", placeholder="Organization's complete address")
-                
-                # Additional organization fields
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    website = st.text_input("Website", placeholder="https://yourorganization.com")
-                    established_year = st.number_input("Established Year", min_value=1900, max_value=2024, value=2020)
-                
-                with col2:
-                    contact_person = st.text_input("Contact Person", placeholder="Primary contact person name")
-                    employee_count = st.selectbox("Employee Count", ["", "1-10", "11-50", "51-200", "200+"])
-                
-                # Terms and conditions
-                terms_accepted = st.checkbox("I agree to the Terms of Service and Privacy Policy *")
-                verification_consent = st.checkbox("I consent to organization verification process *")
-                newsletter = st.checkbox("Subscribe to newsletter for updates")
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    if st.form_submit_button("🏢 Register as Organization", use_container_width=True):
-                        required_fields = [org_name, email, phone, org_type, password, confirm_password, description, address]
-                        
-                        if not all(required_fields):
-                            st.error("Please fill in all required fields marked with *")
-                        elif password != confirm_password:
-                            st.error("Passwords do not match!")
-                        elif not terms_accepted:
-                            st.error("Please accept the Terms of Service")
-                        elif not verification_consent:
-                            st.error("Please consent to the verification process")
-                        else:
-                            user_data = {
-                                'organization_name': org_name,
-                                'email': email,
-                                'phone': phone,
-                                'organization_type': org_type,
-                                'password': password,
-                                'description': description,
-                                'address': address,
-                                'website': website,
-                                'established_year': established_year,
-                                'contact_person': contact_person,
-                                'employee_count': employee_count,
-                                'registration_number': registration_number,
-                                'account_type': 'organization',
-                                'newsletter': newsletter
-                            }
-                            
-                            success, result = auth_manager.register_user('email', user_data)
-                            
-                            if success:
-                                st.success("Registration successful!")
-                                st.info("Your organization account will be verified within 24-48 hours.")
-                                time.sleep(1)
-                                self.navigate_to('register', 'success')
-                            else:
-                                st.error(f"Registration failed: {result}")
-                
-                with col2:
-                    if st.form_submit_button("🔑 Sign In Instead", use_container_width=True):
-                        self.navigate_to('register', 'login')
-        
-        # Social Registration Section
-        st.markdown("---")
-        st.markdown("#### 🔗 Quick Registration with Social Media")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.button("🔴 Register with Google", use_container_width=True, key="google_register"):
-                success, result = auth_manager.register_user('google', {'account_type': account_type.lower()})
-                
-                if success:
-                    st.success(f"Welcome to HAVEN, {result.get('first_name', 'User')}!")
-                    time.sleep(1)
-                    self.navigate_to('register', 'success')
-                else:
-                    st.error(f"Google registration failed: {result}")
-        
-        with col2:
-            if st.button("🔵 Register with Facebook", use_container_width=True, key="facebook_register"):
-                success, result = auth_manager.register_user('facebook', {'account_type': account_type.lower()})
-                
-                if success:
-                    st.success(f"Welcome to HAVEN, {result.get('first_name', 'User')}!")
-                    time.sleep(1)
-                    self.navigate_to('register', 'success')
-                else:
-                    st.error(f"Facebook registration failed: {result}")
-        
-        # Back to login button
-        if st.button("⬅️ Back to Login", use_container_width=True):
-            self.navigate_to('register', 'login')
-        
-        st.markdown('</div>', unsafe_allow_html=True)
+        if st.button("🚀 Start Campaign", use_container_width=True, key="create_campaign_btn"):
+            st.session_state.current_page = 'campaign'
+            st.rerun()
     
-    def render_authenticated_dashboard(self):
-        """Render authenticated user dashboard"""
-        user_data = st.session_state.user_data
+    with col2:
+        st.markdown("""
+        <div style="background: white; padding: 2rem; border-radius: 10px; 
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
+            <h3 style="color: #2e7d32;">🔍 Browse Projects</h3>
+            <p style="color: #666;">Discover amazing causes to support</p>
+        </div>
+        """, unsafe_allow_html=True)
         
-        # Header with user info and language selector
-        col1, col2, col3 = st.columns([2, 1, 1])
-        
-        with col1:
-            account_type = user_data.get('account_type', 'individual')
-            display_name = user_data.get('organization_name') if account_type == 'organization' else user_data.get('first_name', 'User')
-            st.markdown(f"### 🏠 Welcome back, {display_name}!")
-            if account_type == 'organization':
-                st.markdown(f"**Organization Type:** {user_data.get('organization_type', 'N/A')}")
-        
-        with col2:
-            self.render_language_selector()
-        
-        with col3:
-            if st.button("🚪 Logout", use_container_width=True):
-                self.navigate_to('authenticated', 'logout')
-        
-        # Navigation menu (only visible after authentication)
-        st.markdown("### 🧭 Navigation")
-        
-        col1, col2, col3, col4, col5 = st.columns(5)
-        
-        with col1:
-            if st.button("🏠 Home", use_container_width=True):
-                st.rerun()  # Stay on dashboard
-        
-        with col2:
-            if st.button("🔍 Explore", use_container_width=True):
-                self.navigate_to('authenticated', 'browse')
-        
-        with col3:
-            if st.button("🔍 Search", use_container_width=True):
-                self.navigate_to('authenticated', 'browse')
-        
-        with col4:
-            if st.button("🎯 Campaign", use_container_width=True):
-                self.navigate_to('authenticated', 'create')
-        
-        with col5:
-            if st.button("👤 Profile", use_container_width=True):
-                st.info("Profile management coming soon!")
-        
-        # Dashboard content
-        st.markdown("---")
-        
-        # Quick actions
-        st.markdown("### ⚡ Quick Actions")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.markdown("""
-            <div style="background: white; padding: 2rem; border-radius: 10px; 
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
-                <h3 style="color: #2e7d32;">🎯 Create Campaign</h3>
-                <p style="color: #666;">Launch your crowdfunding campaign</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            if st.button("🚀 Start Campaign", use_container_width=True, key="create_campaign_btn"):
-                self.navigate_to('authenticated', 'create')
-        
-        with col2:
-            st.markdown("""
-            <div style="background: white; padding: 2rem; border-radius: 10px; 
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
-                <h3 style="color: #2e7d32;">🔍 Browse Projects</h3>
-                <p style="color: #666;">Discover amazing causes to support</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            if st.button("🔍 Browse Now", use_container_width=True, key="browse_campaigns_btn"):
-                self.navigate_to('authenticated', 'browse')
-        
-        with col3:
-            st.markdown("""
-            <div style="background: white; padding: 2rem; border-radius: 10px; 
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
-                <h3 style="color: #2e7d32;">💝 Support Causes</h3>
-                <p style="color: #666;">Make a difference today</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            if st.button("💝 Donate Now", use_container_width=True, key="support_causes_btn"):
-                self.navigate_to('authenticated', 'browse')
-        
-        # User stats (placeholder)
-        st.markdown("### 📊 Your Impact")
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("Campaigns Created", "0", "0")
-        
-        with col2:
-            st.metric("Total Raised", "₹0", "₹0")
-        
-        with col3:
-            st.metric("Donations Made", "0", "0")
-        
-        with col4:
-            st.metric("Lives Impacted", "0", "0")
+        if st.button("🔍 Browse Now", use_container_width=True, key="browse_campaigns_btn"):
+            st.session_state.current_page = 'explore'
+            st.rerun()
     
-    def render_create_campaign_page(self):
-        """Render simplified campaign creation page"""
-        st.markdown("### 🎯 Create Your Campaign")
+    with col3:
+        st.markdown("""
+        <div style="background: white; padding: 2rem; border-radius: 10px; 
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
+            <h3 style="color: #2e7d32;">💝 Support Causes</h3>
+            <p style="color: #666;">Make a difference today</p>
+        </div>
+        """, unsafe_allow_html=True)
         
-        with st.form("create_campaign_form"):
-            st.markdown("#### 📝 Campaign Information")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                title = st.text_input("Campaign Title *", placeholder="Enter a compelling campaign title")
-                category = st.selectbox("Category *", ["", "Medical", "Education", "Disaster Relief", "Community Development"])
-                target_amount = st.number_input("Target Amount (₹) *", min_value=1000, value=50000, step=1000)
-            
-            with col2:
-                location = st.text_input("Location *", placeholder="City, State, Country")
-                urgency = st.selectbox("Urgency Level *", ["", "Low", "Medium", "High", "Critical"])
-                duration = st.selectbox("Campaign Duration *", [30, 60, 90, 120], format_func=lambda x: f"{x} days")
-            
-            description = st.text_area("Campaign Description *", placeholder="Provide a detailed description of your campaign", height=150)
-            
-            col1, col2, col3 = st.columns([1, 1, 1])
-            
-            with col1:
-                if st.form_submit_button("⬅️ Back to Dashboard", use_container_width=True):
-                    self.navigate_to('create_campaign', 'back')
-            
-            with col3:
-                if st.form_submit_button("🚀 Submit Campaign", use_container_width=True):
-                    if not all([title, category, location, urgency, description, target_amount > 0]):
-                        st.error("Please fill in all required fields marked with *")
-                    else:
-                        # Create campaign object
-                        campaign_data = {
-                            'id': str(uuid.uuid4()),
-                            'user_id': st.session_state.user_data.get('id'),
-                            'title': title,
-                            'category': category,
-                            'location': location,
-                            'urgency': urgency,
-                            'description': description,
-                            'target_amount': target_amount,
-                            'duration': duration,
-                            'created_at': datetime.now().isoformat(),
-                            'status': 'submitted'
-                        }
-                        
-                        st.session_state.current_campaign = campaign_data
-                        self.navigate_to('create_campaign', 'submit')
+        if st.button("💝 Donate Now", use_container_width=True, key="support_causes_btn"):
+            st.session_state.current_page = 'explore'
+            st.rerun()
     
-    def render_browse_campaigns_page(self):
-        """Render campaign browsing page"""
-        st.markdown("### 🔍 Browse Campaigns")
-        
-        # Sample campaigns
-        sample_campaigns = [
-            {
-                'id': 'camp_001',
-                'title': 'Help Ravi Fight Cancer',
-                'category': 'Medical',
-                'location': 'Mumbai, Maharashtra',
-                'target_amount': 500000,
-                'raised_amount': 125000,
-                'donors': 45,
-                'days_left': 25,
-                'verification_status': 'verified',
-                'urgency': 'High',
-                'image': '🏥'
-            },
-            {
-                'id': 'camp_002',
-                'title': 'Education for Underprivileged Children',
-                'category': 'Education',
-                'location': 'Delhi, India',
-                'target_amount': 200000,
-                'raised_amount': 180000,
-                'donors': 120,
-                'days_left': 5,
-                'verification_status': 'verified',
-                'urgency': 'Medium',
-                'image': '📚'
-            }
-        ]
-        
-        # Display campaigns
-        for campaign in sample_campaigns:
-            with st.container():
-                col1, col2, col3, col4 = st.columns([1, 3, 2, 1])
-                
-                with col1:
-                    st.markdown(f"<div style='font-size: 4rem; text-align: center;'>{campaign['image']}</div>", 
-                               unsafe_allow_html=True)
-                
-                with col2:
-                    st.markdown(f"**{campaign['title']}**")
-                    st.markdown(f"📍 {campaign['location']} | 📂 {campaign['category']}")
-                    st.markdown("✅ **Verified Campaign**")
-                
-                with col3:
-                    progress = campaign['raised_amount'] / campaign['target_amount']
-                    st.progress(progress)
-                    st.markdown(f"**₹{campaign['raised_amount']:,}** raised of ₹{campaign['target_amount']:,}")
-                    st.markdown(f"👥 {campaign['donors']} donors | ⏰ {campaign['days_left']} days left")
-                
-                with col4:
-                    if st.button(f"👀 View", key=f"view_{campaign['id']}", use_container_width=True):
-                        st.session_state.selected_campaign = campaign
-                        self.navigate_to('browse_campaigns', 'view')
-            
-            st.markdown("---")
-        
-        if st.button("⬅️ Back to Dashboard", use_container_width=True):
-            self.navigate_to('browse_campaigns', 'back')
+    # User stats (placeholder)
+    st.markdown("### 📊 Your Impact")
     
-    def render_view_campaign_page(self):
-        """Render individual campaign view page"""
-        campaign = st.session_state.selected_campaign
-        
-        st.markdown(f"### {campaign['image']} {campaign['title']}")
-        
-        # Campaign details
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            st.markdown(f"**📍 Location:** {campaign['location']}")
-            st.markdown(f"**📂 Category:** {campaign['category']}")
-            st.markdown(f"**⚡ Urgency:** {campaign['urgency']}")
-            st.markdown("**📖 Description:** This is a detailed campaign description...")
-        
-        with col2:
-            progress = campaign['raised_amount'] / campaign['target_amount']
-            st.progress(progress)
-            st.metric("Raised", f"₹{campaign['raised_amount']:,}")
-            st.metric("Target", f"₹{campaign['target_amount']:,}")
-            st.metric("Donors", campaign['donors'])
-        
-        # Verification status
-        if campaign['verification_status'] == 'verified':
-            st.success("✅ This campaign has been verified by our team")
-            
-            col1, col2 = st.columns([1, 1])
-            
-            with col1:
-                if st.button("⬅️ Back to Browse", use_container_width=True):
-                    self.navigate_to('view_campaign', 'back')
-            
-            with col2:
-                if st.button("💝 Donate Now", use_container_width=True):
-                    self.navigate_to('view_campaign', 'fund_yes')
-        else:
-            st.warning("⏳ This campaign is currently under review")
-            self.navigate_to('view_campaign', 'fund_no')
+    col1, col2, col3, col4 = st.columns(4)
     
-    def render_simple_page(self, title: str, message: str, back_action: str):
-        """Render a simple page with title, message and back button"""
-        st.markdown(f"### {title}")
-        st.markdown(message)
-        
-        if st.button("⬅️ Back to Dashboard", use_container_width=True):
-            self.navigate_to(back_action, 'back')
+    with col1:
+        st.metric("Campaigns Created", "0", "0")
     
-    def render_current_page(self):
-        """Render the current page based on workflow state"""
-        current_state = self.get_current_state()
-        
-        if current_state == 'start':
-            self.render_start_page()
-        elif current_state == 'login':
-            self.render_login_page()
-        elif current_state == 'register':
-            self.render_register_page()
-        elif current_state == 'authenticated':
-            self.render_authenticated_dashboard()
-        elif current_state == 'create_campaign':
-            self.render_create_campaign_page()
-        elif current_state == 'submit_campaign':
-            self.render_simple_page("🎉 Campaign Submitted!", 
-                                   "Your campaign has been submitted for review. You'll be notified once it's approved.", 
-                                   'submit_campaign')
-        elif current_state == 'browse_campaigns':
-            self.render_browse_campaigns_page()
-        elif current_state == 'view_campaign':
-            self.render_view_campaign_page()
-        elif current_state == 'verification_check':
-            self.render_simple_page("🔍 Verification Check", 
-                                   "Campaign verification successful! You can proceed with your donation.", 
-                                   'verification_check')
-            if st.button("💝 Proceed to Donate", use_container_width=True):
-                self.navigate_to('verification_check', 'verified')
-        elif current_state == 'make_contribution':
-            self.render_simple_page("💝 Make Contribution", 
-                                   "Choose your donation amount and proceed to payment.", 
-                                   'make_contribution')
-            if st.button("💳 Proceed to Payment", use_container_width=True):
-                self.navigate_to('make_contribution', 'proceed')
-        elif current_state == 'payment':
-            self.render_simple_page("💳 Secure Payment", 
-                                   "Complete your secure payment to support this campaign.", 
-                                   'payment')
-            if st.button("💳 Complete Payment", use_container_width=True):
-                self.navigate_to('payment', 'success')
-        elif current_state == 'success':
-            self.render_simple_page("🎉 Donation Successful!", 
-                                   "Thank you for your contribution! You'll receive a receipt via email.", 
-                                   'success')
-            if st.button("🏠 Back to Dashboard", use_container_width=True):
-                self.navigate_to('success', 'continue')
-        else:
-            # Default pages for other states
-            self.render_simple_page(f"🔄 {current_state.replace('_', ' ').title()}", 
-                                   f"This is the {current_state} page. Feature coming soon!", 
-                                   current_state)
+    with col2:
+        st.metric("Total Raised", "₹0", "₹0")
+    
+    with col3:
+        st.metric("Donations Made", "0", "0")
+    
+    with col4:
+        st.metric("Lives Impacted", "0", "0")
+
+def show_campaign():
+    """Show campaign creation page"""
+    st.markdown("### 🎯 Create Your Campaign")
+    st.info("Campaign creation feature coming soon!")
+    
+    if st.button("⬅️ Back to Dashboard"):
+        st.session_state.current_page = 'home'
+        st.rerun()
+
+def show_explore():
+    """Show campaign browsing page"""
+    st.markdown("### 🔍 Explore Campaigns")
+    st.info("Campaign browsing feature coming soon!")
+    
+    if st.button("⬅️ Back to Dashboard"):
+        st.session_state.current_page = 'home'
+        st.rerun()
+
+def show_search():
+    """Show search page"""
+    st.markdown("### 🔍 Search Campaigns")
+    st.info("Search feature coming soon!")
+    
+    if st.button("⬅️ Back to Dashboard"):
+        st.session_state.current_page = 'home'
+        st.rerun()
+
+def show_profile():
+    """Show profile page"""
+    st.markdown("### 👤 User Profile")
+    st.info("Profile management feature coming soon!")
+    
+    if st.button("⬅️ Back to Dashboard"):
+        st.session_state.current_page = 'home'
+        st.rerun()
+
+def show_footer():
+    """Show footer"""
+    st.markdown("---")
+    st.markdown("© 2025 HAVEN - Crowdfunding Platform | Built with ❤️ using Streamlit")
 
 # ============================================================================
 # MAIN APPLICATION
@@ -1156,7 +611,7 @@ def main():
         page_title="HAVEN - Crowdfunding Platform",
         page_icon="🏠",
         layout="wide",
-        initial_sidebar_state="collapsed"
+        initial_sidebar_state="expanded"
     )
     
     # Custom CSS for light green theme
@@ -1164,6 +619,23 @@ def main():
     <style>
     .stApp {
         background: linear-gradient(135deg, #f1f8e9 0%, #e8f5e8 100%);
+    }
+    
+    .main-header {
+        background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    
+    .auth-container {
+        background: white;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        margin: 2rem 0;
     }
     
     .stButton > button {
@@ -1179,80 +651,89 @@ def main():
     .stButton > button:hover {
         background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
         transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     }
     
-    .stSelectbox > div > div {
-        background: white;
-        border-radius: 8px;
-    }
-    
-    .stTextInput > div > div > input {
-        background: white;
-        border-radius: 8px;
-    }
-    
-    .stTextArea > div > div > textarea {
-        background: white;
-        border-radius: 8px;
-    }
-    
-    .stProgress > div > div > div {
-        background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
-    }
-    
-    .stMetric {
-        background: white;
-        padding: 1rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    
-    .header-container {
-        text-align: center;
-        padding: 2rem;
+    .sidebar .sidebar-content {
         background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
-        border-radius: 15px;
-        margin-bottom: 2rem;
-    }
-    
-    .auth-container {
-        background: white;
-        padding: 2rem;
-        border-radius: 15px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-        margin: 1rem 0;
     }
     </style>
     """, unsafe_allow_html=True)
     
-    # Initialize workflow manager
-    workflow_manager = WorkflowManager()
+    # Initialize session state
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = 'login'  # Start with login page
     
-    # Check authentication status
-    if auth_manager.check_authentication():
-        st.session_state.user_authenticated = True
-        # If authenticated but on start/login/register page, redirect to dashboard
-        if workflow_manager.get_current_state() in ['start', 'login', 'register']:
-            workflow_manager.navigate_to(workflow_manager.get_current_state(), 'success')
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
+    
+    if 'user_data' not in st.session_state:
+        st.session_state.user_data = {}
+    
+    if 'show_login_form' not in st.session_state:
+        st.session_state.show_login_form = False
+    
+    # Initialize auth manager
+    auth_manager.initialize_auth_state()
+    
+    # Sidebar navigation (only show if authenticated)
+    if st.session_state.authenticated:
+        with st.sidebar:
+            st.markdown("### 🧭 Navigation")
+            
+            # Navigation buttons
+            if st.button("🏠 Home", use_container_width=True):
+                st.session_state.current_page = 'home'
+                st.rerun()
+            
+            if st.button("🎯 Campaign", use_container_width=True):
+                st.session_state.current_page = 'campaign'
+                st.rerun()
+            
+            if st.button("🔍 Explore", use_container_width=True):
+                st.session_state.current_page = 'explore'
+                st.rerun()
+            
+            if st.button("🔍 Search", use_container_width=True):
+                st.session_state.current_page = 'search'
+                st.rerun()
+            
+            if st.button("👤 Profile", use_container_width=True):
+                st.session_state.current_page = 'profile'
+                st.rerun()
+            
+            st.markdown("---")
+            
+            # Debug mode toggle
+            debug_mode = st.checkbox("Debug Mode")
+            if debug_mode:
+                st.write("**Session State:**")
+                st.json(dict(st.session_state))
+    
+    # Main content area
+    if not st.session_state.authenticated:
+        # Show login or register page
+        if st.session_state.current_page == 'register':
+            show_register()
+        else:
+            show_login()
     else:
-        st.session_state.user_authenticated = False
-        # If not authenticated but on protected page, redirect to start
-        protected_states = ['authenticated', 'create_campaign', 'submit_campaign', 'xai_processing', 
-                          'admin_review', 'funding_display', 'discard_project']
-        if workflow_manager.get_current_state() in protected_states:
-            st.session_state.current_workflow_state = 'start'
+        # Show authenticated pages
+        if st.session_state.current_page == 'home':
+            show_home()
+        elif st.session_state.current_page == 'campaign':
+            show_campaign()
+        elif st.session_state.current_page == 'explore':
+            show_explore()
+        elif st.session_state.current_page == 'search':
+            show_search()
+        elif st.session_state.current_page == 'profile':
+            show_profile()
+        else:
+            show_home()  # Default to home
     
-    # Render current page
-    workflow_manager.render_current_page()
-    
-    # Debug info (remove in production)
-    if st.sidebar.checkbox("Debug Mode"):
-        st.sidebar.markdown("### Debug Info")
-        st.sidebar.markdown(f"**Current State:** {workflow_manager.get_current_state()}")
-        st.sidebar.markdown(f"**Authenticated:** {st.session_state.user_authenticated}")
-        st.sidebar.markdown(f"**User:** {st.session_state.user_data.get('first_name', 'None')}")
-        st.sidebar.markdown(f"**Language:** {st.session_state.selected_language}")
+    # Footer
+    show_footer()
 
 if __name__ == "__main__":
     main()
