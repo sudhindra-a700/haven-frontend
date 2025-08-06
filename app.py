@@ -1,6 +1,7 @@
 """
-HAVEN Crowdfunding Platform - Fixed Bootstrap Icons Implementation
-Resolves AttributeError and CSS display issues
+HAVEN Crowdfunding Platform - Improved Navigation with Entypo+ Icons
+- Hidden sidebar until authenticated
+- Links between sign in and register pages
 """
 
 import streamlit as st
@@ -10,91 +11,96 @@ import uuid
 from datetime import datetime, timedelta
 
 # ============================================================================
-# SIMPLIFIED BOOTSTRAP ICONS SYSTEM (Fixed)
+# ENTYPO+ ICONS SYSTEM
 # ============================================================================
 
-class BootstrapIcons:
-    """Simplified Bootstrap Icons using Unicode symbols that work reliably"""
+class EntypoIcons:
+    """Entypo+ Icons using CSS classes"""
     
     # Navigation Icons
-    HOME = "🏠"
-    CAMPAIGN = "🎯"
-    EXPLORE = "🧭"
-    SEARCH = "🔍"
-    PROFILE = "👤"
+    HOME = "entypo-home"
+    CAMPAIGN = "entypo-target"
+    EXPLORE = "entypo-compass"
+    SEARCH = "entypo-magnifying-glass"
+    PROFILE = "entypo-user"
     
     # Action Icons
-    LOGIN = "🔑"
-    LOGOUT = "🚪"
-    REGISTER = "📝"
-    UPLOAD = "📤"
-    DOWNLOAD = "📥"
-    CREATE = "➕"
-    EDIT = "✏️"
-    DELETE = "🗑️"
-    SAVE = "💾"
-    SHARE = "📤"
-    COPY = "📋"
+    LOGIN = "entypo-login"
+    LOGOUT = "entypo-log-out"
+    REGISTER = "entypo-add-user"
+    UPLOAD = "entypo-upload"
+    DOWNLOAD = "entypo-download"
+    CREATE = "entypo-plus"
+    EDIT = "entypo-edit"
+    DELETE = "entypo-trash"
+    SAVE = "entypo-check"
+    SHARE = "entypo-share"
+    COPY = "entypo-copy"
     
     # Status Icons
-    SUCCESS = "✅"
-    WARNING = "⚠️"
-    ERROR = "❌"
-    INFO = "ℹ️"
-    PENDING = "⏳"
+    SUCCESS = "entypo-check"
+    WARNING = "entypo-warning"
+    ERROR = "entypo-cross"
+    INFO = "entypo-info"
+    PENDING = "entypo-clock"
     
     # Document Icons
-    DOCUMENT = "📄"
-    CERTIFICATE = "🏆"
-    VERIFICATION = "✔️"
-    FILE_PDF = "📄"
-    FILE_IMAGE = "🖼️"
+    DOCUMENT = "entypo-document"
+    CERTIFICATE = "entypo-medal"
+    VERIFICATION = "entypo-check"
+    FILE_PDF = "entypo-document"
+    FILE_IMAGE = "entypo-image"
     
     # Social Icons
-    GOOGLE = "🇬"
-    FACEBOOK = "🇫"
+    GOOGLE = "entypo-google+"
+    FACEBOOK = "entypo-facebook"
     
     # General Icons
-    LANGUAGE = "🌐"
-    SECURITY = "🔒"
-    HEART = "❤️"
-    STAR = "⭐"
-    PLUS = "➕"
-    MINUS = "➖"
-    EMAIL = "📧"
-    PHONE = "📞"
-    LOCATION = "📍"
-    CALENDAR = "📅"
-    CLOCK = "🕐"
-    MONEY = "💰"
-    CHART = "📊"
-    GRAPH = "📈"
-    SHIELD = "🛡️"
-    BELL = "🔔"
-    BOOKMARK = "🔖"
-    TAG = "🏷️"
-    FILTER = "🔽"
-    SORT = "🔀"
-    SETTINGS = "⚙️"
-    HELP = "❓"
-    CLOSE = "❌"
-    MENU = "☰"
-    ARROW_LEFT = "←"
-    ARROW_RIGHT = "→"
-    ARROW_UP = "↑"
-    ARROW_DOWN = "↓"
-    EYE = "👁️"
-    EYE_SLASH = "🙈"
-    LOCK = "🔒"
-    UNLOCK = "🔓"
-    PERSON = "👤"
-    BUILDING = "🏢"
+    LANGUAGE = "entypo-globe"
+    SECURITY = "entypo-lock"
+    HEART = "entypo-heart"
+    STAR = "entypo-star"
+    PLUS = "entypo-plus"
+    MINUS = "entypo-minus"
+    EMAIL = "entypo-mail"
+    PHONE = "entypo-phone"
+    LOCATION = "entypo-location-pin"
+    CALENDAR = "entypo-calendar"
+    CLOCK = "entypo-clock"
+    MONEY = "entypo-credit"
+    CHART = "entypo-bar-graph"
+    GRAPH = "entypo-line-graph"
+    SHIELD = "entypo-shield"
+    BELL = "entypo-bell"
+    BOOKMARK = "entypo-bookmark"
+    TAG = "entypo-price-tag"
+    FILTER = "entypo-funnel"
+    SORT = "entypo-select-arrows"
+    SETTINGS = "entypo-cog"
+    HELP = "entypo-help"
+    CLOSE = "entypo-cross"
+    MENU = "entypo-menu"
+    ARROW_LEFT = "entypo-chevron-left"
+    ARROW_RIGHT = "entypo-chevron-right"
+    ARROW_UP = "entypo-chevron-up"
+    ARROW_DOWN = "entypo-chevron-down"
+    EYE = "entypo-eye"
+    EYE_SLASH = "entypo-eye-with-line"
+    LOCK = "entypo-lock"
+    UNLOCK = "entypo-lock-open"
+    PERSON = "entypo-user"
+    BUILDING = "entypo-home"
 
-icons = BootstrapIcons()
+icons = EntypoIcons()
 
-def get_clean_css():
-    """Get clean CSS without Bootstrap Icons dependency"""
+def get_entypo_icon(icon_class, size="16px", color="currentColor", extra_classes=""):
+    """Generate Entypo+ icon HTML"""
+    return f'<i class="{icon_class} {extra_classes}" style="font-size: {size}; color: {color};"></i>'
+
+def get_entypo_css():
+    """Get Entypo+ CSS and custom styling"""
     return """
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/entypo@2.0.0/entypo.css">
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     
@@ -102,6 +108,12 @@ def get_clean_css():
     .main {
         font-family: 'Inter', sans-serif;
     }
+    
+    /* Entypo Icon Utilities */
+    .icon-sm { font-size: 14px; }
+    .icon-md { font-size: 18px; }
+    .icon-lg { font-size: 24px; }
+    .icon-xl { font-size: 32px; }
     
     /* Navigation Styles */
     .nav-item {
@@ -183,6 +195,22 @@ def get_clean_css():
     .btn-facebook:hover {
         background: #166fe5;
         border-color: #166fe5;
+    }
+    
+    /* Link Styles */
+    .auth-link {
+        color: #4caf50;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    
+    .auth-link:hover {
+        color: #2e7d32;
+        text-decoration: underline;
     }
     
     /* Card Styles */
@@ -278,6 +306,10 @@ def get_clean_css():
         font-weight: 700;
         color: #2e7d32;
         margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
     }
     
     .welcome-subtitle {
@@ -323,23 +355,34 @@ def get_clean_css():
         line-height: 1.5;
     }
     
-    /* Icon Styles */
+    /* Icon Text Combinations */
     .icon-text {
         display: inline-flex;
         align-items: center;
         gap: 6px;
     }
     
-    .icon-large {
-        font-size: 24px;
+    /* Auth Navigation */
+    .auth-navigation {
+        text-align: center;
+        padding: 20px 0;
+        border-top: 1px solid #dee2e6;
+        margin-top: 20px;
     }
     
-    .icon-medium {
-        font-size: 18px;
-    }
-    
-    .icon-small {
-        font-size: 14px;
+    /* Entypo Icon Overrides */
+    [class*="entypo-"] {
+        font-family: 'entypo', sans-serif;
+        font-style: normal;
+        font-weight: normal;
+        speak: none;
+        display: inline-block;
+        text-decoration: inherit;
+        width: 1em;
+        text-align: center;
+        font-variant: normal;
+        text-transform: none;
+        line-height: 1em;
     }
     </style>
     """
@@ -443,7 +486,10 @@ TRANSLATIONS = {
         'success': 'Success',
         'error': 'Error',
         'warning': 'Warning',
-        'info': 'Information'
+        'info': 'Information',
+        'already_have_account': 'Already have an account?',
+        'dont_have_account': "Don't have an account?",
+        'back_to_login': 'Back to Login'
     },
     'हिंदी': {
         'welcome_title': 'HAVEN में आपका स्वागत है',
@@ -463,7 +509,10 @@ TRANSLATIONS = {
         'search': 'खोज',
         'profile': 'प्रोफ़ाइल',
         'logout': 'लॉगआउट',
-        'language': 'भाषा'
+        'language': 'भाषा',
+        'already_have_account': 'पहले से खाता है?',
+        'dont_have_account': 'खाता नहीं है?',
+        'back_to_login': 'लॉगिन पर वापस जाएं'
     },
     'தமிழ்': {
         'welcome_title': 'HAVEN இல் உங்களை வரவேற்கிறோம்',
@@ -483,7 +532,10 @@ TRANSLATIONS = {
         'search': 'தேடல்',
         'profile': 'சுயவிவரம்',
         'logout': 'வெளியேறு',
-        'language': 'மொழி'
+        'language': 'மொழி',
+        'already_have_account': 'ஏற்கனவே கணக்கு உள்ளதா?',
+        'dont_have_account': 'கணக்கு இல்லையா?',
+        'back_to_login': 'உள்நுழைவுக்கு திரும்பு'
     },
     'తెలుగు': {
         'welcome_title': 'HAVEN కి స్వాగతం',
@@ -503,7 +555,10 @@ TRANSLATIONS = {
         'search': 'వెతకండి',
         'profile': 'ప్రొఫైల్',
         'logout': 'లాగ్ అవుట్',
-        'language': 'భాష'
+        'language': 'భాష',
+        'already_have_account': 'ఇప్పటికే ఖాతా ఉందా?',
+        'dont_have_account': 'ఖాతా లేదా?',
+        'back_to_login': 'లాగిన్‌కు తిరిగి వెళ్లండి'
     }
 }
 
@@ -521,7 +576,7 @@ def render_language_selector():
     
     st.markdown(f"""
     <div class="language-selector">
-        <span style="font-size: 16px;">{icons.LANGUAGE}</span>
+        {get_entypo_icon(icons.LANGUAGE, "16px", "#4caf50")}
         <span>{get_text('language', st.session_state.language)}</span>
     </div>
     """, unsafe_allow_html=True)
@@ -539,7 +594,8 @@ def render_language_selector():
         st.rerun()
 
 def render_navigation():
-    """Render sidebar navigation with icons"""
+    """Render sidebar navigation with Entypo+ icons - ONLY if authenticated"""
+    # IMPORTANT: Only show navigation if user is authenticated
     if not st.session_state.authenticated:
         return
     
@@ -553,32 +609,32 @@ def render_navigation():
         ('profile', icons.PROFILE, get_text('profile', st.session_state.language))
     ]
     
-    for page_key, icon, label in nav_items:
+    for page_key, icon_class, label in nav_items:
         is_active = st.session_state.current_page == page_key
         
         if is_active:
             st.sidebar.markdown(f"""
             <div class="nav-item active">
-                <span style="font-size: 18px;">{icon}</span>
+                {get_entypo_icon(icon_class, "18px", "#2e7d32")}
                 <span>{label}</span>
             </div>
             """, unsafe_allow_html=True)
         else:
-            if st.sidebar.button(f"{icon} {label}", key=f"nav_{page_key}", use_container_width=True):
+            if st.sidebar.button(f"{label}", key=f"nav_{page_key}", use_container_width=True):
                 st.session_state.current_page = page_key
                 st.rerun()
     
     # Logout button
     st.sidebar.markdown("---")
-    if st.sidebar.button(f"{icons.LOGOUT} {get_text('logout', st.session_state.language)}", key="logout_btn", use_container_width=True):
+    if st.sidebar.button(f"{get_text('logout', st.session_state.language)}", key="logout_btn", use_container_width=True):
         st.session_state.authenticated = False
         st.session_state.user_data = {}
         st.session_state.current_page = 'login'
         st.rerun()
 
-def render_social_login_button(provider, icon, btn_class):
-    """Render social login button with icon"""
-    if st.button(f"{icon} Continue with {provider}", key=f"{provider.lower()}_login", use_container_width=True):
+def render_social_login_button(provider, icon_class, btn_class):
+    """Render social login button with Entypo+ icon"""
+    if st.button(f"Continue with {provider}", key=f"{provider.lower()}_login", use_container_width=True):
         user_data = oauth_login(provider)
         if user_data:
             st.session_state.authenticated = True
@@ -588,14 +644,14 @@ def render_social_login_button(provider, icon, btn_class):
             time.sleep(1)
             st.rerun()
 
-def render_document_upload_section(title, icon, required=True, help_text=""):
-    """Render document upload section with icon"""
+def render_document_upload_section(title, icon_class, required=True, help_text=""):
+    """Render document upload section with Entypo+ icon"""
     status_text = get_text('required', st.session_state.language) if required else get_text('optional', st.session_state.language)
     status_color = "#dc3545" if required else "#6c757d"
     
     st.markdown(f"""
     <div class="form-label">
-        <span style="font-size: 16px; color: #4caf50;">{icon}</span>
+        {get_entypo_icon(icon_class, "16px", "#4caf50")}
         <span>{title}</span>
         <span style="color: {status_color}; font-size: 12px;">({status_text})</span>
     </div>
@@ -614,9 +670,9 @@ def render_document_upload_section(title, icon, required=True, help_text=""):
     if uploaded_file:
         file_size = len(uploaded_file.getvalue()) / (1024 * 1024)  # Size in MB
         if file_size > 5:
-            st.error(f"{icons.ERROR} File size exceeds 5MB limit")
+            st.error(f"{get_entypo_icon(icons.ERROR, '16px')} File size exceeds 5MB limit")
         else:
-            st.success(f"{icons.SUCCESS} {uploaded_file.name} uploaded successfully ({file_size:.1f}MB)")
+            st.success(f"{get_entypo_icon(icons.SUCCESS, '16px')} {uploaded_file.name} uploaded successfully ({file_size:.1f}MB)")
     
     return uploaded_file
 
@@ -625,12 +681,12 @@ def render_document_upload_section(title, icon, required=True, help_text=""):
 # ============================================================================
 
 def render_login_page():
-    """Render login page with icons"""
+    """Render login page with Entypo+ icons and navigation links"""
     # Welcome section
     st.markdown(f"""
     <div class="welcome-section">
         <div class="welcome-title">
-            <span style="font-size: 32px; margin-right: 10px;">{icons.HOME}</span>
+            {get_entypo_icon(icons.HOME, "32px", "#2e7d32")}
             {get_text('welcome_title', st.session_state.language)}
         </div>
         <p class="welcome-subtitle">{get_text('welcome_subtitle', st.session_state.language)}</p>
@@ -643,7 +699,7 @@ def render_login_page():
     # Get Started section
     st.markdown(f"""
     <div class="header-minimal">
-        <span style="font-size: 24px; color: #4caf50;">{icons.LOGIN}</span>
+        {get_entypo_icon(icons.LOGIN, "24px", "#4caf50")}
         <h2 class="header-title">{get_text('get_started', st.session_state.language)}</h2>
     </div>
     """, unsafe_allow_html=True)
@@ -654,7 +710,7 @@ def render_login_page():
         st.markdown(f"""
         <div class="action-card">
             <div class="action-card-icon">
-                <span style="font-size: 48px;">{icons.LOGIN}</span>
+                {get_entypo_icon(icons.LOGIN, "48px", "#4caf50")}
             </div>
             <div class="action-card-title">{get_text('existing_user', st.session_state.language)}</div>
             <div class="action-card-description">Sign in to your existing account</div>
@@ -669,7 +725,7 @@ def render_login_page():
         st.markdown(f"""
         <div class="action-card">
             <div class="action-card-icon">
-                <span style="font-size: 48px;">{icons.REGISTER}</span>
+                {get_entypo_icon(icons.REGISTER, "48px", "#4caf50")}
             </div>
             <div class="action-card-title">{get_text('new_user', st.session_state.language)}</div>
             <div class="action-card-description">Create a new account to get started</div>
@@ -686,10 +742,10 @@ def render_login_page():
         render_login_form()
 
 def render_login_form():
-    """Render login form with icons"""
+    """Render login form with Entypo+ icons and navigation link"""
     st.markdown(f"""
     <div class="header-minimal">
-        <span style="font-size: 20px; color: #4caf50;">{icons.LOGIN}</span>
+        {get_entypo_icon(icons.LOGIN, "20px", "#4caf50")}
         <h3 style="margin: 0; color: #2e7d32;">{get_text('sign_in', st.session_state.language)}</h3>
     </div>
     """, unsafe_allow_html=True)
@@ -698,7 +754,7 @@ def render_login_form():
         # Email field
         st.markdown(f"""
         <div class="form-label">
-            <span style="font-size: 16px; color: #4caf50;">{icons.EMAIL}</span>
+            {get_entypo_icon(icons.EMAIL, "16px", "#4caf50")}
             <span>{get_text('email', st.session_state.language)}</span>
         </div>
         """, unsafe_allow_html=True)
@@ -707,7 +763,7 @@ def render_login_form():
         # Password field
         st.markdown(f"""
         <div class="form-label">
-            <span style="font-size: 16px; color: #4caf50;">{icons.LOCK}</span>
+            {get_entypo_icon(icons.LOCK, "16px", "#4caf50")}
             <span>{get_text('password', st.session_state.language)}</span>
         </div>
         """, unsafe_allow_html=True)
@@ -721,13 +777,13 @@ def render_login_form():
                     st.session_state.authenticated = True
                     st.session_state.user_data = user_data
                     st.session_state.current_page = 'home'
-                    st.success(f"{icons.SUCCESS} Login successful!")
+                    st.success(f"{get_entypo_icon(icons.SUCCESS, '16px')} Login successful!")
                     time.sleep(1)
                     st.rerun()
                 else:
-                    st.error(f"{icons.ERROR} Invalid credentials")
+                    st.error(f"{get_entypo_icon(icons.ERROR, '16px')} Invalid credentials")
             else:
-                st.error(f"{icons.WARNING} Please fill in all fields")
+                st.error(f"{get_entypo_icon(icons.WARNING, '16px')} Please fill in all fields")
     
     # Social login options
     st.markdown("---")
@@ -738,23 +794,57 @@ def render_login_form():
         render_social_login_button("Google", icons.GOOGLE, "btn-google")
     with col2:
         render_social_login_button("Facebook", icons.FACEBOOK, "btn-facebook")
+    
+    # Navigation link to register
+    st.markdown(f"""
+    <div class="auth-navigation">
+        <p>{get_text('dont_have_account', st.session_state.language)} 
+        <a href="#" class="auth-link" onclick="return false;">
+            {get_entypo_icon(icons.REGISTER, "14px")}
+            {get_text('create_account', st.session_state.language)}
+        </a></p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Handle register link click
+    if st.button("Create Account", key="goto_register", use_container_width=True):
+        st.session_state.current_page = 'register'
+        st.session_state.show_login_form = False
+        st.rerun()
 
 def render_register_page():
-    """Render registration page with icons"""
+    """Render registration page with Entypo+ icons and navigation link"""
     st.markdown(f"""
     <div class="welcome-section">
         <div class="welcome-title">
-            <span style="font-size: 32px; margin-right: 10px;">{icons.REGISTER}</span>
+            {get_entypo_icon(icons.REGISTER, "32px", "#2e7d32")}
             {get_text('create_account', st.session_state.language)}
         </div>
         <p class="welcome-subtitle">Help not just some people, but Help Humanity</p>
     </div>
     """, unsafe_allow_html=True)
     
+    # Navigation link back to login
+    st.markdown(f"""
+    <div style="text-align: center; margin-bottom: 20px;">
+        <p>{get_text('already_have_account', st.session_state.language)} 
+        <a href="#" class="auth-link" onclick="return false;">
+            {get_entypo_icon(icons.LOGIN, "14px")}
+            {get_text('sign_in', st.session_state.language)}
+        </a></p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Handle back to login link
+    if st.button("Back to Sign In", key="goto_login", use_container_width=True):
+        st.session_state.current_page = 'login'
+        st.session_state.show_login_form = True
+        st.rerun()
+    
     # Account type selection
     st.markdown(f"""
     <div class="header-minimal">
-        <span style="font-size: 20px; color: #4caf50;">{icons.PERSON}</span>
+        {get_entypo_icon(icons.PERSON, "20px", "#4caf50")}
         <h3 style="margin: 0; color: #2e7d32;">Account Type</h3>
     </div>
     """, unsafe_allow_html=True)
@@ -773,10 +863,10 @@ def render_register_page():
         render_organization_registration()
 
 def render_individual_registration():
-    """Render individual registration form with icons"""
+    """Render individual registration form with Entypo+ icons"""
     st.markdown(f"""
     <div class="header-minimal">
-        <span style="font-size: 20px; color: #4caf50;">{icons.PERSON}</span>
+        {get_entypo_icon(icons.PERSON, "20px", "#4caf50")}
         <h4 style="margin: 0; color: #2e7d32;">Individual Account Registration</h4>
     </div>
     """, unsafe_allow_html=True)
@@ -788,7 +878,7 @@ def render_individual_registration():
             # Full Name
             st.markdown(f"""
             <div class="form-label">
-                <span style="font-size: 16px; color: #4caf50;">{icons.PERSON}</span>
+                {get_entypo_icon(icons.PERSON, "16px", "#4caf50")}
                 <span>{get_text('full_name', st.session_state.language)} *</span>
             </div>
             """, unsafe_allow_html=True)
@@ -797,7 +887,7 @@ def render_individual_registration():
             # Email
             st.markdown(f"""
             <div class="form-label">
-                <span style="font-size: 16px; color: #4caf50;">{icons.EMAIL}</span>
+                {get_entypo_icon(icons.EMAIL, "16px", "#4caf50")}
                 <span>{get_text('email', st.session_state.language)} *</span>
             </div>
             """, unsafe_allow_html=True)
@@ -806,7 +896,7 @@ def render_individual_registration():
             # Password
             st.markdown(f"""
             <div class="form-label">
-                <span style="font-size: 16px; color: #4caf50;">{icons.LOCK}</span>
+                {get_entypo_icon(icons.LOCK, "16px", "#4caf50")}
                 <span>{get_text('password', st.session_state.language)} *</span>
             </div>
             """, unsafe_allow_html=True)
@@ -816,7 +906,7 @@ def render_individual_registration():
             # Phone
             st.markdown(f"""
             <div class="form-label">
-                <span style="font-size: 16px; color: #4caf50;">{icons.PHONE}</span>
+                {get_entypo_icon(icons.PHONE, "16px", "#4caf50")}
                 <span>{get_text('phone', st.session_state.language)} *</span>
             </div>
             """, unsafe_allow_html=True)
@@ -825,7 +915,7 @@ def render_individual_registration():
             # Confirm Password
             st.markdown(f"""
             <div class="form-label">
-                <span style="font-size: 16px; color: #4caf50;">{icons.LOCK}</span>
+                {get_entypo_icon(icons.LOCK, "16px", "#4caf50")}
                 <span>{get_text('confirm_password', st.session_state.language)} *</span>
             </div>
             """, unsafe_allow_html=True)
@@ -835,7 +925,7 @@ def render_individual_registration():
         st.markdown("---")
         st.markdown(f"""
         <div class="header-minimal">
-            <span style="font-size: 20px; color: #4caf50;">{icons.VERIFICATION}</span>
+            {get_entypo_icon(icons.VERIFICATION, "20px", "#4caf50")}
             <h4 style="margin: 0; color: #2e7d32;">Document Verification</h4>
         </div>
         """, unsafe_allow_html=True)
@@ -874,9 +964,9 @@ def render_individual_registration():
         
         # Consent checkboxes
         st.markdown("---")
-        terms_accepted = st.checkbox(f"{icons.VERIFICATION} {get_text('terms_conditions', st.session_state.language)}")
-        kyc_consent = st.checkbox(f"{icons.SHIELD} {get_text('kyc_consent', st.session_state.language)}")
-        data_consent = st.checkbox(f"{icons.SECURITY} {get_text('data_processing', st.session_state.language)}")
+        terms_accepted = st.checkbox(f"{get_entypo_icon(icons.VERIFICATION, '16px')} {get_text('terms_conditions', st.session_state.language)}")
+        kyc_consent = st.checkbox(f"{get_entypo_icon(icons.SHIELD, '16px')} {get_text('kyc_consent', st.session_state.language)}")
+        data_consent = st.checkbox(f"{get_entypo_icon(icons.SECURITY, '16px')} {get_text('data_processing', st.session_state.language)}")
         
         # Submit button
         if st.form_submit_button(get_text('register', st.session_state.language), use_container_width=True):
@@ -897,19 +987,19 @@ def render_individual_registration():
                     st.session_state.authenticated = True
                     st.session_state.user_data = user_data
                     st.session_state.current_page = 'home'
-                    st.success(f"{icons.SUCCESS} Registration successful! Your documents are under review.")
+                    st.success(f"{get_entypo_icon(icons.SUCCESS, '16px')} Registration successful! Your documents are under review.")
                     time.sleep(2)
                     st.rerun()
                 else:
-                    st.error(f"{icons.ERROR} Passwords do not match")
+                    st.error(f"{get_entypo_icon(icons.ERROR, '16px')} Passwords do not match")
             else:
-                st.error(f"{icons.WARNING} Please fill in all required fields and upload required documents")
+                st.error(f"{get_entypo_icon(icons.WARNING, '16px')} Please fill in all required fields and upload required documents")
 
 def render_organization_registration():
-    """Render organization registration form with icons"""
+    """Render organization registration form with Entypo+ icons"""
     st.markdown(f"""
     <div class="header-minimal">
-        <span style="font-size: 20px; color: #4caf50;">{icons.BUILDING}</span>
+        {get_entypo_icon(icons.BUILDING, "20px", "#4caf50")}
         <h4 style="margin: 0; color: #2e7d32;">Organization Account Registration</h4>
     </div>
     """, unsafe_allow_html=True)
@@ -921,7 +1011,7 @@ def render_organization_registration():
             # Organization Name
             st.markdown(f"""
             <div class="form-label">
-                <span style="font-size: 16px; color: #4caf50;">{icons.BUILDING}</span>
+                {get_entypo_icon(icons.BUILDING, "16px", "#4caf50")}
                 <span>{get_text('organization_name', st.session_state.language)} *</span>
             </div>
             """, unsafe_allow_html=True)
@@ -930,7 +1020,7 @@ def render_organization_registration():
             # Organization Type
             st.markdown(f"""
             <div class="form-label">
-                <span style="font-size: 16px; color: #4caf50;">{icons.TAG}</span>
+                {get_entypo_icon(icons.TAG, "16px", "#4caf50")}
                 <span>{get_text('organization_type', st.session_state.language)} *</span>
             </div>
             """, unsafe_allow_html=True)
@@ -939,7 +1029,7 @@ def render_organization_registration():
             # Contact Email
             st.markdown(f"""
             <div class="form-label">
-                <span style="font-size: 16px; color: #4caf50;">{icons.EMAIL}</span>
+                {get_entypo_icon(icons.EMAIL, "16px", "#4caf50")}
                 <span>{get_text('email', st.session_state.language)} *</span>
             </div>
             """, unsafe_allow_html=True)
@@ -949,7 +1039,7 @@ def render_organization_registration():
             # Registration Number
             st.markdown(f"""
             <div class="form-label">
-                <span style="font-size: 16px; color: #4caf50;">{icons.CERTIFICATE}</span>
+                {get_entypo_icon(icons.CERTIFICATE, "16px", "#4caf50")}
                 <span>{get_text('registration_number', st.session_state.language)}</span>
             </div>
             """, unsafe_allow_html=True)
@@ -958,7 +1048,7 @@ def render_organization_registration():
             # Contact Phone
             st.markdown(f"""
             <div class="form-label">
-                <span style="font-size: 16px; color: #4caf50;">{icons.PHONE}</span>
+                {get_entypo_icon(icons.PHONE, "16px", "#4caf50")}
                 <span>{get_text('phone', st.session_state.language)} *</span>
             </div>
             """, unsafe_allow_html=True)
@@ -967,7 +1057,7 @@ def render_organization_registration():
             # Password
             st.markdown(f"""
             <div class="form-label">
-                <span style="font-size: 16px; color: #4caf50;">{icons.LOCK}</span>
+                {get_entypo_icon(icons.LOCK, "16px", "#4caf50")}
                 <span>{get_text('password', st.session_state.language)} *</span>
             </div>
             """, unsafe_allow_html=True)
@@ -976,7 +1066,7 @@ def render_organization_registration():
         # Description
         st.markdown(f"""
         <div class="form-label">
-            <span style="font-size: 16px; color: #4caf50;">{icons.DOCUMENT}</span>
+            {get_entypo_icon(icons.DOCUMENT, "16px", "#4caf50")}
             <span>{get_text('description', st.session_state.language)} *</span>
         </div>
         """, unsafe_allow_html=True)
@@ -986,7 +1076,7 @@ def render_organization_registration():
         st.markdown("---")
         st.markdown(f"""
         <div class="header-minimal">
-            <span style="font-size: 20px; color: #4caf50;">{icons.VERIFICATION}</span>
+            {get_entypo_icon(icons.VERIFICATION, "20px", "#4caf50")}
             <h4 style="margin: 0; color: #2e7d32;">Organization Documents</h4>
         </div>
         """, unsafe_allow_html=True)
@@ -1039,9 +1129,9 @@ def render_organization_registration():
         
         # Consent checkboxes
         st.markdown("---")
-        terms_accepted = st.checkbox(f"{icons.VERIFICATION} {get_text('terms_conditions', st.session_state.language)}")
-        kyc_consent = st.checkbox(f"{icons.SHIELD} {get_text('kyc_consent', st.session_state.language)}")
-        data_consent = st.checkbox(f"{icons.SECURITY} {get_text('data_processing', st.session_state.language)}")
+        terms_accepted = st.checkbox(f"{get_entypo_icon(icons.VERIFICATION, '16px')} {get_text('terms_conditions', st.session_state.language)}")
+        kyc_consent = st.checkbox(f"{get_entypo_icon(icons.SHIELD, '16px')} {get_text('kyc_consent', st.session_state.language)}")
+        data_consent = st.checkbox(f"{get_entypo_icon(icons.SECURITY, '16px')} {get_text('data_processing', st.session_state.language)}")
         
         # Submit button
         if st.form_submit_button(get_text('register', st.session_state.language), use_container_width=True):
@@ -1063,14 +1153,14 @@ def render_organization_registration():
                 st.session_state.authenticated = True
                 st.session_state.user_data = user_data
                 st.session_state.current_page = 'home'
-                st.success(f"{icons.SUCCESS} Organization registration successful! Your documents are under review.")
+                st.success(f"{get_entypo_icon(icons.SUCCESS, '16px')} Organization registration successful! Your documents are under review.")
                 time.sleep(2)
                 st.rerun()
             else:
-                st.error(f"{icons.WARNING} Please fill in all required fields and upload required documents")
+                st.error(f"{get_entypo_icon(icons.WARNING, '16px')} Please fill in all required fields and upload required documents")
 
 def render_home_page():
-    """Render home dashboard with icons"""
+    """Render home dashboard with Entypo+ icons"""
     user_data = st.session_state.user_data
     
     # Welcome header
@@ -1080,7 +1170,7 @@ def render_home_page():
     st.markdown(f"""
     <div class="welcome-section">
         <div class="welcome-title">
-            <span style="font-size: 32px; margin-right: 10px;">{icons.HOME}</span>
+            {get_entypo_icon(icons.HOME, "32px", "#2e7d32")}
             Welcome back, {display_name}!
         </div>
         <p class="welcome-subtitle">Your impact dashboard and quick actions</p>
@@ -1090,7 +1180,7 @@ def render_home_page():
     # Quick actions
     st.markdown(f"""
     <div class="header-minimal">
-        <span style="font-size: 20px; color: #4caf50;">⚡</span>
+        {get_entypo_icon("entypo-flash", "20px", "#4caf50")}
         <h3 style="margin: 0; color: #2e7d32;">Quick Actions</h3>
     </div>
     """, unsafe_allow_html=True)
@@ -1101,7 +1191,7 @@ def render_home_page():
         st.markdown(f"""
         <div class="action-card">
             <div class="action-card-icon">
-                <span style="font-size: 48px;">{icons.CAMPAIGN}</span>
+                {get_entypo_icon(icons.CAMPAIGN, "48px", "#4caf50")}
             </div>
             <div class="action-card-title">Create Campaign</div>
             <div class="action-card-description">Start a new fundraising campaign</div>
@@ -1116,7 +1206,7 @@ def render_home_page():
         st.markdown(f"""
         <div class="action-card">
             <div class="action-card-icon">
-                <span style="font-size: 48px;">{icons.EXPLORE}</span>
+                {get_entypo_icon(icons.EXPLORE, "48px", "#4caf50")}
             </div>
             <div class="action-card-title">Browse Campaigns</div>
             <div class="action-card-description">Discover causes to support</div>
@@ -1131,7 +1221,7 @@ def render_home_page():
         st.markdown(f"""
         <div class="action-card">
             <div class="action-card-icon">
-                <span style="font-size: 48px;">{icons.HEART}</span>
+                {get_entypo_icon(icons.HEART, "48px", "#4caf50")}
             </div>
             <div class="action-card-title">Make Donation</div>
             <div class="action-card-description">Support a cause directly</div>
@@ -1146,7 +1236,7 @@ def render_home_page():
     st.markdown("---")
     st.markdown(f"""
     <div class="header-minimal">
-        <span style="font-size: 20px; color: #4caf50;">{icons.CHART}</span>
+        {get_entypo_icon(icons.CHART, "20px", "#4caf50")}
         <h3 style="margin: 0; color: #2e7d32;">Your Impact</h3>
     </div>
     """, unsafe_allow_html=True)
@@ -1155,34 +1245,34 @@ def render_home_page():
     
     with col1:
         st.metric(
-            label=f"{icons.CAMPAIGN} Campaigns Created",
+            label="Campaigns Created",
             value="0",
             delta="Start your first campaign"
         )
     
     with col2:
         st.metric(
-            label=f"{icons.MONEY} Total Raised",
+            label="Total Raised",
             value="₹0",
             delta="Begin fundraising"
         )
     
     with col3:
         st.metric(
-            label=f"{icons.HEART} Donations Made",
+            label="Donations Made",
             value="0",
             delta="Support a cause"
         )
     
     with col4:
         st.metric(
-            label=f"{icons.STAR} Impact Score",
+            label="Impact Score",
             value="0",
             delta="Build your reputation"
         )
 
 def render_other_pages():
-    """Render placeholder pages with icons"""
+    """Render placeholder pages with Entypo+ icons"""
     page_configs = {
         'campaign': {
             'icon': icons.CAMPAIGN,
@@ -1212,14 +1302,14 @@ def render_other_pages():
     st.markdown(f"""
     <div class="welcome-section">
         <div class="welcome-title">
-            <span style="font-size: 32px; margin-right: 10px;">{config.get('icon', icons.INFO)}</span>
+            {get_entypo_icon(config.get('icon', icons.INFO), "32px", "#2e7d32")}
             {config.get('title', 'Page')}
         </div>
         <p class="welcome-subtitle">{config.get('description', 'Page description')}</p>
     </div>
     """, unsafe_allow_html=True)
     
-    st.info(f"{icons.INFO} This page is under development. Full functionality will be available soon.")
+    st.info(f"{get_entypo_icon(icons.INFO, '16px')} This page is under development. Full functionality will be available soon.")
 
 # ============================================================================
 # MAIN APPLICATION
@@ -1227,21 +1317,23 @@ def render_other_pages():
 
 def main():
     """Main application function"""
-    # Page configuration
+    # Page configuration - IMPORTANT: Set sidebar to collapsed for unauthenticated users
+    sidebar_state = "expanded" if st.session_state.get('authenticated', False) else "collapsed"
+    
     st.set_page_config(
         page_title="HAVEN - Crowdfunding Platform",
         page_icon="🏠",
         layout="wide",
-        initial_sidebar_state="expanded"
+        initial_sidebar_state=sidebar_state
     )
     
-    # Load clean CSS
-    st.markdown(get_clean_css(), unsafe_allow_html=True)
+    # Load Entypo+ CSS
+    st.markdown(get_entypo_css(), unsafe_allow_html=True)
     
     # Initialize session state
     initialize_session_state()
     
-    # Render navigation (only if authenticated)
+    # Render navigation (ONLY if authenticated)
     render_navigation()
     
     # Main content area
