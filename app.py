@@ -1,6 +1,6 @@
 """
-HAVEN Crowdfunding Platform - Completely Clean Version
-No HTML markup - Pure Streamlit components only
+HAVEN Crowdfunding Platform - True Bootstrap Icons Implementation
+Professional minimalist design with actual Bootstrap Icons
 """
 
 import streamlit as st
@@ -8,6 +8,331 @@ import requests
 import time
 import uuid
 from datetime import datetime, timedelta
+
+# ============================================================================
+# BOOTSTRAP ICONS SYSTEM (Actual Bootstrap Icons)
+# ============================================================================
+
+class BootstrapIcons:
+    """True Bootstrap Icons using actual Bootstrap Icons font"""
+    
+    # Navigation Icons
+    HOME = "house"
+    CAMPAIGN = "target"
+    EXPLORE = "compass"
+    SEARCH = "search"
+    PROFILE = "person"
+    
+    # Action Icons
+    LOGIN = "box-arrow-in-right"
+    LOGOUT = "box-arrow-right"
+    REGISTER = "person-plus"
+    UPLOAD = "upload"
+    DOWNLOAD = "download"
+    CREATE = "plus-circle"
+    EDIT = "pencil"
+    DELETE = "trash"
+    SAVE = "check-circle"
+    SHARE = "share"
+    COPY = "clipboard"
+    
+    # Status Icons
+    SUCCESS = "check-circle-fill"
+    WARNING = "exclamation-triangle-fill"
+    ERROR = "x-circle-fill"
+    INFO = "info-circle-fill"
+    PENDING = "clock"
+    
+    # Document Icons
+    DOCUMENT = "file-text"
+    CERTIFICATE = "award"
+    VERIFICATION = "patch-check"
+    FILE_PDF = "file-pdf"
+    FILE_IMAGE = "file-image"
+    
+    # Social Icons
+    GOOGLE = "google"
+    FACEBOOK = "facebook"
+    
+    # General Icons
+    LANGUAGE = "globe"
+    SECURITY = "shield-lock"
+    HEART = "heart"
+    STAR = "star"
+    PLUS = "plus"
+    MINUS = "dash"
+    EMAIL = "envelope"
+    PHONE = "telephone"
+    LOCATION = "geo-alt"
+    CALENDAR = "calendar3"
+    CLOCK = "clock"
+    MONEY = "currency-dollar"
+    CHART = "bar-chart"
+    GRAPH = "graph-up"
+    SHIELD = "shield-check"
+    BELL = "bell"
+    BOOKMARK = "bookmark"
+    TAG = "tag"
+    FILTER = "funnel"
+    SORT = "sort-alpha-down"
+    SETTINGS = "gear"
+    HELP = "question-circle"
+    CLOSE = "x"
+    MENU = "list"
+    ARROW_LEFT = "arrow-left"
+    ARROW_RIGHT = "arrow-right"
+    ARROW_UP = "arrow-up"
+    ARROW_DOWN = "arrow-down"
+    EYE = "eye"
+    EYE_SLASH = "eye-slash"
+    LOCK = "lock"
+    UNLOCK = "unlock"
+
+icons = BootstrapIcons()
+
+def get_bootstrap_icon(icon_name, size="16", color="currentColor", extra_classes=""):
+    """Generate Bootstrap icon HTML"""
+    return f'<i class="bi bi-{icon_name} {extra_classes}" style="font-size: {size}px; color: {color};"></i>'
+
+def get_bootstrap_css():
+    """Get Bootstrap Icons CSS and custom styling"""
+    return """
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    /* Global Styles */
+    .main {
+        font-family: 'Inter', sans-serif;
+    }
+    
+    /* Bootstrap Icon Utilities */
+    .icon-sm { font-size: 14px; }
+    .icon-md { font-size: 18px; }
+    .icon-lg { font-size: 24px; }
+    .icon-xl { font-size: 32px; }
+    
+    /* Navigation Styles */
+    .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        margin-bottom: 4px;
+        text-decoration: none;
+        color: #495057;
+        font-weight: 500;
+    }
+    
+    .nav-item:hover {
+        background: #f8f9fa;
+        color: #2e7d32;
+    }
+    
+    .nav-item.active {
+        background: #e8f5e8;
+        color: #2e7d32;
+        border-left: 3px solid #4caf50;
+    }
+    
+    /* Button Styles */
+    .btn-minimal {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        background: white;
+        color: #495057;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+    
+    .btn-minimal:hover {
+        background: #f8f9fa;
+        border-color: #adb5bd;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .btn-primary {
+        background: #4caf50;
+        border-color: #4caf50;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: #45a049;
+        border-color: #45a049;
+    }
+    
+    /* Social Login Buttons */
+    .btn-google {
+        background: #4285f4;
+        border-color: #4285f4;
+        color: white;
+    }
+    
+    .btn-google:hover {
+        background: #3367d6;
+        border-color: #3367d6;
+    }
+    
+    .btn-facebook {
+        background: #1877f2;
+        border-color: #1877f2;
+        color: white;
+    }
+    
+    .btn-facebook:hover {
+        background: #166fe5;
+        border-color: #166fe5;
+    }
+    
+    /* Card Styles */
+    .card-minimal {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        transition: all 0.2s ease;
+    }
+    
+    .card-minimal:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+    }
+    
+    /* Form Styles */
+    .form-group {
+        margin-bottom: 16px;
+    }
+    
+    .form-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 6px;
+    }
+    
+    /* Status Indicators */
+    .status-success { color: #28a745; }
+    .status-warning { color: #ffc107; }
+    .status-error { color: #dc3545; }
+    .status-info { color: #17a2b8; }
+    
+    /* Document Upload Styles */
+    .upload-area {
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+        background: #f8f9fa;
+        transition: all 0.2s ease;
+    }
+    
+    .upload-area:hover {
+        border-color: #4caf50;
+        background: #e8f5e8;
+    }
+    
+    /* Language Selector */
+    .language-selector {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        background: white;
+        font-size: 14px;
+    }
+    
+    /* Header Styles */
+    .header-minimal {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 0;
+        border-bottom: 1px solid #dee2e6;
+        margin-bottom: 20px;
+    }
+    
+    .header-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: #2e7d32;
+        margin: 0;
+    }
+    
+    /* Welcome Section */
+    .welcome-section {
+        text-align: center;
+        padding: 40px 20px;
+        background: linear-gradient(135deg, #e8f5e8 0%, #f1f8e9 100%);
+        border-radius: 12px;
+        margin-bottom: 30px;
+    }
+    
+    .welcome-title {
+        font-size: 32px;
+        font-weight: 700;
+        color: #2e7d32;
+        margin-bottom: 8px;
+    }
+    
+    .welcome-subtitle {
+        font-size: 16px;
+        color: #4a5568;
+        margin-bottom: 0;
+    }
+    
+    /* Action Cards */
+    .action-card {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 12px;
+        padding: 24px;
+        text-align: center;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        height: 100%;
+    }
+    
+    .action-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        border-color: #4caf50;
+    }
+    
+    .action-card-icon {
+        font-size: 48px;
+        color: #4caf50;
+        margin-bottom: 16px;
+    }
+    
+    .action-card-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 8px;
+    }
+    
+    .action-card-description {
+        font-size: 14px;
+        color: #718096;
+        line-height: 1.5;
+    }
+    </style>
+    """
 
 # ============================================================================
 # AUTHENTICATION UTILITIES
@@ -24,676 +349,881 @@ def initialize_session_state():
     if 'user_data' not in st.session_state:
         st.session_state.user_data = {}
     
-    if 'show_login_form' not in st.session_state:
-        st.session_state.show_login_form = False
+    if 'language' not in st.session_state:
+        st.session_state.language = 'English'
 
-def login_user(email, password):
-    """Simple login function"""
+def authenticate_user(email, password):
+    """Simulate user authentication"""
+    # Demo authentication - in production, this would validate against a database
     if email and password:
-        # Demo login - always works for testing
-        user_data = {
-            'id': 'demo_user',
+        return {
+            'id': str(uuid.uuid4()),
             'email': email,
-            'name': email.split('@')[0],
+            'first_name': email.split('@')[0].title(),
+            'account_type': 'individual',
             'verified': True,
-            'account_type': 'individual'
+            'login_time': datetime.now()
         }
-        
-        st.session_state.authenticated = True
-        st.session_state.user_data = user_data
-        return True, user_data
-    
-    return False, "Please enter both email and password"
+    return None
 
-def register_user(user_data):
-    """Simple registration function"""
-    # Demo registration - always works for testing
-    demo_user = {
-        'id': f'user_{int(time.time())}',
-        'email': user_data['email'],
-        'name': user_data.get('full_name', user_data.get('org_name', 'User')),
-        'account_type': user_data.get('account_type', 'individual'),
-        'verified': False,
-        'verification_status': 'pending'
+def oauth_login(provider):
+    """Simulate OAuth login"""
+    # Demo OAuth - in production, this would handle actual OAuth flow
+    return {
+        'id': str(uuid.uuid4()),
+        'email': f'user@{provider.lower()}.com',
+        'first_name': f'{provider} User',
+        'account_type': 'individual',
+        'verified': True,
+        'oauth_provider': provider,
+        'login_time': datetime.now()
     }
-    
-    st.session_state.authenticated = True
-    st.session_state.user_data = demo_user
-    return True, demo_user
-
-def logout_user():
-    """Logout current user"""
-    st.session_state.authenticated = False
-    st.session_state.user_data = {}
-    st.session_state.current_page = 'login'
 
 # ============================================================================
-# NAVIGATION UTILITIES
+# TRANSLATION SYSTEM
 # ============================================================================
 
-def render_sidebar_navigation():
-    """Render sidebar navigation"""
-    st.sidebar.title("🧭 Navigation")
-    
-    current_page = st.session_state.get('current_page', 'home')
-    
-    # Navigation buttons
-    if current_page == 'home':
-        st.sidebar.success("🏠 Home (Current)")
-    else:
-        if st.sidebar.button("🏠 Home", use_container_width=True):
-            st.session_state.current_page = 'home'
-            st.rerun()
-    
-    if current_page == 'campaign':
-        st.sidebar.success("🎯 Campaign (Current)")
-    else:
-        if st.sidebar.button("🎯 Campaign", use_container_width=True):
-            st.session_state.current_page = 'campaign'
-            st.rerun()
-    
-    if current_page == 'explore':
-        st.sidebar.success("🔍 Explore (Current)")
-    else:
-        if st.sidebar.button("🔍 Explore", use_container_width=True):
-            st.session_state.current_page = 'explore'
-            st.rerun()
-    
-    if current_page == 'search':
-        st.sidebar.success("🔎 Search (Current)")
-    else:
-        if st.sidebar.button("🔎 Search", use_container_width=True):
-            st.session_state.current_page = 'search'
-            st.rerun()
-    
-    if current_page == 'profile':
-        st.sidebar.success("👤 Profile (Current)")
-    else:
-        if st.sidebar.button("👤 Profile", use_container_width=True):
-            st.session_state.current_page = 'profile'
-            st.rerun()
+TRANSLATIONS = {
+    'English': {
+        'welcome_title': 'Welcome to HAVEN',
+        'welcome_subtitle': 'Empowering communities to support causes that matter',
+        'get_started': 'Get Started',
+        'existing_user': 'Existing User',
+        'new_user': 'New User',
+        'sign_in': 'Sign In',
+        'create_account': 'Create Account',
+        'email': 'Email',
+        'password': 'Password',
+        'login': 'Login',
+        'register': 'Register',
+        'home': 'Home',
+        'campaign': 'Campaign',
+        'explore': 'Explore',
+        'search': 'Search',
+        'profile': 'Profile',
+        'logout': 'Logout',
+        'language': 'Language',
+        'individual': 'Individual',
+        'organization': 'Organization',
+        'full_name': 'Full Name',
+        'phone': 'Phone Number',
+        'confirm_password': 'Confirm Password',
+        'organization_name': 'Organization Name',
+        'organization_type': 'Organization Type',
+        'registration_number': 'Registration Number',
+        'description': 'Description',
+        'pan_card': 'PAN Card',
+        'aadhaar_card': 'Aadhaar Card',
+        'bank_statement': 'Bank Statement',
+        'address_proof': 'Address Proof',
+        'registration_certificate': 'Registration Certificate',
+        'tax_exemption': 'Tax Exemption Certificate',
+        'financial_statements': 'Financial Statements',
+        'board_resolution': 'Board Resolution',
+        'fcra_certificate': 'FCRA Certificate',
+        'upload_document': 'Upload Document',
+        'required': 'Required',
+        'optional': 'Optional',
+        'terms_conditions': 'I agree to the Terms and Conditions',
+        'kyc_consent': 'I consent to KYC verification',
+        'data_processing': 'I agree to data processing',
+        'submit': 'Submit',
+        'cancel': 'Cancel',
+        'success': 'Success',
+        'error': 'Error',
+        'warning': 'Warning',
+        'info': 'Information'
+    },
+    'हिंदी': {
+        'welcome_title': 'HAVEN में आपका स्वागत है',
+        'welcome_subtitle': 'समुदायों को महत्वपूर्ण कारणों का समर्थन करने के लिए सशक्त बनाना',
+        'get_started': 'शुरू करें',
+        'existing_user': 'मौजूदा उपयोगकर्ता',
+        'new_user': 'नया उपयोगकर्ता',
+        'sign_in': 'साइन इन करें',
+        'create_account': 'खाता बनाएं',
+        'email': 'ईमेल',
+        'password': 'पासवर्ड',
+        'login': 'लॉगिन',
+        'register': 'पंजीकरण',
+        'home': 'होम',
+        'campaign': 'अभियान',
+        'explore': 'खोजें',
+        'search': 'खोज',
+        'profile': 'प्रोफ़ाइल',
+        'logout': 'लॉगआउट',
+        'language': 'भाषा'
+    },
+    'தமிழ்': {
+        'welcome_title': 'HAVEN இல் உங்களை வரவேற்கிறோம்',
+        'welcome_subtitle': 'முக்கியமான காரணங்களை ஆதரிக்க சமூகங்களை அதிகாரப்படுத்துதல்',
+        'get_started': 'தொடங்குங்கள்',
+        'existing_user': 'ஏற்கனவே உள்ள பயனர்',
+        'new_user': 'புதிய பயனர்',
+        'sign_in': 'உள்நுழைக',
+        'create_account': 'கணக்கை உருவாக்கவும்',
+        'email': 'மின்னஞ்சல்',
+        'password': 'கடவுச்சொல்',
+        'login': 'உள்நுழைக',
+        'register': 'பதிவு செய்யவும்',
+        'home': 'முகப்பு',
+        'campaign': 'பிரச்சாரம்',
+        'explore': 'ஆராயுங்கள்',
+        'search': 'தேடல்',
+        'profile': 'சுயவிவரம்',
+        'logout': 'வெளியேறு',
+        'language': 'மொழி'
+    },
+    'తెలుగు': {
+        'welcome_title': 'HAVEN కి స్వాగతం',
+        'welcome_subtitle': 'ముఖ్యమైన కారణాలకు మద్దతు ఇవ్వడానికి కమ్యూనిటీలను శక్తివంతం చేయడం',
+        'get_started': 'ప్రారంభించండి',
+        'existing_user': 'ఇప్పటికే ఉన్న వినియోగదారు',
+        'new_user': 'కొత్త వినియోగదారు',
+        'sign_in': 'సైన్ ఇన్ చేయండి',
+        'create_account': 'ఖాతా సృష్టించండి',
+        'email': 'ఇమెయిల్',
+        'password': 'పాస్‌వర్డ్',
+        'login': 'లాగిన్',
+        'register': 'నమోదు',
+        'home': 'హోమ్',
+        'campaign': 'ప్రచారం',
+        'explore': 'అన్వేషించండి',
+        'search': 'వెతకండి',
+        'profile': 'ప్రొఫైల్',
+        'logout': 'లాగ్ అవుట్',
+        'language': 'భాష'
+    }
+}
+
+def get_text(key, language='English'):
+    """Get translated text"""
+    return TRANSLATIONS.get(language, TRANSLATIONS['English']).get(key, key)
 
 # ============================================================================
-# PAGE FUNCTIONS
+# UI COMPONENTS
 # ============================================================================
 
-def show_login():
-    """Show login page - completely clean version"""
-    # Simple header
-    st.title("🏠 Welcome to HAVEN")
-    st.subheader("Your Trusted Crowdfunding Platform")
-    st.write("*Empowering communities to support causes that matter*")
+def render_language_selector():
+    """Render language selector with globe icon"""
+    languages = ['English', 'हिंदी', 'தமிழ்', 'తెలుగు']
     
-    st.divider()
+    st.markdown(f"""
+    <div class="language-selector">
+        {get_bootstrap_icon(icons.LANGUAGE, "16", "#4caf50")}
+        <span>{get_text('language', st.session_state.language)}</span>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Language selector
-    st.subheader("🌐 Language")
-    language = st.selectbox(
-        "Select Language",
-        ["English", "हिंदी", "தமிழ்", "తెలుగు"],
-        index=0,
+    selected_language = st.selectbox(
+        "",
+        languages,
+        index=languages.index(st.session_state.language),
+        key="language_selector",
         label_visibility="collapsed"
     )
     
-    st.divider()
+    if selected_language != st.session_state.language:
+        st.session_state.language = selected_language
+        st.rerun()
+
+def render_navigation():
+    """Render sidebar navigation with Bootstrap icons"""
+    if not st.session_state.authenticated:
+        return
+    
+    st.sidebar.markdown("### Navigation")
+    
+    nav_items = [
+        ('home', icons.HOME, get_text('home', st.session_state.language)),
+        ('campaign', icons.CAMPAIGN, get_text('campaign', st.session_state.language)),
+        ('explore', icons.EXPLORE, get_text('explore', st.session_state.language)),
+        ('search', icons.SEARCH, get_text('search', st.session_state.language)),
+        ('profile', icons.PROFILE, get_text('profile', st.session_state.language))
+    ]
+    
+    for page_key, icon_name, label in nav_items:
+        is_active = st.session_state.current_page == page_key
+        
+        if is_active:
+            st.sidebar.markdown(f"""
+            <div class="nav-item active">
+                {get_bootstrap_icon(icon_name, "18", "#2e7d32")}
+                <span>{label}</span>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            if st.sidebar.button(f"{label}", key=f"nav_{page_key}", use_container_width=True):
+                st.session_state.current_page = page_key
+                st.rerun()
+    
+    # Logout button
+    st.sidebar.markdown("---")
+    if st.sidebar.button(f"{get_text('logout', st.session_state.language)}", key="logout_btn", use_container_width=True):
+        st.session_state.authenticated = False
+        st.session_state.user_data = {}
+        st.session_state.current_page = 'login'
+        st.rerun()
+
+def render_social_login_button(provider, icon_name, btn_class):
+    """Render social login button with Bootstrap icon"""
+    button_html = f"""
+    <div class="btn-minimal {btn_class}" style="width: 100%; justify-content: center; margin-bottom: 8px;">
+        {get_bootstrap_icon(icon_name, "18")}
+        <span>Continue with {provider}</span>
+    </div>
+    """
+    
+    if st.button(f"Continue with {provider}", key=f"{provider.lower()}_login", use_container_width=True):
+        user_data = oauth_login(provider)
+        if user_data:
+            st.session_state.authenticated = True
+            st.session_state.user_data = user_data
+            st.session_state.current_page = 'home'
+            st.success(f"Successfully logged in with {provider}!")
+            time.sleep(1)
+            st.rerun()
+
+def render_document_upload_section(title, icon_name, required=True, help_text=""):
+    """Render document upload section with Bootstrap icon"""
+    status_text = get_text('required', st.session_state.language) if required else get_text('optional', st.session_state.language)
+    status_color = "#dc3545" if required else "#6c757d"
+    
+    st.markdown(f"""
+    <div class="form-label">
+        {get_bootstrap_icon(icon_name, "16", "#4caf50")}
+        <span>{title}</span>
+        <span style="color: {status_color}; font-size: 12px;">({status_text})</span>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if help_text:
+        st.markdown(f"<small style='color: #6c757d;'>{help_text}</small>", unsafe_allow_html=True)
+    
+    uploaded_file = st.file_uploader(
+        "",
+        type=['pdf', 'jpg', 'jpeg', 'png'],
+        key=f"upload_{title.lower().replace(' ', '_')}",
+        label_visibility="collapsed"
+    )
+    
+    if uploaded_file:
+        file_size = len(uploaded_file.getvalue()) / (1024 * 1024)  # Size in MB
+        if file_size > 5:
+            st.error(f"{get_bootstrap_icon(icons.ERROR, '16')} File size exceeds 5MB limit")
+        else:
+            st.success(f"{get_bootstrap_icon(icons.SUCCESS, '16')} {uploaded_file.name} uploaded successfully ({file_size:.1f}MB)")
+    
+    return uploaded_file
+
+# ============================================================================
+# PAGE COMPONENTS
+# ============================================================================
+
+def render_login_page():
+    """Render login page with Bootstrap icons"""
+    # Welcome section
+    st.markdown(f"""
+    <div class="welcome-section">
+        <div class="welcome-title">
+            {get_bootstrap_icon(icons.HOME, "32", "#2e7d32")}
+            {get_text('welcome_title', st.session_state.language)}
+        </div>
+        <p class="welcome-subtitle">{get_text('welcome_subtitle', st.session_state.language)}</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Language selector
+    render_language_selector()
     
     # Get Started section
-    st.subheader("🔐 Get Started")
+    st.markdown(f"""
+    <div class="header-minimal">
+        {get_bootstrap_icon(icons.LOGIN, "24", "#4caf50")}
+        <h2 class="header-title">{get_text('get_started', st.session_state.language)}</h2>
+    </div>
+    """, unsafe_allow_html=True)
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.write("#### 🔑 Existing User")
-        st.write("*Already have an account?*")
+        st.markdown(f"""
+        <div class="action-card">
+            <div class="action-card-icon">
+                {get_bootstrap_icon(icons.LOGIN, "48", "#4caf50")}
+            </div>
+            <div class="action-card-title">{get_text('existing_user', st.session_state.language)}</div>
+            <div class="action-card-description">Sign in to your existing account</div>
+        </div>
+        """, unsafe_allow_html=True)
         
-        if st.button("Sign In", use_container_width=True, key="existing_user"):
+        if st.button(get_text('sign_in', st.session_state.language), key="show_login", use_container_width=True):
             st.session_state.show_login_form = True
             st.rerun()
     
     with col2:
-        st.write("#### 👤 New User")
-        st.write("*Create your account*")
+        st.markdown(f"""
+        <div class="action-card">
+            <div class="action-card-icon">
+                {get_bootstrap_icon(icons.REGISTER, "48", "#4caf50")}
+            </div>
+            <div class="action-card-title">{get_text('new_user', st.session_state.language)}</div>
+            <div class="action-card-description">Create a new account to get started</div>
+        </div>
+        """, unsafe_allow_html=True)
         
-        if st.button("Create Account", use_container_width=True, key="new_user"):
+        if st.button(get_text('create_account', st.session_state.language), key="show_register", use_container_width=True):
             st.session_state.current_page = 'register'
             st.rerun()
     
-    # Show login form if "Existing User" was clicked
+    # Show login form if requested
     if st.session_state.get('show_login_form', False):
-        st.divider()
-        st.subheader("🔑 Sign In to HAVEN")
-        
-        with st.form("login_form"):
-            email = st.text_input("Email", placeholder="Enter your email")
-            password = st.text_input("Password", type="password", placeholder="Enter your password")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.form_submit_button("Continue", use_container_width=True):
-                    if email and password:
-                        success, result = login_user(email, password)
-                        
-                        if success:
-                            st.success(f"Welcome back, {result.get('name', 'User')}!")
-                            time.sleep(1)
-                            st.session_state.current_page = 'home'
-                            st.session_state.show_login_form = False
-                            st.rerun()
-                        else:
-                            st.error(f"Login failed: {result}")
-                    else:
-                        st.error("Please enter both email and password")
-            
-            with col2:
-                if st.form_submit_button("Sign Up", use_container_width=True):
-                    st.session_state.current_page = 'register'
-                    st.session_state.show_login_form = False
-                    st.rerun()
-        
-        st.write("#### Or continue with:")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🔵 Google", use_container_width=True, key="google_login"):
-                demo_user = {
-                    'id': 'google_demo',
-                    'email': 'demo@google.com',
-                    'name': 'Google User',
-                    'verified': True
-                }
-                st.session_state.authenticated = True
-                st.session_state.user_data = demo_user
-                st.success("Welcome, Google User!")
-                time.sleep(1)
-                st.session_state.current_page = 'home'
-                st.session_state.show_login_form = False
-                st.rerun()
-        
-        with col2:
-            if st.button("🔵 Facebook", use_container_width=True, key="facebook_login"):
-                demo_user = {
-                    'id': 'facebook_demo',
-                    'email': 'demo@facebook.com',
-                    'name': 'Facebook User',
-                    'verified': True
-                }
-                st.session_state.authenticated = True
-                st.session_state.user_data = demo_user
-                st.success("Welcome, Facebook User!")
-                time.sleep(1)
-                st.session_state.current_page = 'home'
-                st.session_state.show_login_form = False
-                st.rerun()
-        
-        if st.button("⬅️ Back to Get Started", key="back_to_start"):
-            st.session_state.show_login_form = False
-            st.rerun()
+        st.markdown("---")
+        render_login_form()
 
-def show_register():
-    """Show registration page - completely clean version"""
-    st.title("🏠 HAVEN Registration")
-    st.subheader("Help not just some people, but Help Humanity")
+def render_login_form():
+    """Render login form with Bootstrap icons"""
+    st.markdown(f"""
+    <div class="header-minimal">
+        {get_bootstrap_icon(icons.LOGIN, "20", "#4caf50")}
+        <h3 style="margin: 0; color: #2e7d32;">{get_text('sign_in', st.session_state.language)}</h3>
+    </div>
+    """, unsafe_allow_html=True)
     
-    st.divider()
-    
-    st.subheader("Register for HAVEN")
-    
-    # Account type selection
-    account_type = st.selectbox("Account Type", ["Individual", "Organization"])
-    
-    if account_type == "Individual":
-        # Individual Registration Form
-        with st.form("individual_register"):
-            st.write("### 👤 Individual Account Registration")
-            
-            # Basic Information
-            st.write("#### 📝 Basic Information")
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                full_name = st.text_input("Full Name *", placeholder="Enter your full name")
-                email = st.text_input("Email *", placeholder="your.email@example.com")
-                password = st.text_input("Password *", type="password", placeholder="Create a strong password")
-            
-            with col2:
-                phone = st.text_input("Phone Number *", placeholder="+91 9876543210")
-                confirm_password = st.text_input("Confirm Password *", type="password", placeholder="Confirm your password")
-                date_of_birth = st.date_input("Date of Birth *")
-            
-            address = st.text_area("Address *", placeholder="Your complete address")
-            
-            # Document Verification Section
-            st.write("#### 📄 Document Verification")
-            st.warning("🛡️ Identity Verification Required - To ensure platform security and prevent fraud, we require valid government-issued identity documents.")
-            
-            # PAN Card Upload
-            st.write("**📄 PAN Card** *")
-            st.caption("Upload a clear image or PDF of your PAN card. Ensure all details are visible and readable.")
-            pan_card = st.file_uploader(
-                "Upload PAN Card",
-                type=['pdf', 'jpg', 'jpeg', 'png'],
-                key="pan_card_upload"
-            )
-            
-            # Aadhaar Card Upload
-            st.write("**📄 Aadhaar Card** *")
-            st.caption("Upload a clear image or PDF of your Aadhaar card. You may mask the Aadhaar number for privacy.")
-            aadhaar_card = st.file_uploader(
-                "Upload Aadhaar Card",
-                type=['pdf', 'jpg', 'jpeg', 'png'],
-                key="aadhaar_card_upload"
-            )
-            
-            # Optional Documents
-            st.write("#### 📋 Additional Documents (Optional)")
-            
-            # Bank Statement
-            st.write("**📄 Bank Statement**")
-            st.caption("Upload recent bank statement (last 3 months) for enhanced verification.")
-            bank_statement = st.file_uploader(
-                "Upload Bank Statement",
-                type=['pdf', 'jpg', 'jpeg', 'png'],
-                key="bank_statement_upload"
-            )
-            
-            # Address Proof
-            st.write("**📄 Address Proof**")
-            st.caption("Upload utility bill, rental agreement, or other address proof document.")
-            address_proof = st.file_uploader(
-                "Upload Address Proof",
-                type=['pdf', 'jpg', 'jpeg', 'png'],
-                key="address_proof_upload"
-            )
-            
-            # Terms and conditions
-            st.write("#### ✅ Terms & Conditions")
-            terms_accepted = st.checkbox("I agree to the Terms of Service and Privacy Policy *")
-            kyc_consent = st.checkbox("I consent to KYC (Know Your Customer) verification process *")
-            data_processing = st.checkbox("I consent to processing of my personal data for verification purposes *")
-            newsletter = st.checkbox("Subscribe to newsletter for updates")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if st.form_submit_button("Register as Individual", use_container_width=True):
-                    # Validation
-                    if not all([full_name, email, phone, password, confirm_password, address]):
-                        st.error("Please fill in all required fields marked with *")
-                    elif password != confirm_password:
-                        st.error("Passwords do not match!")
-                    elif not all([terms_accepted, kyc_consent, data_processing]):
-                        st.error("Please accept all required terms and consents")
-                    elif not pan_card or not aadhaar_card:
-                        st.error("PAN Card and Aadhaar Card are required for registration")
-                    else:
-                        user_data = {
-                            'full_name': full_name,
-                            'email': email,
-                            'phone': phone,
-                            'password': password,
-                            'address': address,
-                            'date_of_birth': date_of_birth,
-                            'account_type': 'individual',
-                            'newsletter': newsletter
-                        }
-                        
-                        success, result = register_user(user_data)
-                        
-                        if success:
-                            st.success("Registration successful! Your documents will be verified within 24-48 hours.")
-                            time.sleep(2)
-                            st.session_state.current_page = 'home'
-                            st.rerun()
-                        else:
-                            st.error(f"Registration failed: {result}")
-            
-            with col2:
-                if st.form_submit_button("Sign In Instead", use_container_width=True):
-                    st.session_state.current_page = 'login'
+    with st.form("login_form"):
+        # Email field
+        st.markdown(f"""
+        <div class="form-label">
+            {get_bootstrap_icon(icons.EMAIL, "16", "#4caf50")}
+            <span>{get_text('email', st.session_state.language)}</span>
+        </div>
+        """, unsafe_allow_html=True)
+        email = st.text_input("", placeholder="your.email@example.com", key="login_email", label_visibility="collapsed")
+        
+        # Password field
+        st.markdown(f"""
+        <div class="form-label">
+            {get_bootstrap_icon(icons.LOCK, "16", "#4caf50")}
+            <span>{get_text('password', st.session_state.language)}</span>
+        </div>
+        """, unsafe_allow_html=True)
+        password = st.text_input("", type="password", placeholder="Enter your password", key="login_password", label_visibility="collapsed")
+        
+        # Login button
+        if st.form_submit_button(get_text('login', st.session_state.language), use_container_width=True):
+            if email and password:
+                user_data = authenticate_user(email, password)
+                if user_data:
+                    st.session_state.authenticated = True
+                    st.session_state.user_data = user_data
+                    st.session_state.current_page = 'home'
+                    st.success(f"{get_bootstrap_icon(icons.SUCCESS, '16')} Login successful!")
+                    time.sleep(1)
                     st.rerun()
+                else:
+                    st.error(f"{get_bootstrap_icon(icons.ERROR, '16')} Invalid credentials")
+            else:
+                st.error(f"{get_bootstrap_icon(icons.WARNING, '16')} Please fill in all fields")
     
-    else:  # Organization
-        # Organization Registration Form
-        with st.form("organization_register"):
-            st.write("### 🏢 Organization Account Registration")
-            
-            # Basic Information
-            st.write("#### 🏢 Organization Information")
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                org_name = st.text_input("Organization Name *", placeholder="Enter organization name")
-                email = st.text_input("Email *", placeholder="organization@example.com")
-                org_type = st.selectbox("Organization Type *", ["", "NGO", "Startup", "Charity", "Foundation", "Trust", "Social Enterprise"])
-                password = st.text_input("Password *", type="password", placeholder="Create a strong password")
-            
-            with col2:
-                phone = st.text_input("Phone Number *", placeholder="+91 9876543210")
-                registration_number = st.text_input("Registration Number *", placeholder="Official registration number")
-                confirm_password = st.text_input("Confirm Password *", type="password", placeholder="Confirm your password")
-                established_year = st.number_input("Established Year *", min_value=1900, max_value=2024, value=2020)
-            
-            description = st.text_area("Organization Description *", placeholder="Describe your organization's mission and activities")
-            address = st.text_area("Address *", placeholder="Organization's complete address")
-            
-            # Additional organization fields
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                website = st.text_input("Website", placeholder="https://yourorganization.com")
-                contact_person = st.text_input("Contact Person *", placeholder="Primary contact person name")
-            
-            with col2:
-                employee_count = st.selectbox("Employee Count", ["", "1-10", "11-50", "51-200", "200+"])
-                annual_turnover = st.selectbox("Annual Turnover", ["", "< ₹1 Lakh", "₹1-10 Lakhs", "₹10-50 Lakhs", "₹50 Lakhs - ₹1 Crore", "> ₹1 Crore"])
-            
-            # Document Verification Section
-            st.write("#### 📄 Organization Document Verification")
-            st.warning("🛡️ Organization Verification Required - To ensure legitimacy and prevent fraudulent organizations, we require official registration documents.")
-            
-            # Registration Certificate
-            st.write("**📄 Registration Certificate** *")
-            st.caption("Upload official registration certificate (Society Registration, Trust Deed, Company Incorporation, etc.)")
-            registration_certificate = st.file_uploader(
-                "Upload Registration Certificate",
-                type=['pdf', 'jpg', 'jpeg', 'png'],
-                key="registration_certificate_upload"
-            )
-            
-            # Tax Exemption Certificate
-            st.write("**📄 Tax Exemption Certificate** *")
-            st.caption("Upload 12A/80G certificate for NGOs or relevant tax documents for other organization types.")
-            tax_exemption = st.file_uploader(
-                "Upload Tax Exemption Certificate",
-                type=['pdf', 'jpg', 'jpeg', 'png'],
-                key="tax_exemption_upload"
-            )
-            
-            # PAN Card of Organization
-            st.write("**📄 Organization PAN Card** *")
-            st.caption("Upload PAN card issued in the name of the organization.")
-            org_pan_card = st.file_uploader(
-                "Upload Organization PAN Card",
-                type=['pdf', 'jpg', 'jpeg', 'png'],
-                key="org_pan_card_upload"
-            )
-            
-            # Additional Documents
-            st.write("#### 📋 Additional Documents")
-            
-            # Audited Financial Statements
-            st.write("**📄 Audited Financial Statements**")
-            st.caption("Upload last 2 years audited financial statements or balance sheets.")
-            financial_statements = st.file_uploader(
-                "Upload Financial Statements",
-                type=['pdf', 'jpg', 'jpeg', 'png'],
-                key="financial_statements_upload"
-            )
-            
-            # Board Resolution
-            st.write("**📄 Board Resolution**")
-            st.caption("Upload board resolution authorizing the contact person to register on behalf of the organization.")
-            board_resolution = st.file_uploader(
-                "Upload Board Resolution",
-                type=['pdf', 'jpg', 'jpeg', 'png'],
-                key="board_resolution_upload"
-            )
-            
-            # FCRA Certificate (for NGOs)
-            if org_type == "NGO":
-                st.write("**📄 FCRA Certificate**")
-                st.caption("Upload FCRA (Foreign Contribution Regulation Act) certificate if applicable.")
-                fcra_certificate = st.file_uploader(
-                    "Upload FCRA Certificate",
-                    type=['pdf', 'jpg', 'jpeg', 'png'],
-                    key="fcra_certificate_upload"
-                )
-            
-            # Terms and conditions
-            st.write("#### ✅ Terms & Conditions")
-            terms_accepted = st.checkbox("I agree to the Terms of Service and Privacy Policy *")
-            verification_consent = st.checkbox("I consent to organization verification process *")
-            data_processing = st.checkbox("I consent to processing of organization data for verification purposes *")
-            authorized_signatory = st.checkbox("I confirm that I am an authorized signatory of this organization *")
-            newsletter = st.checkbox("Subscribe to newsletter for updates")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if st.form_submit_button("Register as Organization", use_container_width=True):
-                    # Validation
-                    required_fields = [org_name, email, phone, password, confirm_password, org_type, 
-                                     description, address, registration_number, contact_person, established_year]
-                    
-                    if not all(required_fields):
-                        st.error("Please fill in all required fields marked with *")
-                    elif password != confirm_password:
-                        st.error("Passwords do not match!")
-                    elif not all([terms_accepted, verification_consent, data_processing, authorized_signatory]):
-                        st.error("Please accept all required terms and consents")
-                    elif not registration_certificate or not tax_exemption or not org_pan_card:
-                        st.error("Registration Certificate, Tax Exemption Certificate, and Organization PAN Card are required")
-                    else:
-                        user_data = {
-                            'org_name': org_name,
-                            'email': email,
-                            'phone': phone,
-                            'password': password,
-                            'org_type': org_type,
-                            'description': description,
-                            'address': address,
-                            'registration_number': registration_number,
-                            'website': website,
-                            'established_year': established_year,
-                            'contact_person': contact_person,
-                            'employee_count': employee_count,
-                            'annual_turnover': annual_turnover,
-                            'account_type': 'organization',
-                            'newsletter': newsletter
-                        }
-                        
-                        success, result = register_user(user_data)
-                        
-                        if success:
-                            st.success("Registration successful! Your organization will be verified within 3-5 business days.")
-                            st.info("You will receive email updates about the verification status.")
-                            time.sleep(2)
-                            st.session_state.current_page = 'home'
-                            st.rerun()
-                        else:
-                            st.error(f"Registration failed: {result}")
-            
-            with col2:
-                if st.form_submit_button("Sign In Instead", use_container_width=True):
-                    st.session_state.current_page = 'login'
-                    st.rerun()
-    
-    # Social registration options
-    st.write("### Or register with:")
-    st.info("Note: Social registration will still require document verification to be completed later.")
+    # Social login options
+    st.markdown("---")
+    st.markdown("**Or continue with:**")
     
     col1, col2 = st.columns(2)
-    
     with col1:
-        if st.button("🔵 Register with Google", use_container_width=True, key="google_register"):
-            demo_user = {
-                'id': 'google_demo',
-                'email': 'demo@google.com',
-                'name': 'Google User',
-                'account_type': account_type.lower(),
-                'verified': False,
-                'verification_status': 'pending'
-            }
-            st.session_state.authenticated = True
-            st.session_state.user_data = demo_user
-            st.success("Welcome to HAVEN!")
-            st.info("Please complete document verification from your profile to unlock all features.")
-            time.sleep(2)
-            st.session_state.current_page = 'home'
-            st.rerun()
-    
+        render_social_login_button("Google", icons.GOOGLE, "btn-google")
     with col2:
-        if st.button("🔵 Register with Facebook", use_container_width=True, key="facebook_register"):
-            demo_user = {
-                'id': 'facebook_demo',
-                'email': 'demo@facebook.com',
-                'name': 'Facebook User',
-                'account_type': account_type.lower(),
-                'verified': False,
-                'verification_status': 'pending'
-            }
-            st.session_state.authenticated = True
-            st.session_state.user_data = demo_user
-            st.success("Welcome to HAVEN!")
-            st.info("Please complete document verification from your profile to unlock all features.")
-            time.sleep(2)
-            st.session_state.current_page = 'home'
-            st.rerun()
-    
-    # Back to login button
-    if st.button("⬅️ Back to Login", use_container_width=True, key="back_to_login"):
-        st.session_state.current_page = 'login'
-        st.rerun()
+        render_social_login_button("Facebook", icons.FACEBOOK, "btn-facebook")
 
-def show_home():
-    """Show authenticated user dashboard"""
+def render_register_page():
+    """Render registration page with Bootstrap icons"""
+    st.markdown(f"""
+    <div class="welcome-section">
+        <div class="welcome-title">
+            {get_bootstrap_icon(icons.REGISTER, "32", "#2e7d32")}
+            {get_text('create_account', st.session_state.language)}
+        </div>
+        <p class="welcome-subtitle">Help not just some people, but Help Humanity</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Account type selection
+    st.markdown(f"""
+    <div class="header-minimal">
+        {get_bootstrap_icon(icons.PERSON, "20", "#4caf50")}
+        <h3 style="margin: 0; color: #2e7d32;">Account Type</h3>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    account_type = st.radio(
+        "",
+        ["Individual", "Organization"],
+        key="account_type",
+        horizontal=True,
+        label_visibility="collapsed"
+    )
+    
+    if account_type == "Individual":
+        render_individual_registration()
+    else:
+        render_organization_registration()
+
+def render_individual_registration():
+    """Render individual registration form with Bootstrap icons"""
+    st.markdown(f"""
+    <div class="header-minimal">
+        {get_bootstrap_icon(icons.PERSON, "20", "#4caf50")}
+        <h4 style="margin: 0; color: #2e7d32;">Individual Account Registration</h4>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.form("individual_register"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Full Name
+            st.markdown(f"""
+            <div class="form-label">
+                {get_bootstrap_icon(icons.PERSON, "16", "#4caf50")}
+                <span>{get_text('full_name', st.session_state.language)} *</span>
+            </div>
+            """, unsafe_allow_html=True)
+            full_name = st.text_input("", placeholder="Enter your full name", key="ind_full_name", label_visibility="collapsed")
+            
+            # Email
+            st.markdown(f"""
+            <div class="form-label">
+                {get_bootstrap_icon(icons.EMAIL, "16", "#4caf50")}
+                <span>{get_text('email', st.session_state.language)} *</span>
+            </div>
+            """, unsafe_allow_html=True)
+            email = st.text_input("", placeholder="your.email@example.com", key="ind_email", label_visibility="collapsed")
+            
+            # Password
+            st.markdown(f"""
+            <div class="form-label">
+                {get_bootstrap_icon(icons.LOCK, "16", "#4caf50")}
+                <span>{get_text('password', st.session_state.language)} *</span>
+            </div>
+            """, unsafe_allow_html=True)
+            password = st.text_input("", type="password", placeholder="Create a strong password", key="ind_password", label_visibility="collapsed")
+        
+        with col2:
+            # Phone
+            st.markdown(f"""
+            <div class="form-label">
+                {get_bootstrap_icon(icons.PHONE, "16", "#4caf50")}
+                <span>{get_text('phone', st.session_state.language)} *</span>
+            </div>
+            """, unsafe_allow_html=True)
+            phone = st.text_input("", placeholder="+91 9876543210", key="ind_phone", label_visibility="collapsed")
+            
+            # Confirm Password
+            st.markdown(f"""
+            <div class="form-label">
+                {get_bootstrap_icon(icons.LOCK, "16", "#4caf50")}
+                <span>{get_text('confirm_password', st.session_state.language)} *</span>
+            </div>
+            """, unsafe_allow_html=True)
+            confirm_password = st.text_input("", type="password", placeholder="Confirm your password", key="ind_confirm_password", label_visibility="collapsed")
+        
+        # Document verification section
+        st.markdown("---")
+        st.markdown(f"""
+        <div class="header-minimal">
+            {get_bootstrap_icon(icons.VERIFICATION, "20", "#4caf50")}
+            <h4 style="margin: 0; color: #2e7d32;">Document Verification</h4>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            pan_card = render_document_upload_section(
+                get_text('pan_card', st.session_state.language),
+                icons.CERTIFICATE,
+                required=True,
+                help_text="Government-issued PAN card for tax identification"
+            )
+            
+            bank_statement = render_document_upload_section(
+                get_text('bank_statement', st.session_state.language),
+                icons.DOCUMENT,
+                required=False,
+                help_text="Recent 3-month bank statement (optional)"
+            )
+        
+        with col2:
+            aadhaar_card = render_document_upload_section(
+                get_text('aadhaar_card', st.session_state.language),
+                icons.CERTIFICATE,
+                required=True,
+                help_text="Aadhaar card for identity verification"
+            )
+            
+            address_proof = render_document_upload_section(
+                get_text('address_proof', st.session_state.language),
+                icons.DOCUMENT,
+                required=False,
+                help_text="Utility bill or rental agreement (optional)"
+            )
+        
+        # Consent checkboxes
+        st.markdown("---")
+        terms_accepted = st.checkbox(f"{get_bootstrap_icon(icons.VERIFICATION, '16')} {get_text('terms_conditions', st.session_state.language)}")
+        kyc_consent = st.checkbox(f"{get_bootstrap_icon(icons.SHIELD, '16')} {get_text('kyc_consent', st.session_state.language)}")
+        data_consent = st.checkbox(f"{get_bootstrap_icon(icons.SECURITY, '16')} {get_text('data_processing', st.session_state.language)}")
+        
+        # Submit button
+        if st.form_submit_button(get_text('register', st.session_state.language), use_container_width=True):
+            if all([full_name, email, password, phone, confirm_password, pan_card, aadhaar_card, terms_accepted, kyc_consent, data_consent]):
+                if password == confirm_password:
+                    # Create user account
+                    user_data = {
+                        'id': str(uuid.uuid4()),
+                        'email': email,
+                        'first_name': full_name.split()[0],
+                        'full_name': full_name,
+                        'phone': phone,
+                        'account_type': 'individual',
+                        'verified': False,  # Will be verified after document review
+                        'registration_time': datetime.now()
+                    }
+                    
+                    st.session_state.authenticated = True
+                    st.session_state.user_data = user_data
+                    st.session_state.current_page = 'home'
+                    st.success(f"{get_bootstrap_icon(icons.SUCCESS, '16')} Registration successful! Your documents are under review.")
+                    time.sleep(2)
+                    st.rerun()
+                else:
+                    st.error(f"{get_bootstrap_icon(icons.ERROR, '16')} Passwords do not match")
+            else:
+                st.error(f"{get_bootstrap_icon(icons.WARNING, '16')} Please fill in all required fields and upload required documents")
+
+def render_organization_registration():
+    """Render organization registration form with Bootstrap icons"""
+    st.markdown(f"""
+    <div class="header-minimal">
+        {get_bootstrap_icon("building", "20", "#4caf50")}
+        <h4 style="margin: 0; color: #2e7d32;">Organization Account Registration</h4>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.form("organization_register"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Organization Name
+            st.markdown(f"""
+            <div class="form-label">
+                {get_bootstrap_icon("building", "16", "#4caf50")}
+                <span>{get_text('organization_name', st.session_state.language)} *</span>
+            </div>
+            """, unsafe_allow_html=True)
+            org_name = st.text_input("", placeholder="Enter organization name", key="org_name", label_visibility="collapsed")
+            
+            # Organization Type
+            st.markdown(f"""
+            <div class="form-label">
+                {get_bootstrap_icon(icons.TAG, "16", "#4caf50")}
+                <span>{get_text('organization_type', st.session_state.language)} *</span>
+            </div>
+            """, unsafe_allow_html=True)
+            org_type = st.selectbox("", ["", "NGO", "Startup", "Charity", "Foundation", "Trust"], key="org_type", label_visibility="collapsed")
+            
+            # Contact Email
+            st.markdown(f"""
+            <div class="form-label">
+                {get_bootstrap_icon(icons.EMAIL, "16", "#4caf50")}
+                <span>{get_text('email', st.session_state.language)} *</span>
+            </div>
+            """, unsafe_allow_html=True)
+            email = st.text_input("", placeholder="organization@example.com", key="org_email", label_visibility="collapsed")
+        
+        with col2:
+            # Registration Number
+            st.markdown(f"""
+            <div class="form-label">
+                {get_bootstrap_icon(icons.CERTIFICATE, "16", "#4caf50")}
+                <span>{get_text('registration_number', st.session_state.language)}</span>
+            </div>
+            """, unsafe_allow_html=True)
+            reg_number = st.text_input("", placeholder="Official registration number", key="org_reg_number", label_visibility="collapsed")
+            
+            # Contact Phone
+            st.markdown(f"""
+            <div class="form-label">
+                {get_bootstrap_icon(icons.PHONE, "16", "#4caf50")}
+                <span>{get_text('phone', st.session_state.language)} *</span>
+            </div>
+            """, unsafe_allow_html=True)
+            phone = st.text_input("", placeholder="+91 9876543210", key="org_phone", label_visibility="collapsed")
+            
+            # Password
+            st.markdown(f"""
+            <div class="form-label">
+                {get_bootstrap_icon(icons.LOCK, "16", "#4caf50")}
+                <span>{get_text('password', st.session_state.language)} *</span>
+            </div>
+            """, unsafe_allow_html=True)
+            password = st.text_input("", type="password", placeholder="Create a strong password", key="org_password", label_visibility="collapsed")
+        
+        # Description
+        st.markdown(f"""
+        <div class="form-label">
+            {get_bootstrap_icon(icons.DOCUMENT, "16", "#4caf50")}
+            <span>{get_text('description', st.session_state.language)} *</span>
+        </div>
+        """, unsafe_allow_html=True)
+        description = st.text_area("", placeholder="Describe your organization's mission and activities", key="org_description", label_visibility="collapsed")
+        
+        # Document verification section
+        st.markdown("---")
+        st.markdown(f"""
+        <div class="header-minimal">
+            {get_bootstrap_icon(icons.VERIFICATION, "20", "#4caf50")}
+            <h4 style="margin: 0; color: #2e7d32;">Organization Documents</h4>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            reg_certificate = render_document_upload_section(
+                get_text('registration_certificate', st.session_state.language),
+                icons.CERTIFICATE,
+                required=True,
+                help_text="Society Registration, Trust Deed, or Company Incorporation"
+            )
+            
+            org_pan = render_document_upload_section(
+                "Organization PAN Card",
+                icons.CERTIFICATE,
+                required=True,
+                help_text="PAN card issued in organization's name"
+            )
+            
+            financial_statements = render_document_upload_section(
+                get_text('financial_statements', st.session_state.language),
+                icons.CHART,
+                required=False,
+                help_text="Audited financial statements (last 2 years)"
+            )
+        
+        with col2:
+            tax_exemption = render_document_upload_section(
+                get_text('tax_exemption', st.session_state.language),
+                icons.CERTIFICATE,
+                required=True,
+                help_text="12A/80G certificate for NGOs or relevant tax documents"
+            )
+            
+            board_resolution = render_document_upload_section(
+                get_text('board_resolution', st.session_state.language),
+                icons.DOCUMENT,
+                required=False,
+                help_text="Board resolution authorizing contact person"
+            )
+            
+            fcra_certificate = render_document_upload_section(
+                get_text('fcra_certificate', st.session_state.language),
+                icons.CERTIFICATE,
+                required=False,
+                help_text="For NGOs receiving foreign contributions"
+            )
+        
+        # Consent checkboxes
+        st.markdown("---")
+        terms_accepted = st.checkbox(f"{get_bootstrap_icon(icons.VERIFICATION, '16')} {get_text('terms_conditions', st.session_state.language)}")
+        kyc_consent = st.checkbox(f"{get_bootstrap_icon(icons.SHIELD, '16')} {get_text('kyc_consent', st.session_state.language)}")
+        data_consent = st.checkbox(f"{get_bootstrap_icon(icons.SECURITY, '16')} {get_text('data_processing', st.session_state.language)}")
+        
+        # Submit button
+        if st.form_submit_button(get_text('register', st.session_state.language), use_container_width=True):
+            if all([org_name, org_type, email, phone, password, description, reg_certificate, tax_exemption, org_pan, terms_accepted, kyc_consent, data_consent]):
+                # Create organization account
+                user_data = {
+                    'id': str(uuid.uuid4()),
+                    'email': email,
+                    'organization_name': org_name,
+                    'organization_type': org_type,
+                    'phone': phone,
+                    'description': description,
+                    'registration_number': reg_number,
+                    'account_type': 'organization',
+                    'verified': False,  # Will be verified after document review
+                    'registration_time': datetime.now()
+                }
+                
+                st.session_state.authenticated = True
+                st.session_state.user_data = user_data
+                st.session_state.current_page = 'home'
+                st.success(f"{get_bootstrap_icon(icons.SUCCESS, '16')} Organization registration successful! Your documents are under review.")
+                time.sleep(2)
+                st.rerun()
+            else:
+                st.error(f"{get_bootstrap_icon(icons.WARNING, '16')} Please fill in all required fields and upload required documents")
+
+def render_home_page():
+    """Render home dashboard with Bootstrap icons"""
     user_data = st.session_state.user_data
     
-    # Header with user info
-    st.title(f"🏠 Welcome back, {user_data.get('name', 'User')}!")
+    # Welcome header
+    account_type = user_data.get('account_type', 'individual')
+    display_name = user_data.get('organization_name') if account_type == 'organization' else user_data.get('first_name', 'User')
     
-    # Verification Status
-    verification_status = user_data.get('verification_status', 'verified')
-    if verification_status == 'pending':
-        st.warning("📋 Document verification is pending. Some features may be limited until verification is complete.")
-    elif verification_status == 'verified':
-        st.success("✅ Your account is fully verified!")
-    elif verification_status == 'rejected':
-        st.error("❌ Document verification was rejected. Please contact support or re-submit documents.")
+    st.markdown(f"""
+    <div class="welcome-section">
+        <div class="welcome-title">
+            {get_bootstrap_icon(icons.HOME, "32", "#2e7d32")}
+            Welcome back, {display_name}!
+        </div>
+        <p class="welcome-subtitle">Your impact dashboard and quick actions</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    if user_data.get('account_type') == 'organization':
-        st.write(f"**Organization Type:** {user_data.get('org_type', 'N/A')}")
-    
-    # Logout button
-    if st.button("🚪 Logout", key="logout_btn"):
-        logout_user()
-        st.rerun()
-    
-    # Dashboard content
-    st.subheader("⚡ Quick Actions")
+    # Quick actions
+    st.markdown(f"""
+    <div class="header-minimal">
+        {get_bootstrap_icon("lightning", "20", "#4caf50")}
+        <h3 style="margin: 0; color: #2e7d32;">Quick Actions</h3>
+    </div>
+    """, unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.write("### 🎯 Create Campaign")
-        st.write("Launch your crowdfunding campaign")
+        st.markdown(f"""
+        <div class="action-card">
+            <div class="action-card-icon">
+                {get_bootstrap_icon(icons.CAMPAIGN, "48", "#4caf50")}
+            </div>
+            <div class="action-card-title">Create Campaign</div>
+            <div class="action-card-description">Start a new fundraising campaign</div>
+        </div>
+        """, unsafe_allow_html=True)
         
-        if verification_status == 'verified':
-            if st.button("Start Campaign", use_container_width=True, key="create_campaign_btn"):
-                st.session_state.current_page = 'campaign'
-                st.rerun()
-        else:
-            st.button("Start Campaign", use_container_width=True, disabled=True, key="create_campaign_btn_disabled")
-            st.caption("⚠️ Requires verification")
+        if st.button("Create Campaign", key="create_campaign", use_container_width=True):
+            st.session_state.current_page = 'campaign'
+            st.rerun()
     
     with col2:
-        st.write("### 🔍 Browse Projects")
-        st.write("Discover amazing causes to support")
+        st.markdown(f"""
+        <div class="action-card">
+            <div class="action-card-icon">
+                {get_bootstrap_icon(icons.EXPLORE, "48", "#4caf50")}
+            </div>
+            <div class="action-card-title">Browse Campaigns</div>
+            <div class="action-card-description">Discover causes to support</div>
+        </div>
+        """, unsafe_allow_html=True)
         
-        if st.button("Browse Now", use_container_width=True, key="browse_campaigns_btn"):
+        if st.button("Browse Campaigns", key="browse_campaigns", use_container_width=True):
             st.session_state.current_page = 'explore'
             st.rerun()
     
     with col3:
-        st.write("### ❤️ Support Causes")
-        st.write("Make a difference today")
+        st.markdown(f"""
+        <div class="action-card">
+            <div class="action-card-icon">
+                {get_bootstrap_icon(icons.HEART, "48", "#4caf50")}
+            </div>
+            <div class="action-card-title">Make Donation</div>
+            <div class="action-card-description">Support a cause directly</div>
+        </div>
+        """, unsafe_allow_html=True)
         
-        if st.button("Donate Now", use_container_width=True, key="support_causes_btn"):
-            st.session_state.current_page = 'explore'
+        if st.button("Make Donation", key="make_donation", use_container_width=True):
+            st.session_state.current_page = 'search'
             st.rerun()
     
     # User stats
-    st.subheader("📊 Your Impact")
+    st.markdown("---")
+    st.markdown(f"""
+    <div class="header-minimal">
+        {get_bootstrap_icon(icons.CHART, "20", "#4caf50")}
+        <h3 style="margin: 0; color: #2e7d32;">Your Impact</h3>
+    </div>
+    """, unsafe_allow_html=True)
     
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("Campaigns Created", "0", "0")
+        st.metric(
+            label=f"{get_bootstrap_icon(icons.CAMPAIGN, '16')} Campaigns Created",
+            value="0",
+            delta="Start your first campaign"
+        )
     
     with col2:
-        st.metric("Total Raised", "₹0", "₹0")
+        st.metric(
+            label=f"{get_bootstrap_icon(icons.MONEY, '16')} Total Raised",
+            value="₹0",
+            delta="Begin fundraising"
+        )
     
     with col3:
-        st.metric("Donations Made", "0", "0")
+        st.metric(
+            label=f"{get_bootstrap_icon(icons.HEART, '16')} Donations Made",
+            value="0",
+            delta="Support a cause"
+        )
     
     with col4:
-        st.metric("Lives Impacted", "0", "0")
+        st.metric(
+            label=f"{get_bootstrap_icon(icons.STAR, '16')} Impact Score",
+            value="0",
+            delta="Build your reputation"
+        )
 
-def show_campaign():
-    """Show campaign creation page"""
-    st.title("🎯 Create Your Campaign")
+def render_other_pages():
+    """Render placeholder pages with Bootstrap icons"""
+    page_configs = {
+        'campaign': {
+            'icon': icons.CAMPAIGN,
+            'title': 'Campaign Management',
+            'description': 'Create and manage your fundraising campaigns'
+        },
+        'explore': {
+            'icon': icons.EXPLORE,
+            'title': 'Explore Campaigns',
+            'description': 'Discover and browse active campaigns'
+        },
+        'search': {
+            'icon': icons.SEARCH,
+            'title': 'Search & Filter',
+            'description': 'Find specific campaigns and causes'
+        },
+        'profile': {
+            'icon': icons.PROFILE,
+            'title': 'User Profile',
+            'description': 'Manage your account and settings'
+        }
+    }
     
-    st.info("Campaign creation feature coming soon!")
+    current_page = st.session_state.current_page
+    config = page_configs.get(current_page, {})
     
-    if st.button("⬅️ Back to Dashboard", key="back_to_dashboard_campaign"):
-        st.session_state.current_page = 'home'
-        st.rerun()
-
-def show_explore():
-    """Show campaign browsing page"""
-    st.title("🔍 Explore Campaigns")
+    st.markdown(f"""
+    <div class="welcome-section">
+        <div class="welcome-title">
+            {get_bootstrap_icon(config.get('icon', icons.INFO), "32", "#2e7d32")}
+            {config.get('title', 'Page')}
+        </div>
+        <p class="welcome-subtitle">{config.get('description', 'Page description')}</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    st.info("Campaign browsing feature coming soon!")
-    
-    if st.button("⬅️ Back to Dashboard", key="back_to_dashboard_explore"):
-        st.session_state.current_page = 'home'
-        st.rerun()
-
-def show_search():
-    """Show search page"""
-    st.title("🔎 Search Campaigns")
-    
-    st.info("Search feature coming soon!")
-    
-    if st.button("⬅️ Back to Dashboard", key="back_to_dashboard_search"):
-        st.session_state.current_page = 'home'
-        st.rerun()
-
-def show_profile():
-    """Show profile page"""
-    user_data = st.session_state.user_data
-    
-    st.title("👤 User Profile")
-    
-    # Verification Status Section
-    st.subheader("📋 Verification Status")
-    
-    verification_status = user_data.get('verification_status', 'verified')
-    
-    if verification_status == 'pending':
-        st.warning("⏳ Document verification is in progress. This typically takes 24-48 hours for individuals and 3-5 business days for organizations.")
-    elif verification_status == 'verified':
-        st.success("✅ Your account is fully verified! You can now access all platform features.")
-    elif verification_status == 'rejected':
-        st.error("❌ Document verification was rejected. Please contact support for details.")
-        
-        if st.button("Re-submit Documents"):
-            st.session_state.current_page = 'register'
-            st.rerun()
-    
-    st.info("Profile management feature coming soon!")
-    
-    if st.button("⬅️ Back to Dashboard", key="back_to_dashboard_profile"):
-        st.session_state.current_page = 'home'
-        st.rerun()
+    st.info(f"{get_bootstrap_icon(icons.INFO, '16')} This page is under development. Full functionality will be available soon.")
 
 # ============================================================================
 # MAIN APPLICATION
 # ============================================================================
 
 def main():
-    """Main application entry point"""
-    # Configure Streamlit page
+    """Main application function"""
+    # Page configuration
     st.set_page_config(
         page_title="HAVEN - Crowdfunding Platform",
         page_icon="🏠",
@@ -701,64 +1231,26 @@ def main():
         initial_sidebar_state="expanded"
     )
     
-    # Simple CSS for light green theme - NO HTML MARKUP
-    st.markdown("""
-    <style>
-    .stApp {
-        background: linear-gradient(135deg, #f1f8e9 0%, #e8f5e8 100%);
-    }
-    
-    .stButton > button {
-        background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        font-weight: 600;
-    }
-    
-    .stButton > button:hover {
-        background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
-    }
-    
-    .stButton > button:disabled {
-        background: #cccccc;
-        color: #666666;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    # Load Bootstrap Icons CSS
+    st.markdown(get_bootstrap_css(), unsafe_allow_html=True)
     
     # Initialize session state
     initialize_session_state()
     
-    # Sidebar navigation (only show if authenticated)
-    if st.session_state.authenticated:
-        render_sidebar_navigation()
+    # Render navigation (only if authenticated)
+    render_navigation()
     
     # Main content area
     if not st.session_state.authenticated:
-        # Show login or register page
         if st.session_state.current_page == 'register':
-            show_register()
+            render_register_page()
         else:
-            show_login()
+            render_login_page()
     else:
-        # Show authenticated pages
         if st.session_state.current_page == 'home':
-            show_home()
-        elif st.session_state.current_page == 'campaign':
-            show_campaign()
-        elif st.session_state.current_page == 'explore':
-            show_explore()
-        elif st.session_state.current_page == 'search':
-            show_search()
-        elif st.session_state.current_page == 'profile':
-            show_profile()
+            render_home_page()
         else:
-            show_home()  # Default to home
-    
-    # Footer
-    st.divider()
-    st.write("© 2025 HAVEN - Crowdfunding Platform | Built with ❤️ using Streamlit")
+            render_other_pages()
 
 if __name__ == "__main__":
     main()
