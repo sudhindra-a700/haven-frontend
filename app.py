@@ -1,6 +1,6 @@
 """
-Fixed HAVEN Crowdfunding Platform - Main Application
-Implements proper authentication flow with conditional navigation and language dropdown
+HAVEN Crowdfunding Platform - Main Application
+Reorganized to match sudhindra-a700/haven-frontend repository structure
 """
 
 import streamlit as st
@@ -13,22 +13,28 @@ logger = logging.getLogger(__name__)
 
 # Import page modules with error handling
 try:
-    from pages import home, login, register, explore, search, campaign, profile
-    PAGES_AVAILABLE = True
-except ImportError:
+    from pages import home, login
+    # Try to import additional pages if they exist
     try:
-        # Fallback to individual imports
-        import home
-        import login  
-        import register
-        import explore
-        import search
-        import campaign
-        import profile
-        PAGES_AVAILABLE = True
-    except ImportError as e:
-        logger.error(f"Failed to import page modules: {e}")
-        PAGES_AVAILABLE = False
+        from pages import footer, register, explore, search, campaign, profile
+        EXTENDED_PAGES_AVAILABLE = True
+    except ImportError:
+        EXTENDED_PAGES_AVAILABLE = False
+    PAGES_AVAILABLE = True
+except ImportError as e:
+    logger.error(f"Failed to import page modules: {e}")
+    PAGES_AVAILABLE = False
+    EXTENDED_PAGES_AVAILABLE = False
+
+# Import utility modules
+try:
+    from utils.translation_service import t, set_language, get_supported_languages
+    from utils.config import get_config
+    from utils.auth_utils import check_authentication, logout_user
+    UTILS_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Some utility modules not available: {e}")
+    UTILS_AVAILABLE = False
 
 def main():
     """Main application function"""
@@ -261,7 +267,7 @@ def show_auth_interface():
         """, unsafe_allow_html=True)
         
         # Authentication tabs
-        tab1, tab2 = st.tabs(["🔐 Sign In", "📝 Register"])
+        tab1, tab2 = st.tabs([get_text("sign_in", "🔐 Sign In"), get_text("register", "📝 Register")])
         
         with tab1:
             if PAGES_AVAILABLE:
@@ -274,7 +280,7 @@ def show_auth_interface():
                 show_fallback_login()
         
         with tab2:
-            if PAGES_AVAILABLE:
+            if EXTENDED_PAGES_AVAILABLE:
                 try:
                     register.show()
                 except Exception as e:
@@ -285,6 +291,13 @@ def show_auth_interface():
         
         # Platform information
         show_platform_info()
+        
+        # Footer
+        if EXTENDED_PAGES_AVAILABLE:
+            try:
+                footer.show()
+            except Exception as e:
+                logger.error(f"Error loading footer: {e}")
         
     except Exception as e:
         logger.error(f"Auth interface error: {e}")
@@ -307,13 +320,13 @@ def show_main_interface():
             try:
                 if current_page == 'home':
                     home.show()
-                elif current_page == 'explore':
+                elif current_page == 'explore' and EXTENDED_PAGES_AVAILABLE:
                     explore.show()
-                elif current_page == 'search':
+                elif current_page == 'search' and EXTENDED_PAGES_AVAILABLE:
                     search.show()
-                elif current_page == 'campaign':
+                elif current_page == 'campaign' and EXTENDED_PAGES_AVAILABLE:
                     campaign.show()
-                elif current_page == 'profile':
+                elif current_page == 'profile' and EXTENDED_PAGES_AVAILABLE:
                     profile.show()
                 else:
                     # Default to home
@@ -327,6 +340,13 @@ def show_main_interface():
         # Floating action button for quick campaign creation
         show_floating_action_button()
         
+        # Footer
+        if EXTENDED_PAGES_AVAILABLE:
+            try:
+                footer.show()
+            except Exception as e:
+                logger.error(f"Error loading footer: {e}")
+        
     except Exception as e:
         logger.error(f"Main interface error: {e}")
         st.error("Error loading main interface.")
@@ -334,14 +354,17 @@ def show_main_interface():
 def show_language_dropdown():
     """Show language selection dropdown"""
     try:
-        st.markdown("### 🌍 Language / भाषा")
+        st.markdown(f"### 🌍 {get_text('language', 'Language')} / भाषा")
         
-        languages = {
-            "English": "🇺🇸 English",
-            "Hindi": "🇮🇳 हिंदी", 
-            "Tamil": "🇮🇳 தமிழ்",
-            "Telugu": "🇮🇳 తెలుగు"
-        }
+        if UTILS_AVAILABLE:
+            languages = get_supported_languages()
+        else:
+            languages = {
+                "English": "🇺🇸 English",
+                "Hindi": "🇮🇳 हिंदी", 
+                "Tamil": "🇮🇳 தமிழ்",
+                "Telugu": "🇮🇳 తెలుగు"
+            }
         
         selected_language = st.selectbox(
             "Choose your language",
@@ -353,6 +376,8 @@ def show_language_dropdown():
         
         if selected_language != st.session_state.get('language'):
             st.session_state.language = selected_language
+            if UTILS_AVAILABLE:
+                set_language(selected_language)
             st.success(f"Language changed to {languages[selected_language]}")
             st.rerun()
             
@@ -382,16 +407,21 @@ def show_user_info():
 def show_navigation_menu():
     """Show navigation menu for authenticated users"""
     try:
-        st.markdown("### 🧭 Navigation")
+        st.markdown(f"### 🧭 {get_text('navigation', 'Navigation')}")
         
         # Navigation options
         nav_options = {
-            'home': {'icon': '🏠', 'label': 'Home', 'description': 'Dashboard and overview'},
-            'explore': {'icon': '🔍', 'label': 'Explore', 'description': 'Browse campaigns'},
-            'search': {'icon': '🔎', 'label': 'Search', 'description': 'Find specific campaigns'},
-            'campaign': {'icon': '🎯', 'label': 'Campaigns', 'description': 'Manage your campaigns'},
-            'profile': {'icon': '👤', 'label': 'Profile', 'description': 'Account settings'}
+            'home': {'icon': '🏠', 'label': get_text('home', 'Home'), 'description': 'Dashboard and overview'},
         }
+        
+        # Add extended navigation if available
+        if EXTENDED_PAGES_AVAILABLE:
+            nav_options.update({
+                'explore': {'icon': '🔍', 'label': get_text('explore', 'Explore'), 'description': 'Browse campaigns'},
+                'search': {'icon': '🔎', 'label': get_text('search', 'Search'), 'description': 'Find specific campaigns'},
+                'campaign': {'icon': '🎯', 'label': get_text('campaign', 'Campaigns'), 'description': 'Manage your campaigns'},
+                'profile': {'icon': '👤', 'label': get_text('profile', 'Profile'), 'description': 'Account settings'}
+            })
         
         current_page = st.session_state.get('current_page', 'home')
         
@@ -410,13 +440,13 @@ def show_navigation_menu():
         
         # Quick stats
         st.markdown("---")
-        st.markdown("### 📊 Quick Stats")
+        st.markdown(f"### 📊 {get_text('quick_stats', 'Quick Stats')}")
         
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("💰 Raised", "₹2.5L", "+₹15K")
+            st.metric(f"💰 {get_text('raised', 'Raised')}", "₹2.5L", "+₹15K")
         with col2:
-            st.metric("🎯 Campaigns", "3", "+1")
+            st.metric(f"🎯 {get_text('campaigns', 'Campaigns')}", "3", "+1")
         
     except Exception as e:
         logger.error(f"Navigation menu error: {e}")
@@ -426,13 +456,16 @@ def show_logout_button():
     try:
         st.markdown("---")
         
-        if st.button("🚪 Logout", use_container_width=True, type="secondary"):
+        if st.button(f"🚪 {get_text('logout', 'Logout')}", use_container_width=True, type="secondary"):
             # Clear session state
-            st.session_state.authenticated = False
-            st.session_state.user = {}
-            st.session_state.current_page = 'login'
+            if UTILS_AVAILABLE:
+                logout_user()
+            else:
+                st.session_state.authenticated = False
+                st.session_state.user = {}
+                st.session_state.current_page = 'login'
             
-            st.success("👋 Logged out successfully!")
+            st.success(f"👋 {get_text('logged_out', 'Logged out successfully!')}")
             st.rerun()
             
     except Exception as e:
@@ -461,25 +494,25 @@ def show_platform_info():
     """Show platform information for unauthenticated users"""
     try:
         st.markdown("---")
-        st.markdown("### ℹ️ About HAVEN Platform")
+        st.markdown(f"### ℹ️ {get_text('about_platform', 'About HAVEN Platform')}")
         
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.markdown("""
-            #### 🎯 Create Campaigns
+            st.markdown(f"""
+            #### 🎯 {get_text('create_campaigns', 'Create Campaigns')}
             Launch your fundraising campaigns with ease. Our platform provides all the tools you need to tell your story and reach your goals.
             """)
         
         with col2:
-            st.markdown("""
-            #### 🔍 Discover Causes
+            st.markdown(f"""
+            #### 🔍 {get_text('discover_causes', 'Discover Causes')}
             Find and support causes that matter to you. Browse through verified campaigns across multiple categories.
             """)
         
         with col3:
-            st.markdown("""
-            #### 🔒 Secure & Trusted
+            st.markdown(f"""
+            #### 🔒 {get_text('secure_trusted', 'Secure & Trusted')}
             Advanced fraud detection and secure payment processing ensure your donations reach the right hands.
             """)
         
@@ -488,33 +521,33 @@ def show_platform_info():
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.metric("💰 Total Raised", "₹12.5 Cr")
+            st.metric(f"💰 {get_text('total_raised', 'Total Raised')}", "₹12.5 Cr")
         
         with col2:
-            st.metric("🎯 Active Campaigns", "1,247")
+            st.metric(f"🎯 {get_text('active_campaigns', 'Active Campaigns')}", "1,247")
         
         with col3:
-            st.metric("👥 Community Members", "45,678")
+            st.metric(f"👥 {get_text('community_members', 'Community Members')}", "45,678")
         
         with col4:
-            st.metric("🏆 Success Rate", "78%")
+            st.metric(f"🏆 {get_text('success_rate', 'Success Rate')}", "78%")
         
     except Exception as e:
         logger.error(f"Platform info error: {e}")
 
 def show_fallback_login():
     """Fallback login interface when modules fail to load"""
-    st.markdown("### 🔐 Sign In to HAVEN")
+    st.markdown(f"### 🔐 {get_text('sign_in_to_haven', 'Sign In to HAVEN')}")
     
     with st.form("fallback_login"):
-        email = st.text_input("📧 Email", placeholder="your.email@example.com")
-        password = st.text_input("🔒 Password", type="password", placeholder="Your password")
+        email = st.text_input(f"📧 {get_text('email', 'Email')}", placeholder="your.email@example.com")
+        password = st.text_input(f"🔒 {get_text('password', 'Password')}", type="password", placeholder="Your password")
         
         col1, col2 = st.columns(2)
         with col1:
-            login_btn = st.form_submit_button("🚀 Sign In", use_container_width=True)
+            login_btn = st.form_submit_button(f"🚀 {get_text('sign_in', 'Sign In')}", use_container_width=True)
         with col2:
-            demo_btn = st.form_submit_button("🎭 Demo Login", use_container_width=True)
+            demo_btn = st.form_submit_button(f"🎭 {get_text('demo_login', 'Demo Login')}", use_container_width=True)
     
     if login_btn and email and password:
         # Simple validation for demo
@@ -526,10 +559,10 @@ def show_fallback_login():
                 'avatar': '👤'
             }
             st.session_state.current_page = 'home'
-            st.success("✅ Login successful!")
+            st.success(f"✅ {get_text('login_successful', 'Login successful!')}")
             st.rerun()
         else:
-            st.error("❌ Please enter a valid email address")
+            st.error(f"❌ {get_text('valid_email_required', 'Please enter a valid email address')}")
     
     if demo_btn:
         # Demo login
@@ -540,20 +573,20 @@ def show_fallback_login():
             'avatar': '🎭'
         }
         st.session_state.current_page = 'home'
-        st.success("✅ Demo login successful!")
+        st.success(f"✅ {get_text('demo_login_successful', 'Demo login successful!')}")
         st.rerun()
 
 def show_fallback_register():
     """Fallback registration interface when modules fail to load"""
-    st.markdown("### 📝 Create HAVEN Account")
+    st.markdown(f"### 📝 {get_text('create_haven_account', 'Create HAVEN Account')}")
     
     with st.form("fallback_register"):
-        name = st.text_input("👤 Full Name", placeholder="Your full name")
-        email = st.text_input("📧 Email", placeholder="your.email@example.com")
-        password = st.text_input("🔒 Password", type="password", placeholder="Create password")
-        terms = st.checkbox("I agree to Terms of Service")
+        name = st.text_input(f"👤 {get_text('full_name', 'Full Name')}", placeholder="Your full name")
+        email = st.text_input(f"📧 {get_text('email', 'Email')}", placeholder="your.email@example.com")
+        password = st.text_input(f"🔒 {get_text('password', 'Password')}", type="password", placeholder="Create password")
+        terms = st.checkbox(get_text('agree_terms', 'I agree to Terms of Service'))
         
-        register_btn = st.form_submit_button("🎉 Create Account", use_container_width=True)
+        register_btn = st.form_submit_button(f"🎉 {get_text('create_account', 'Create Account')}", use_container_width=True)
     
     if register_btn:
         if name and email and password and terms:
@@ -564,11 +597,11 @@ def show_fallback_register():
                 'avatar': '👤'
             }
             st.session_state.current_page = 'home'
-            st.success("🎉 Account created successfully!")
+            st.success(f"🎉 {get_text('account_created', 'Account created successfully!')}")
             st.balloons()
             st.rerun()
         else:
-            st.error("❌ Please fill all fields and accept terms")
+            st.error(f"❌ {get_text('fill_all_fields', 'Please fill all fields and accept terms')}")
 
 def show_fallback_page(page_name: str):
     """Show fallback page when modules fail to load"""
@@ -580,6 +613,12 @@ def show_fallback_page(page_name: str):
     """, unsafe_allow_html=True)
     
     st.info(f"The {page_name} page functionality will be available soon. Please check back later!")
+
+def get_text(key: str, default: str = None) -> str:
+    """Get translated text with fallback"""
+    if UTILS_AVAILABLE:
+        return t(key, default)
+    return default or key
 
 if __name__ == "__main__":
     main()
