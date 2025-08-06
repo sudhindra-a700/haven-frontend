@@ -1,624 +1,698 @@
 """
-HAVEN Crowdfunding Platform - Main Application
-Reorganized to match sudhindra-a700/haven-frontend repository structure
+Complete Workflow-Based HAVEN Frontend Application
+Implements the exact workflow from the diagrams with proper state management
 """
 
 import streamlit as st
 import logging
 from typing import Dict, Any, Optional
+import time
+from datetime import datetime
+
+# Import workflow modules
+from workflow_auth_utils import auth_manager, check_authentication, login_user, register_user, logout_user
+from workflow_campaign_pages import (
+    render_create_campaign_page, render_submit_campaign_page, 
+    render_xai_processing_page
+)
+from workflow_verification_funding import (
+    render_admin_review_page, render_funding_display_page, render_discard_project_page,
+    render_browse_campaigns_page, render_view_campaign_page, render_verification_check_page,
+    render_show_warning_page, render_make_contribution_page, render_payment_page,
+    render_success_page
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Import page modules with error handling
-try:
-    from pages import home, login
-    # Try to import additional pages if they exist
-    try:
-        from pages import footer, register, explore, search, campaign, profile
-        EXTENDED_PAGES_AVAILABLE = True
-    except ImportError:
-        EXTENDED_PAGES_AVAILABLE = False
-    PAGES_AVAILABLE = True
-except ImportError as e:
-    logger.error(f"Failed to import page modules: {e}")
-    PAGES_AVAILABLE = False
-    EXTENDED_PAGES_AVAILABLE = False
-
-# Import utility modules
-try:
-    from utils.translation_service import t, set_language, get_supported_languages
-    from utils.config import get_config
-    from utils.auth_utils import check_authentication, logout_user
-    UTILS_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"Some utility modules not available: {e}")
-    UTILS_AVAILABLE = False
-
-def main():
-    """Main application function"""
-    try:
-        # Page configuration
-        st.set_page_config(
-            page_title="HAVEN - Crowdfunding Platform",
-            page_icon="🏠",
-            layout="wide",
-            initial_sidebar_state="expanded"
-        )
+class WorkflowManager:
+    """Manages the complete workflow state and navigation"""
+    
+    def __init__(self):
+        self.workflow_states = {
+            'start': 'start',
+            'login': 'login',
+            'register': 'register',
+            'authenticated': 'authenticated',
+            'create_campaign': 'create_campaign',
+            'submit_campaign': 'submit_campaign',
+            'xai_processing': 'xai_processing',
+            'admin_review': 'admin_review',
+            'funding_display': 'funding_display',
+            'discard_project': 'discard_project',
+            'browse_campaigns': 'browse_campaigns',
+            'view_campaign': 'view_campaign',
+            'verification_check': 'verification_check',
+            'show_warning': 'show_warning',
+            'make_contribution': 'make_contribution',
+            'payment': 'payment',
+            'success': 'success'
+        }
         
-        # Initialize session state
-        initialize_session_state()
+        self.initialize_session_state()
+    
+    def initialize_session_state(self):
+        """Initialize all session state variables"""
+        # Authentication state
+        if 'user_authenticated' not in st.session_state:
+            st.session_state.user_authenticated = False
         
-        # Load custom CSS
-        load_custom_css()
+        if 'user_data' not in st.session_state:
+            st.session_state.user_data = {}
         
-        # Check authentication status
-        is_authenticated = st.session_state.get('authenticated', False)
+        # Workflow state
+        if 'current_workflow_state' not in st.session_state:
+            st.session_state.current_workflow_state = 'start'
         
-        if not is_authenticated:
-            # Show login/registration interface
-            show_auth_interface()
+        if 'previous_workflow_state' not in st.session_state:
+            st.session_state.previous_workflow_state = None
+        
+        # Language state
+        if 'selected_language' not in st.session_state:
+            st.session_state.selected_language = 'English'
+        
+        # Campaign state
+        if 'current_campaign' not in st.session_state:
+            st.session_state.current_campaign = {}
+        
+        if 'selected_campaign' not in st.session_state:
+            st.session_state.selected_campaign = {}
+        
+        # Payment state
+        if 'payment_data' not in st.session_state:
+            st.session_state.payment_data = {}
+        
+        # Initialize auth manager
+        auth_manager.initialize_auth_state()
+    
+    def navigate_to(self, current_state: str, action: str):
+        """Navigate between workflow states based on current state and action"""
+        st.session_state.previous_workflow_state = current_state
+        
+        # Navigation logic based on workflow diagram
+        if current_state == 'start':
+            if action == 'login_yes':
+                st.session_state.current_workflow_state = 'login'
+            elif action == 'login_no':
+                st.session_state.current_workflow_state = 'register'
+        
+        elif current_state == 'login':
+            if action == 'success':
+                st.session_state.current_workflow_state = 'authenticated'
+            elif action == 'register':
+                st.session_state.current_workflow_state = 'register'
+        
+        elif current_state == 'register':
+            if action == 'success':
+                st.session_state.current_workflow_state = 'authenticated'
+            elif action == 'login':
+                st.session_state.current_workflow_state = 'login'
+        
+        elif current_state == 'authenticated':
+            if action == 'create':
+                st.session_state.current_workflow_state = 'create_campaign'
+            elif action == 'browse':
+                st.session_state.current_workflow_state = 'browse_campaigns'
+            elif action == 'logout':
+                logout_user()
+                st.session_state.current_workflow_state = 'start'
+        
+        elif current_state == 'create_campaign':
+            if action == 'submit':
+                st.session_state.current_workflow_state = 'submit_campaign'
+            elif action == 'back':
+                st.session_state.current_workflow_state = 'authenticated'
+        
+        elif current_state == 'submit_campaign':
+            if action == 'auto':
+                st.session_state.current_workflow_state = 'xai_processing'
+            elif action == 'back':
+                st.session_state.current_workflow_state = 'authenticated'
+        
+        elif current_state == 'xai_processing':
+            if action == 'auto':
+                st.session_state.current_workflow_state = 'admin_review'
+        
+        elif current_state == 'admin_review':
+            if action == 'approved':
+                st.session_state.current_workflow_state = 'funding_display'
+            elif action == 'rejected':
+                st.session_state.current_workflow_state = 'discard_project'
+            elif action == 'back':
+                st.session_state.current_workflow_state = 'authenticated'
+        
+        elif current_state == 'funding_display':
+            if action == 'view':
+                st.session_state.current_workflow_state = 'view_campaign'
+            elif action == 'back':
+                st.session_state.current_workflow_state = 'authenticated'
+        
+        elif current_state == 'discard_project':
+            if action == 'back':
+                st.session_state.current_workflow_state = 'authenticated'
+        
+        elif current_state == 'browse_campaigns':
+            if action == 'view':
+                st.session_state.current_workflow_state = 'view_campaign'
+            elif action == 'back':
+                st.session_state.current_workflow_state = 'authenticated'
+        
+        elif current_state == 'view_campaign':
+            if action == 'fund_yes':
+                st.session_state.current_workflow_state = 'verification_check'
+            elif action == 'fund_no':
+                st.session_state.current_workflow_state = 'show_warning'
+            elif action == 'back':
+                st.session_state.current_workflow_state = 'browse_campaigns'
+        
+        elif current_state == 'verification_check':
+            if action == 'verified':
+                st.session_state.current_workflow_state = 'make_contribution'
+            elif action == 'not_verified':
+                st.session_state.current_workflow_state = 'show_warning'
+            elif action == 'back':
+                st.session_state.current_workflow_state = 'view_campaign'
+        
+        elif current_state == 'show_warning':
+            if action == 'back':
+                st.session_state.current_workflow_state = 'browse_campaigns'
+        
+        elif current_state == 'make_contribution':
+            if action == 'proceed':
+                st.session_state.current_workflow_state = 'payment'
+            elif action == 'back':
+                st.session_state.current_workflow_state = 'view_campaign'
+        
+        elif current_state == 'payment':
+            if action == 'success':
+                st.session_state.current_workflow_state = 'success'
+            elif action == 'back':
+                st.session_state.current_workflow_state = 'make_contribution'
+        
+        elif current_state == 'success':
+            if action == 'continue':
+                st.session_state.current_workflow_state = 'authenticated'
+        
+        # Rerun to update the display
+        st.rerun()
+    
+    def get_current_state(self) -> str:
+        """Get current workflow state"""
+        return st.session_state.current_workflow_state
+    
+    def render_current_page(self):
+        """Render the current page based on workflow state"""
+        current_state = self.get_current_state()
+        
+        if current_state == 'start':
+            self.render_start_page()
+        elif current_state == 'login':
+            self.render_login_page()
+        elif current_state == 'register':
+            self.render_register_page()
+        elif current_state == 'authenticated':
+            self.render_authenticated_dashboard()
+        elif current_state == 'create_campaign':
+            render_create_campaign_page(self)
+        elif current_state == 'submit_campaign':
+            render_submit_campaign_page(self)
+        elif current_state == 'xai_processing':
+            render_xai_processing_page(self)
+        elif current_state == 'admin_review':
+            render_admin_review_page(self)
+        elif current_state == 'funding_display':
+            render_funding_display_page(self)
+        elif current_state == 'discard_project':
+            render_discard_project_page(self)
+        elif current_state == 'browse_campaigns':
+            render_browse_campaigns_page(self)
+        elif current_state == 'view_campaign':
+            render_view_campaign_page(self)
+        elif current_state == 'verification_check':
+            render_verification_check_page(self)
+        elif current_state == 'show_warning':
+            render_show_warning_page(self)
+        elif current_state == 'make_contribution':
+            render_make_contribution_page(self)
+        elif current_state == 'payment':
+            render_payment_page(self)
+        elif current_state == 'success':
+            render_success_page(self)
         else:
-            # Show main application interface
-            show_main_interface()
-            
-    except Exception as e:
-        logger.error(f"Main application error: {e}")
-        st.error("Sorry, there was an error loading the application. Please refresh the page.")
-        st.exception(e)
-
-def initialize_session_state():
-    """Initialize session state variables"""
-    if 'authenticated' not in st.session_state:
-        st.session_state.authenticated = False
+            st.error(f"Unknown workflow state: {current_state}")
     
-    if 'user' not in st.session_state:
-        st.session_state.user = {}
-    
-    if 'current_page' not in st.session_state:
-        st.session_state.current_page = 'login'
-    
-    if 'language' not in st.session_state:
-        st.session_state.language = 'English'
-
-def load_custom_css():
-    """Load custom CSS styling with light green theme"""
-    st.markdown("""
-    <style>
-    /* Main theme colors - Light Green */
-    :root {
-        --primary-color: #4caf50;
-        --secondary-color: #81c784;
-        --accent-color: #2e7d32;
-        --background-color: #e8f5e8;
-        --text-color: #1b5e20;
-    }
-    
-    /* Main container styling */
-    .main > div {
-        padding-top: 2rem;
-    }
-    
-    /* Sidebar styling */
-    .css-1d391kg {
-        background-color: var(--background-color);
-    }
-    
-    /* Button styling */
-    .stButton > button {
-        background-color: var(--primary-color);
-        color: white;
-        border: none;
-        border-radius: 25px;
-        padding: 0.5rem 1rem;
-        font-weight: bold;
-        transition: all 0.3s ease;
-    }
-    
-    .stButton > button:hover {
-        background-color: var(--accent-color);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
-    }
-    
-    /* Header styling */
-    .main-header {
-        background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
-        padding: 2rem;
-        border-radius: 15px;
-        margin-bottom: 2rem;
-        text-align: center;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-    }
-    
-    /* Navigation styling */
-    .nav-button {
-        width: 100%;
-        margin: 0.25rem 0;
-        padding: 0.75rem;
-        background: white;
-        border: 2px solid var(--primary-color);
-        border-radius: 10px;
-        color: var(--accent-color);
-        font-weight: bold;
-        text-align: center;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-    
-    .nav-button:hover {
-        background: var(--primary-color);
-        color: white;
-        transform: translateX(5px);
-    }
-    
-    .nav-button.active {
-        background: var(--accent-color);
-        color: white;
-    }
-    
-    /* Language dropdown styling */
-    .language-dropdown {
-        background: white;
-        border: 2px solid var(--primary-color);
-        border-radius: 10px;
-        padding: 0.5rem;
-        margin-bottom: 1rem;
-    }
-    
-    /* Auth interface styling */
-    .auth-container {
-        max-width: 500px;
-        margin: 0 auto;
-        padding: 2rem;
-        background: white;
-        border-radius: 15px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-    }
-    
-    /* Pulse animation for OAuth buttons */
-    .pulse {
-        animation: pulse 2s infinite;
-    }
-    
-    @keyframes pulse {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.05); }
-        100% { transform: scale(1); }
-    }
-    
-    /* MaterializeCSS inspired elements */
-    .floating-action-btn {
-        position: fixed;
-        bottom: 2rem;
-        right: 2rem;
-        width: 56px;
-        height: 56px;
-        background: var(--primary-color);
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-size: 1.5rem;
-        box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-    
-    .floating-action-btn:hover {
-        transform: scale(1.1);
-        box-shadow: 0 6px 20px rgba(76, 175, 80, 0.6);
-    }
-    
-    /* Card panel styling */
-    .card-panel {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        margin-bottom: 1rem;
-        border-left: 4px solid var(--primary-color);
-    }
-    
-    /* Success/Error message styling */
-    .stSuccess {
-        background-color: #c8e6c9;
-        border-left: 4px solid #4caf50;
-    }
-    
-    .stError {
-        background-color: #ffcdd2;
-        border-left: 4px solid #f44336;
-    }
-    
-    .stWarning {
-        background-color: #fff3e0;
-        border-left: 4px solid #ff9800;
-    }
-    
-    .stInfo {
-        background-color: #e3f2fd;
-        border-left: 4px solid #2196f3;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-def show_auth_interface():
-    """Show authentication interface (login/registration only)"""
-    try:
-        # Language dropdown at the top
-        show_language_dropdown()
-        
-        # Main header
+    def render_start_page(self):
+        """Render the start page - login decision point"""
         st.markdown("""
-        <div class="main-header">
-            <h1 style="color: #2e7d32; font-size: 3rem; margin-bottom: 1rem;">
-                🏠 HAVEN
-            </h1>
-            <h2 style="color: #388e3c; margin-bottom: 1rem;">
-                Crowdfunding Platform
-            </h2>
+        <div style="background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%); 
+                    padding: 3rem; border-radius: 15px; text-align: center; margin-bottom: 2rem;">
+            <h1 style="color: #2e7d32;">🏠 Welcome to HAVEN</h1>
+            <h2 style="color: #388e3c;">Your Trusted Crowdfunding Platform</h2>
             <p style="color: #4caf50; font-size: 1.2rem;">
-                Empowering Communities Through Crowdfunding
+                Empowering communities to support causes that matter
             </p>
         </div>
         """, unsafe_allow_html=True)
         
-        # Authentication tabs
-        tab1, tab2 = st.tabs([get_text("sign_in", "🔐 Sign In"), get_text("register", "📝 Register")])
+        # Language selection (always available)
+        self.render_language_selector()
         
-        with tab1:
-            if PAGES_AVAILABLE:
-                try:
-                    login.show()
-                except Exception as e:
-                    logger.error(f"Error loading login page: {e}")
-                    show_fallback_login()
-            else:
-                show_fallback_login()
-        
-        with tab2:
-            if EXTENDED_PAGES_AVAILABLE:
-                try:
-                    register.show()
-                except Exception as e:
-                    logger.error(f"Error loading register page: {e}")
-                    show_fallback_register()
-            else:
-                show_fallback_register()
-        
-        # Platform information
-        show_platform_info()
-        
-        # Footer
-        if EXTENDED_PAGES_AVAILABLE:
-            try:
-                footer.show()
-            except Exception as e:
-                logger.error(f"Error loading footer: {e}")
-        
-    except Exception as e:
-        logger.error(f"Auth interface error: {e}")
-        st.error("Error loading authentication interface.")
-
-def show_main_interface():
-    """Show main application interface for authenticated users"""
-    try:
-        # Sidebar navigation
-        with st.sidebar:
-            show_user_info()
-            show_language_dropdown()
-            show_navigation_menu()
-            show_logout_button()
-        
-        # Main content area
-        current_page = st.session_state.get('current_page', 'home')
-        
-        if PAGES_AVAILABLE:
-            try:
-                if current_page == 'home':
-                    home.show()
-                elif current_page == 'explore' and EXTENDED_PAGES_AVAILABLE:
-                    explore.show()
-                elif current_page == 'search' and EXTENDED_PAGES_AVAILABLE:
-                    search.show()
-                elif current_page == 'campaign' and EXTENDED_PAGES_AVAILABLE:
-                    campaign.show()
-                elif current_page == 'profile' and EXTENDED_PAGES_AVAILABLE:
-                    profile.show()
-                else:
-                    # Default to home
-                    home.show()
-            except Exception as e:
-                logger.error(f"Error loading page {current_page}: {e}")
-                show_fallback_page(current_page)
-        else:
-            show_fallback_page(current_page)
-        
-        # Floating action button for quick campaign creation
-        show_floating_action_button()
-        
-        # Footer
-        if EXTENDED_PAGES_AVAILABLE:
-            try:
-                footer.show()
-            except Exception as e:
-                logger.error(f"Error loading footer: {e}")
-        
-    except Exception as e:
-        logger.error(f"Main interface error: {e}")
-        st.error("Error loading main interface.")
-
-def show_language_dropdown():
-    """Show language selection dropdown"""
-    try:
-        st.markdown(f"### 🌍 {get_text('language', 'Language')} / भाषा")
-        
-        if UTILS_AVAILABLE:
-            languages = get_supported_languages()
-        else:
-            languages = {
-                "English": "🇺🇸 English",
-                "Hindi": "🇮🇳 हिंदी", 
-                "Tamil": "🇮🇳 தமிழ்",
-                "Telugu": "🇮🇳 తెలుగు"
-            }
-        
-        selected_language = st.selectbox(
-            "Choose your language",
-            options=list(languages.keys()),
-            format_func=lambda x: languages[x],
-            index=list(languages.keys()).index(st.session_state.get('language', 'English')),
-            key="language_selector"
-        )
-        
-        if selected_language != st.session_state.get('language'):
-            st.session_state.language = selected_language
-            if UTILS_AVAILABLE:
-                set_language(selected_language)
-            st.success(f"Language changed to {languages[selected_language]}")
-            st.rerun()
-            
-    except Exception as e:
-        logger.error(f"Language dropdown error: {e}")
-        st.error("Error loading language options.")
-
-def show_user_info():
-    """Show user information in sidebar"""
-    try:
-        user = st.session_state.get('user', {})
-        user_name = user.get('name', 'User')
-        user_email = user.get('email', 'user@example.com')
-        user_avatar = user.get('avatar', '👤')
-        
-        st.markdown(f"""
-        <div class="card-panel" style="text-align: center;">
-            <div style="font-size: 3rem; margin-bottom: 0.5rem;">{user_avatar}</div>
-            <h3 style="color: #2e7d32; margin-bottom: 0.5rem;">{user_name}</h3>
-            <p style="color: #666; font-size: 0.9rem;">{user_email}</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-    except Exception as e:
-        logger.error(f"User info error: {e}")
-
-def show_navigation_menu():
-    """Show navigation menu for authenticated users"""
-    try:
-        st.markdown(f"### 🧭 {get_text('navigation', 'Navigation')}")
-        
-        # Navigation options
-        nav_options = {
-            'home': {'icon': '🏠', 'label': get_text('home', 'Home'), 'description': 'Dashboard and overview'},
-        }
-        
-        # Add extended navigation if available
-        if EXTENDED_PAGES_AVAILABLE:
-            nav_options.update({
-                'explore': {'icon': '🔍', 'label': get_text('explore', 'Explore'), 'description': 'Browse campaigns'},
-                'search': {'icon': '🔎', 'label': get_text('search', 'Search'), 'description': 'Find specific campaigns'},
-                'campaign': {'icon': '🎯', 'label': get_text('campaign', 'Campaigns'), 'description': 'Manage your campaigns'},
-                'profile': {'icon': '👤', 'label': get_text('profile', 'Profile'), 'description': 'Account settings'}
-            })
-        
-        current_page = st.session_state.get('current_page', 'home')
-        
-        for page_key, page_info in nav_options.items():
-            # Create button with active state styling
-            button_class = "nav-button active" if page_key == current_page else "nav-button"
-            
-            if st.button(
-                f"{page_info['icon']} {page_info['label']}",
-                key=f"nav_{page_key}",
-                help=page_info['description'],
-                use_container_width=True
-            ):
-                st.session_state.current_page = page_key
-                st.rerun()
-        
-        # Quick stats
-        st.markdown("---")
-        st.markdown(f"### 📊 {get_text('quick_stats', 'Quick Stats')}")
+        # Login decision
+        st.markdown("### 🔐 Get Started")
         
         col1, col2 = st.columns(2)
+        
         with col1:
-            st.metric(f"💰 {get_text('raised', 'Raised')}", "₹2.5L", "+₹15K")
+            st.markdown("""
+            <div style="background: white; padding: 2rem; border-radius: 10px; 
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
+                <h3 style="color: #2e7d32;">🔑 Existing User</h3>
+                <p style="color: #666;">Already have an account? Sign in to continue</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            if st.button("🔑 Sign In", use_container_width=True, key="signin_btn"):
+                self.navigate_to('start', 'login_yes')
+        
         with col2:
-            st.metric(f"🎯 {get_text('campaigns', 'Campaigns')}", "3", "+1")
-        
-    except Exception as e:
-        logger.error(f"Navigation menu error: {e}")
-
-def show_logout_button():
-    """Show logout button"""
-    try:
-        st.markdown("---")
-        
-        if st.button(f"🚪 {get_text('logout', 'Logout')}", use_container_width=True, type="secondary"):
-            # Clear session state
-            if UTILS_AVAILABLE:
-                logout_user()
-            else:
-                st.session_state.authenticated = False
-                st.session_state.user = {}
-                st.session_state.current_page = 'login'
+            st.markdown("""
+            <div style="background: white; padding: 2rem; border-radius: 10px; 
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
+                <h3 style="color: #2e7d32;">👤 New User</h3>
+                <p style="color: #666;">Join our community and start making a difference</p>
+            </div>
+            """, unsafe_allow_html=True)
             
-            st.success(f"👋 {get_text('logged_out', 'Logged out successfully!')}")
-            st.rerun()
-            
-    except Exception as e:
-        logger.error(f"Logout error: {e}")
-
-def show_floating_action_button():
-    """Show floating action button for quick campaign creation"""
-    try:
-        st.markdown("""
-        <div class="floating-action-btn" onclick="createCampaign()" title="Create New Campaign">
-            ➕
-        </div>
+            if st.button("👤 Create Account", use_container_width=True, key="signup_btn"):
+                self.navigate_to('start', 'login_no')
         
-        <script>
-        function createCampaign() {
-            // This would trigger campaign creation
-            alert('Quick campaign creation coming soon!');
-        }
-        </script>
-        """, unsafe_allow_html=True)
-        
-    except Exception as e:
-        logger.error(f"Floating action button error: {e}")
-
-def show_platform_info():
-    """Show platform information for unauthenticated users"""
-    try:
+        # Platform features
         st.markdown("---")
-        st.markdown(f"### ℹ️ {get_text('about_platform', 'About HAVEN Platform')}")
+        st.markdown("### ✨ Why Choose HAVEN?")
         
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.markdown(f"""
-            #### 🎯 {get_text('create_campaigns', 'Create Campaigns')}
-            Launch your fundraising campaigns with ease. Our platform provides all the tools you need to tell your story and reach your goals.
-            """)
+            st.markdown("""
+            <div style="background: white; padding: 1.5rem; border-radius: 10px; 
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
+                <h4 style="color: #2e7d32;">🔒 Secure & Verified</h4>
+                <p style="color: #666;">AI-powered fraud detection and manual verification</p>
+            </div>
+            """, unsafe_allow_html=True)
         
         with col2:
-            st.markdown(f"""
-            #### 🔍 {get_text('discover_causes', 'Discover Causes')}
-            Find and support causes that matter to you. Browse through verified campaigns across multiple categories.
-            """)
+            st.markdown("""
+            <div style="background: white; padding: 1.5rem; border-radius: 10px; 
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
+                <h4 style="color: #2e7d32;">🌍 Multi-Language</h4>
+                <p style="color: #666;">Support in English, Hindi, Tamil, and Telugu</p>
+            </div>
+            """, unsafe_allow_html=True)
         
         with col3:
-            st.markdown(f"""
-            #### 🔒 {get_text('secure_trusted', 'Secure & Trusted')}
-            Advanced fraud detection and secure payment processing ensure your donations reach the right hands.
-            """)
+            st.markdown("""
+            <div style="background: white; padding: 1.5rem; border-radius: 10px; 
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
+                <h4 style="color: #2e7d32;">💝 Transparent</h4>
+                <p style="color: #666;">Real-time updates and complete transparency</p>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    def render_language_selector(self):
+        """Render language selector (always available)"""
+        languages = {
+            'English': '🇺🇸 English',
+            'Hindi': '🇮🇳 हिंदी',
+            'Tamil': '🇮🇳 தமிழ்',
+            'Telugu': '🇮🇳 తెలుగు'
+        }
         
-        # Platform statistics
+        col1, col2, col3 = st.columns([1, 1, 2])
+        
+        with col2:
+            selected_lang = st.selectbox(
+                "🌐 Language",
+                options=list(languages.keys()),
+                format_func=lambda x: languages[x],
+                index=list(languages.keys()).index(st.session_state.selected_language)
+            )
+            
+            if selected_lang != st.session_state.selected_language:
+                st.session_state.selected_language = selected_lang
+                st.rerun()
+    
+    def render_login_page(self):
+        """Render login page"""
+        st.markdown("### 🔑 Sign In to HAVEN")
+        
+        # Language selector
+        self.render_language_selector()
+        
+        # Login tabs
+        tab1, tab2 = st.tabs(["📧 Email Login", "🔗 Social Login"])
+        
+        with tab1:
+            with st.form("email_login_form"):
+                st.markdown("#### 📧 Email & Password")
+                
+                email = st.text_input("Email Address", placeholder="your.email@example.com")
+                password = st.text_input("Password", type="password", placeholder="Enter your password")
+                
+                remember_me = st.checkbox("Remember me")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    if st.form_submit_button("🔑 Sign In", use_container_width=True):
+                        if email and password:
+                            success, result = login_user('email', {'email': email, 'password': password})
+                            
+                            if success:
+                                st.success(f"Welcome back, {result.get('first_name', 'User')}!")
+                                time.sleep(1)
+                                self.navigate_to('login', 'success')
+                            else:
+                                st.error(f"Login failed: {result}")
+                        else:
+                            st.error("Please enter both email and password")
+                
+                with col2:
+                    if st.form_submit_button("👤 Create Account", use_container_width=True):
+                        self.navigate_to('login', 'register')
+                
+                st.markdown("[Forgot Password?](#)")
+        
+        with tab2:
+            st.markdown("#### 🔗 Social Login")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("🔴 Google", use_container_width=True, key="google_login"):
+                    success, result = login_user('google', {})
+                    
+                    if success:
+                        st.success(f"Welcome, {result.get('first_name', 'User')}!")
+                        time.sleep(1)
+                        self.navigate_to('login', 'success')
+                    else:
+                        st.error(f"Google login failed: {result}")
+            
+            with col2:
+                if st.button("🔵 Facebook", use_container_width=True, key="facebook_login"):
+                    success, result = login_user('facebook', {})
+                    
+                    if success:
+                        st.success(f"Welcome, {result.get('first_name', 'User')}!")
+                        time.sleep(1)
+                        self.navigate_to('login', 'success')
+                    else:
+                        st.error(f"Facebook login failed: {result}")
+    
+    def render_register_page(self):
+        """Render registration page"""
+        st.markdown("### 👤 Create Your HAVEN Account")
+        
+        # Language selector
+        self.render_language_selector()
+        
+        # Registration tabs
+        tab1, tab2 = st.tabs(["📧 Email Registration", "🔗 Social Registration"])
+        
+        with tab1:
+            with st.form("email_register_form"):
+                st.markdown("#### 📧 Create Account with Email")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    first_name = st.text_input("First Name *", placeholder="Your first name")
+                    email = st.text_input("Email Address *", placeholder="your.email@example.com")
+                    password = st.text_input("Password *", type="password", placeholder="Create a strong password")
+                
+                with col2:
+                    last_name = st.text_input("Last Name *", placeholder="Your last name")
+                    phone = st.text_input("Phone Number", placeholder="+91 9876543210")
+                    confirm_password = st.text_input("Confirm Password *", type="password", placeholder="Confirm your password")
+                
+                terms_accepted = st.checkbox("I agree to the Terms of Service and Privacy Policy *")
+                newsletter = st.checkbox("Subscribe to newsletter for updates")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    if st.form_submit_button("👤 Create Account", use_container_width=True):
+                        required_fields = [first_name, last_name, email, password, confirm_password]
+                        
+                        if not all(required_fields):
+                            st.error("Please fill in all required fields marked with *")
+                        elif password != confirm_password:
+                            st.error("Passwords do not match")
+                        elif not terms_accepted:
+                            st.error("Please accept the Terms of Service")
+                        else:
+                            user_data = {
+                                'first_name': first_name,
+                                'last_name': last_name,
+                                'email': email,
+                                'password': password,
+                                'phone': phone,
+                                'newsletter': newsletter
+                            }
+                            
+                            success, result = register_user('email', user_data)
+                            
+                            if success:
+                                st.success(f"Welcome to HAVEN, {result.get('first_name', 'User')}!")
+                                time.sleep(1)
+                                self.navigate_to('register', 'success')
+                            else:
+                                st.error(f"Registration failed: {result}")
+                
+                with col2:
+                    if st.form_submit_button("🔑 Sign In Instead", use_container_width=True):
+                        self.navigate_to('register', 'login')
+        
+        with tab2:
+            st.markdown("#### 🔗 Quick Registration with Social Media")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("🔴 Register with Google", use_container_width=True, key="google_register"):
+                    success, result = register_user('google', {})
+                    
+                    if success:
+                        st.success(f"Welcome to HAVEN, {result.get('first_name', 'User')}!")
+                        time.sleep(1)
+                        self.navigate_to('register', 'success')
+                    else:
+                        st.error(f"Google registration failed: {result}")
+            
+            with col2:
+                if st.button("🔵 Register with Facebook", use_container_width=True, key="facebook_register"):
+                    success, result = register_user('facebook', {})
+                    
+                    if success:
+                        st.success(f"Welcome to HAVEN, {result.get('first_name', 'User')}!")
+                        time.sleep(1)
+                        self.navigate_to('register', 'success')
+                    else:
+                        st.error(f"Facebook registration failed: {result}")
+    
+    def render_authenticated_dashboard(self):
+        """Render authenticated user dashboard"""
+        user_data = st.session_state.user_data
+        
+        # Header with user info and language selector
+        col1, col2, col3 = st.columns([2, 1, 1])
+        
+        with col1:
+            st.markdown(f"### 🏠 Welcome back, {user_data.get('first_name', 'User')}!")
+        
+        with col2:
+            self.render_language_selector()
+        
+        with col3:
+            if st.button("🚪 Logout", use_container_width=True):
+                self.navigate_to('authenticated', 'logout')
+        
+        # Navigation menu (only visible after authentication)
+        st.markdown("### 🧭 Navigation")
+        
+        col1, col2, col3, col4, col5 = st.columns(5)
+        
+        with col1:
+            if st.button("🏠 Home", use_container_width=True):
+                st.rerun()  # Stay on dashboard
+        
+        with col2:
+            if st.button("🔍 Explore", use_container_width=True):
+                self.navigate_to('authenticated', 'browse')
+        
+        with col3:
+            if st.button("🔍 Search", use_container_width=True):
+                self.navigate_to('authenticated', 'browse')
+        
+        with col4:
+            if st.button("🎯 Campaign", use_container_width=True):
+                self.navigate_to('authenticated', 'create')
+        
+        with col5:
+            if st.button("👤 Profile", use_container_width=True):
+                st.info("Profile management coming soon!")
+        
+        # Dashboard content
         st.markdown("---")
+        
+        # Quick actions
+        st.markdown("### ⚡ Quick Actions")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("""
+            <div style="background: white; padding: 2rem; border-radius: 10px; 
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
+                <h3 style="color: #2e7d32;">🎯 Create Campaign</h3>
+                <p style="color: #666;">Launch your crowdfunding campaign</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            if st.button("🚀 Start Campaign", use_container_width=True, key="create_campaign_btn"):
+                self.navigate_to('authenticated', 'create')
+        
+        with col2:
+            st.markdown("""
+            <div style="background: white; padding: 2rem; border-radius: 10px; 
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
+                <h3 style="color: #2e7d32;">🔍 Browse Projects</h3>
+                <p style="color: #666;">Discover amazing causes to support</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            if st.button("🔍 Browse Now", use_container_width=True, key="browse_campaigns_btn"):
+                self.navigate_to('authenticated', 'browse')
+        
+        with col3:
+            st.markdown("""
+            <div style="background: white; padding: 2rem; border-radius: 10px; 
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center;">
+                <h3 style="color: #2e7d32;">💝 Support Causes</h3>
+                <p style="color: #666;">Make a difference today</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            if st.button("💝 Donate Now", use_container_width=True, key="support_causes_btn"):
+                self.navigate_to('authenticated', 'browse')
+        
+        # User stats (placeholder)
+        st.markdown("### 📊 Your Impact")
+        
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.metric(f"💰 {get_text('total_raised', 'Total Raised')}", "₹12.5 Cr")
+            st.metric("Campaigns Created", "0", "0")
         
         with col2:
-            st.metric(f"🎯 {get_text('active_campaigns', 'Active Campaigns')}", "1,247")
+            st.metric("Total Raised", "₹0", "₹0")
         
         with col3:
-            st.metric(f"👥 {get_text('community_members', 'Community Members')}", "45,678")
+            st.metric("Donations Made", "0", "0")
         
         with col4:
-            st.metric(f"🏆 {get_text('success_rate', 'Success Rate')}", "78%")
-        
-    except Exception as e:
-        logger.error(f"Platform info error: {e}")
+            st.metric("Lives Impacted", "0", "0")
 
-def show_fallback_login():
-    """Fallback login interface when modules fail to load"""
-    st.markdown(f"### 🔐 {get_text('sign_in_to_haven', 'Sign In to HAVEN')}")
+def main():
+    """Main application entry point"""
+    # Configure Streamlit page
+    st.set_page_config(
+        page_title="HAVEN - Crowdfunding Platform",
+        page_icon="🏠",
+        layout="wide",
+        initial_sidebar_state="collapsed"
+    )
     
-    with st.form("fallback_login"):
-        email = st.text_input(f"📧 {get_text('email', 'Email')}", placeholder="your.email@example.com")
-        password = st.text_input(f"🔒 {get_text('password', 'Password')}", type="password", placeholder="Your password")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            login_btn = st.form_submit_button(f"🚀 {get_text('sign_in', 'Sign In')}", use_container_width=True)
-        with col2:
-            demo_btn = st.form_submit_button(f"🎭 {get_text('demo_login', 'Demo Login')}", use_container_width=True)
+    # Custom CSS for light green theme
+    st.markdown("""
+    <style>
+    .stApp {
+        background: linear-gradient(135deg, #f1f8e9 0%, #e8f5e8 100%);
+    }
     
-    if login_btn and email and password:
-        # Simple validation for demo
-        if "@" in email:
-            st.session_state.authenticated = True
-            st.session_state.user = {
-                'name': email.split('@')[0].title(),
-                'email': email,
-                'avatar': '👤'
-            }
-            st.session_state.current_page = 'home'
-            st.success(f"✅ {get_text('login_successful', 'Login successful!')}")
-            st.rerun()
-        else:
-            st.error(f"❌ {get_text('valid_email_required', 'Please enter a valid email address')}")
+    .stButton > button {
+        background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
     
-    if demo_btn:
-        # Demo login
-        st.session_state.authenticated = True
-        st.session_state.user = {
-            'name': 'Demo User',
-            'email': 'demo@haven.com',
-            'avatar': '🎭'
-        }
-        st.session_state.current_page = 'home'
-        st.success(f"✅ {get_text('demo_login_successful', 'Demo login successful!')}")
-        st.rerun()
-
-def show_fallback_register():
-    """Fallback registration interface when modules fail to load"""
-    st.markdown(f"### 📝 {get_text('create_haven_account', 'Create HAVEN Account')}")
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+    }
     
-    with st.form("fallback_register"):
-        name = st.text_input(f"👤 {get_text('full_name', 'Full Name')}", placeholder="Your full name")
-        email = st.text_input(f"📧 {get_text('email', 'Email')}", placeholder="your.email@example.com")
-        password = st.text_input(f"🔒 {get_text('password', 'Password')}", type="password", placeholder="Create password")
-        terms = st.checkbox(get_text('agree_terms', 'I agree to Terms of Service'))
-        
-        register_btn = st.form_submit_button(f"🎉 {get_text('create_account', 'Create Account')}", use_container_width=True)
+    .stSelectbox > div > div {
+        background: white;
+        border-radius: 8px;
+    }
     
-    if register_btn:
-        if name and email and password and terms:
-            st.session_state.authenticated = True
-            st.session_state.user = {
-                'name': name,
-                'email': email,
-                'avatar': '👤'
-            }
-            st.session_state.current_page = 'home'
-            st.success(f"🎉 {get_text('account_created', 'Account created successfully!')}")
-            st.balloons()
-            st.rerun()
-        else:
-            st.error(f"❌ {get_text('fill_all_fields', 'Please fill all fields and accept terms')}")
-
-def show_fallback_page(page_name: str):
-    """Show fallback page when modules fail to load"""
-    st.markdown(f"""
-    <div class="main-header">
-        <h1 style="color: #2e7d32;">🚧 {page_name.title()} Page</h1>
-        <p style="color: #666;">This page is currently under development.</p>
-    </div>
+    .stTextInput > div > div > input {
+        background: white;
+        border-radius: 8px;
+    }
+    
+    .stTextArea > div > div > textarea {
+        background: white;
+        border-radius: 8px;
+    }
+    
+    .stProgress > div > div > div {
+        background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+    }
+    
+    .stMetric {
+        background: white;
+        padding: 1rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    </style>
     """, unsafe_allow_html=True)
     
-    st.info(f"The {page_name} page functionality will be available soon. Please check back later!")
-
-def get_text(key: str, default: str = None) -> str:
-    """Get translated text with fallback"""
-    if UTILS_AVAILABLE:
-        return t(key, default)
-    return default or key
+    # Initialize workflow manager
+    workflow_manager = WorkflowManager()
+    
+    # Check authentication status
+    if check_authentication():
+        st.session_state.user_authenticated = True
+        # If authenticated but on start/login/register page, redirect to dashboard
+        if workflow_manager.get_current_state() in ['start', 'login', 'register']:
+            workflow_manager.navigate_to(workflow_manager.get_current_state(), 'success')
+    else:
+        st.session_state.user_authenticated = False
+        # If not authenticated but on protected page, redirect to start
+        protected_states = ['authenticated', 'create_campaign', 'submit_campaign', 'xai_processing', 
+                          'admin_review', 'funding_display', 'discard_project']
+        if workflow_manager.get_current_state() in protected_states:
+            st.session_state.current_workflow_state = 'start'
+    
+    # Render current page
+    workflow_manager.render_current_page()
+    
+    # Debug info (remove in production)
+    if st.sidebar.checkbox("Debug Mode"):
+        st.sidebar.markdown("### Debug Info")
+        st.sidebar.markdown(f"**Current State:** {workflow_manager.get_current_state()}")
+        st.sidebar.markdown(f"**Authenticated:** {st.session_state.user_authenticated}")
+        st.sidebar.markdown(f"**User:** {st.session_state.user_data.get('first_name', 'None')}")
+        st.sidebar.markdown(f"**Language:** {st.session_state.selected_language}")
 
 if __name__ == "__main__":
     main()
