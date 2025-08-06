@@ -1,203 +1,210 @@
 """
-Footer Component for HAVEN Crowdfunding Platform
-Handles footer rendering with proper links and contact information
+Footer component for HAVEN Crowdfunding Platform
+Matches the repository structure of sudhindra-a700/haven-frontend
 """
 
 import streamlit as st
+import logging
 from datetime import datetime
 
-def render_footer():
-    """Render the main footer"""
-    st.markdown("---")
-    
-    # Footer content
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("### 📞 Contact")
-        st.markdown("- [Support](mailto:support@haven.org)")
-        st.markdown("- [Contact Us](mailto:contact@haven.org)")
-        st.markdown("- Phone: +91-XXX-XXX-XXXX")
-        st.markdown("- Address: Mumbai, India")
-    
-    with col2:
-        st.markdown("### 📄 Legal")
-        st.info("📝 Legal pages are being prepared and will be available soon.")
-        st.markdown("- Terms of Service (Coming Soon)")
-        st.markdown("- Privacy Policy (Coming Soon)")
-        st.markdown("- Cookie Policy (Coming Soon)")
-        st.markdown("- Refund Policy (Coming Soon)")
-    
-    with col3:
-        st.markdown("### 🌐 Connect")
-        st.info("🔗 Social media pages are being set up and will be available soon.")
-        st.markdown("- Twitter (Coming Soon)")
-        st.markdown("- Facebook (Coming Soon)")
-        st.markdown("- LinkedIn (Coming Soon)")
-        st.markdown("- Instagram (Coming Soon)")
-    
-    # Copyright and additional info
-    st.markdown("---")
-    
-    col1, col2, col3 = st.columns([2, 1, 2])
-    
-    with col1:
+logger = logging.getLogger(__name__)
+
+def show():
+    """Display the footer component"""
+    try:
+        # Footer styling
+        st.markdown("""
+        <style>
+        .footer {
+            background: linear-gradient(135deg, #2e7d32 0%, #4caf50 100%);
+            color: white;
+            padding: 2rem 1rem;
+            margin-top: 3rem;
+            border-radius: 15px 15px 0 0;
+            text-align: center;
+        }
+        
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .footer-section {
+            margin-bottom: 1.5rem;
+        }
+        
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 2rem;
+            margin: 1rem 0;
+        }
+        
+        .footer-link {
+            color: #c8e6c9;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+        
+        .footer-link:hover {
+            color: white;
+            text-decoration: underline;
+        }
+        
+        .social-icons {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .social-icon {
+            font-size: 1.5rem;
+            color: #c8e6c9;
+            transition: transform 0.3s ease, color 0.3s ease;
+        }
+        
+        .social-icon:hover {
+            transform: scale(1.2);
+            color: white;
+        }
+        
+        .footer-divider {
+            border: none;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.2);
+            margin: 1.5rem 0;
+        }
+        
+        .footer-bottom {
+            font-size: 0.9rem;
+            color: #c8e6c9;
+        }
+        
+        .footer-logo {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Footer content
         current_year = datetime.now().year
+        
         st.markdown(f"""
-        <div style="text-align: left; color: #666; font-size: 0.9rem;">
-            © {current_year} HAVEN Crowdfunding Platform. All rights reserved.<br>
-            Made with ❤️ in India
+        <div class="footer">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <div class="footer-logo">🏠 HAVEN</div>
+                    <p style="margin: 0.5rem 0; color: #c8e6c9;">
+                        Empowering Communities Through Crowdfunding
+                    </p>
+                </div>
+                
+                <div class="footer-section">
+                    <div class="footer-links">
+                        <a href="#" class="footer-link">About Us</a>
+                        <a href="#" class="footer-link">How It Works</a>
+                        <a href="#" class="footer-link">Success Stories</a>
+                        <a href="#" class="footer-link">Help Center</a>
+                        <a href="#" class="footer-link">Contact</a>
+                        <a href="#" class="footer-link">Blog</a>
+                    </div>
+                </div>
+                
+                <div class="footer-section">
+                    <div class="footer-links">
+                        <a href="#" class="footer-link">Privacy Policy</a>
+                        <a href="#" class="footer-link">Terms of Service</a>
+                        <a href="#" class="footer-link">Cookie Policy</a>
+                        <a href="#" class="footer-link">Trust & Safety</a>
+                        <a href="#" class="footer-link">Fraud Prevention</a>
+                    </div>
+                </div>
+                
+                <div class="footer-section">
+                    <div class="social-icons">
+                        <span class="social-icon" title="Facebook">📘</span>
+                        <span class="social-icon" title="Twitter">🐦</span>
+                        <span class="social-icon" title="Instagram">📷</span>
+                        <span class="social-icon" title="LinkedIn">💼</span>
+                        <span class="social-icon" title="YouTube">📺</span>
+                        <span class="social-icon" title="WhatsApp">💬</span>
+                    </div>
+                </div>
+                
+                <hr class="footer-divider">
+                
+                <div class="footer-bottom">
+                    <p style="margin: 0.5rem 0;">
+                        © {current_year} HAVEN Crowdfunding Platform. All rights reserved.
+                    </p>
+                    <p style="margin: 0.5rem 0; font-size: 0.8rem;">
+                        Built with ❤️ using Streamlit | Secured with 🔒 Advanced Fraud Detection
+                    </p>
+                    <p style="margin: 0.5rem 0; font-size: 0.8rem;">
+                        🌍 Supporting communities across India | 🚀 Powered by AI & ML
+                    </p>
+                </div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
-    
-    with col2:
+        
+        # Additional footer information
+        with st.expander("📊 Platform Statistics", expanded=False):
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("💰 Total Raised", "₹12.5 Cr", "↗️ +15%")
+            
+            with col2:
+                st.metric("🎯 Campaigns", "1,247", "↗️ +8%")
+            
+            with col3:
+                st.metric("👥 Users", "45,678", "↗️ +12%")
+            
+            with col4:
+                st.metric("🏆 Success Rate", "78%", "↗️ +3%")
+        
+        # Trust indicators
         st.markdown("""
-        <div style="text-align: center;">
-            <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMjAiIGZpbGw9IiM2NjdlZWEiLz4KPHN2ZyB4PSI4IiB5PSI4IiB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSI+CjxwYXRoIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMlM2LjQ4IDIyIDEyIDIyUzIyIDE3LjUyIDIyIDEyUzE3LjUyIDIgMTIgMlpNMTMgMTdIMTFWMTFIMTNWMTdaTTEzIDlIMTFWN0gxM1Y5WiIgZmlsbD0id2hpdGUiLz4KPC9zdmc+Cjwvc3ZnPgo=" alt="HAVEN Logo" style="width: 40px; height: 40px;">
+        <div style="text-align: center; margin: 2rem 0; padding: 1rem; background: rgba(76, 175, 80, 0.1); border-radius: 10px;">
+            <h4 style="color: #2e7d32; margin-bottom: 1rem;">🛡️ Trust & Security</h4>
+            <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 2rem;">
+                <div style="text-align: center;">
+                    <div style="font-size: 2rem;">🔒</div>
+                    <div style="font-size: 0.9rem; color: #666;">SSL Encrypted</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 2rem;">🛡️</div>
+                    <div style="font-size: 0.9rem; color: #666;">Fraud Protected</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 2rem;">✅</div>
+                    <div style="font-size: 0.9rem; color: #666;">Verified Campaigns</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 2rem;">💳</div>
+                    <div style="font-size: 0.9rem; color: #666;">Secure Payments</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 2rem;">📞</div>
+                    <div style="font-size: 0.9rem; color: #666;">24/7 Support</div>
+                </div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown("""
-        <div style="text-align: right; color: #666; font-size: 0.9rem;">
-            Secure payments powered by Instamojo<br>
-            Email services by Brevo<br>
-            Search powered by Algolia
-        </div>
-        """, unsafe_allow_html=True)
-
-def render_mini_footer():
-    """Render a minimal footer for pages with limited space"""
-    st.markdown("---")
-    
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        current_year = datetime.now().year
+        
+    except Exception as e:
+        logger.error(f"Footer display error: {e}")
+        # Minimal fallback footer
+        st.markdown("---")
         st.markdown(f"""
-        <div style="text-align: center; color: #666; font-size: 0.8rem; padding: 1rem 0;">
-            © {current_year} HAVEN Crowdfunding Platform | 
-            <a href="mailto:support@haven.org" style="color: #667eea;">Support</a> | 
-            <a href="mailto:contact@haven.org" style="color: #667eea;">Contact</a>
-        </div>
-        """, unsafe_allow_html=True)
-
-def render_legal_notice():
-    """Render legal notice for pages that need it"""
-    st.markdown("""
-    <div style="background-color: #f8f9fa; padding: 1rem; border-radius: 5px; margin: 1rem 0; font-size: 0.8rem; color: #666;">
-        <strong>Legal Notice:</strong> HAVEN is a crowdfunding platform that connects campaign creators with supporters. 
-        We are not responsible for the content, accuracy, or outcomes of individual campaigns. 
-        All donations are made directly to campaign creators. Please read our Terms of Service and Privacy Policy 
-        (coming soon) before using our platform.
-    </div>
-    """, unsafe_allow_html=True)
-
-def render_security_notice():
-    """Render security notice"""
-    st.markdown("""
-    <div style="background-color: #e8f5e8; padding: 1rem; border-radius: 5px; margin: 1rem 0; font-size: 0.8rem; color: #2d5a2d; border-left: 4px solid #4caf50;">
-        🔒 <strong>Security:</strong> Your data is protected with industry-standard encryption. 
-        We use secure payment processing through Instamojo and never store your payment information.
-    </div>
-    """, unsafe_allow_html=True)
-
-def render_help_section():
-    """Render help section"""
-    with st.expander("❓ Need Help?", expanded=False):
-        st.markdown("""
-        ### Frequently Asked Questions
-        
-        **How do I create a campaign?**
-        Register for an account, verify your email, and click "Create Campaign" in the sidebar.
-        
-        **How do donations work?**
-        Donations are processed securely through Instamojo. Funds go directly to campaign creators.
-        
-        **Is my personal information safe?**
-        Yes, we use industry-standard security measures to protect your data.
-        
-        **How do I contact support?**
-        Email us at support@haven.org or use the contact form.
-        
-        **Can I get a refund?**
-        Refund policies vary by campaign. Contact the campaign creator or our support team.
-        """)
-        
-        st.markdown("### Contact Support")
-        st.markdown("📧 Email: support@haven.org")
-        st.markdown("📞 Phone: +91-XXX-XXX-XXXX")
-        st.markdown("⏰ Support Hours: 9 AM - 6 PM IST, Monday - Friday")
-
-def render_platform_stats_footer():
-    """Render platform statistics in footer"""
-    st.markdown("### 📊 Platform Impact")
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Total Campaigns", "150+", delta="12 this month")
-    
-    with col2:
-        st.metric("Amount Raised", "₹2.5M+", delta="₹50K this week")
-    
-    with col3:
-        st.metric("Active Users", "1,200+", delta="25 this week")
-    
-    with col4:
-        st.metric("Success Rate", "78%", delta="2% this month")
-
-def render_newsletter_signup():
-    """Render newsletter signup form"""
-    st.markdown("### 📧 Stay Updated")
-    st.markdown("Get notified about new campaigns and platform updates!")
-    
-    with st.form("newsletter_signup"):
-        email = st.text_input("Email Address", placeholder="your.email@example.com")
-        interests = st.multiselect(
-            "Interested in:",
-            ["New Campaigns", "Success Stories", "Platform Updates", "Fundraising Tips"]
-        )
-        
-        submitted = st.form_submit_button("Subscribe", use_container_width=True)
-        
-        if submitted:
-            if email:
-                # TODO: Integrate with Brevo mailing list
-                st.success("Thank you for subscribing! You'll receive updates soon.")
-            else:
-                st.error("Please enter a valid email address.")
-
-def render_trust_indicators():
-    """Render trust and security indicators"""
-    st.markdown("### 🛡️ Trust & Security")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("""
-        <div style="text-align: center; padding: 1rem; border: 1px solid #ddd; border-radius: 8px;">
-            🔒<br>
-            <strong>SSL Encrypted</strong><br>
-            <small>Your data is protected</small>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div style="text-align: center; padding: 1rem; border: 1px solid #ddd; border-radius: 8px;">
-            💳<br>
-            <strong>Secure Payments</strong><br>
-            <small>Powered by Instamojo</small>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown("""
-        <div style="text-align: center; padding: 1rem; border: 1px solid #ddd; border-radius: 8px;">
-            ✅<br>
-            <strong>Verified Platform</strong><br>
-            <small>Trusted by thousands</small>
+        <div style="text-align: center; color: #666; padding: 1rem;">
+            © {datetime.now().year} HAVEN Crowdfunding Platform | Built with ❤️ using Streamlit
         </div>
         """, unsafe_allow_html=True)
 
