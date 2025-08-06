@@ -1,6 +1,6 @@
 """
-HAVEN Crowdfunding Platform - True Bootstrap Icons Implementation
-Professional minimalist design with actual Bootstrap Icons
+HAVEN Crowdfunding Platform - Fixed Bootstrap Icons Implementation
+Resolves AttributeError and CSS display issues
 """
 
 import streamlit as st
@@ -10,94 +10,91 @@ import uuid
 from datetime import datetime, timedelta
 
 # ============================================================================
-# BOOTSTRAP ICONS SYSTEM (Actual Bootstrap Icons)
+# SIMPLIFIED BOOTSTRAP ICONS SYSTEM (Fixed)
 # ============================================================================
 
 class BootstrapIcons:
-    """True Bootstrap Icons using actual Bootstrap Icons font"""
+    """Simplified Bootstrap Icons using Unicode symbols that work reliably"""
     
     # Navigation Icons
-    HOME = "house"
-    CAMPAIGN = "target"
-    EXPLORE = "compass"
-    SEARCH = "search"
-    PROFILE = "person"
+    HOME = "🏠"
+    CAMPAIGN = "🎯"
+    EXPLORE = "🧭"
+    SEARCH = "🔍"
+    PROFILE = "👤"
     
     # Action Icons
-    LOGIN = "box-arrow-in-right"
-    LOGOUT = "box-arrow-right"
-    REGISTER = "person-plus"
-    UPLOAD = "upload"
-    DOWNLOAD = "download"
-    CREATE = "plus-circle"
-    EDIT = "pencil"
-    DELETE = "trash"
-    SAVE = "check-circle"
-    SHARE = "share"
-    COPY = "clipboard"
+    LOGIN = "🔑"
+    LOGOUT = "🚪"
+    REGISTER = "📝"
+    UPLOAD = "📤"
+    DOWNLOAD = "📥"
+    CREATE = "➕"
+    EDIT = "✏️"
+    DELETE = "🗑️"
+    SAVE = "💾"
+    SHARE = "📤"
+    COPY = "📋"
     
     # Status Icons
-    SUCCESS = "check-circle-fill"
-    WARNING = "exclamation-triangle-fill"
-    ERROR = "x-circle-fill"
-    INFO = "info-circle-fill"
-    PENDING = "clock"
+    SUCCESS = "✅"
+    WARNING = "⚠️"
+    ERROR = "❌"
+    INFO = "ℹ️"
+    PENDING = "⏳"
     
     # Document Icons
-    DOCUMENT = "file-text"
-    CERTIFICATE = "award"
-    VERIFICATION = "patch-check"
-    FILE_PDF = "file-pdf"
-    FILE_IMAGE = "file-image"
+    DOCUMENT = "📄"
+    CERTIFICATE = "🏆"
+    VERIFICATION = "✔️"
+    FILE_PDF = "📄"
+    FILE_IMAGE = "🖼️"
     
     # Social Icons
-    GOOGLE = "google"
-    FACEBOOK = "facebook"
+    GOOGLE = "🇬"
+    FACEBOOK = "🇫"
     
     # General Icons
-    LANGUAGE = "globe"
-    SECURITY = "shield-lock"
-    HEART = "heart"
-    STAR = "star"
-    PLUS = "plus"
-    MINUS = "dash"
-    EMAIL = "envelope"
-    PHONE = "telephone"
-    LOCATION = "geo-alt"
-    CALENDAR = "calendar3"
-    CLOCK = "clock"
-    MONEY = "currency-dollar"
-    CHART = "bar-chart"
-    GRAPH = "graph-up"
-    SHIELD = "shield-check"
-    BELL = "bell"
-    BOOKMARK = "bookmark"
-    TAG = "tag"
-    FILTER = "funnel"
-    SORT = "sort-alpha-down"
-    SETTINGS = "gear"
-    HELP = "question-circle"
-    CLOSE = "x"
-    MENU = "list"
-    ARROW_LEFT = "arrow-left"
-    ARROW_RIGHT = "arrow-right"
-    ARROW_UP = "arrow-up"
-    ARROW_DOWN = "arrow-down"
-    EYE = "eye"
-    EYE_SLASH = "eye-slash"
-    LOCK = "lock"
-    UNLOCK = "unlock"
+    LANGUAGE = "🌐"
+    SECURITY = "🔒"
+    HEART = "❤️"
+    STAR = "⭐"
+    PLUS = "➕"
+    MINUS = "➖"
+    EMAIL = "📧"
+    PHONE = "📞"
+    LOCATION = "📍"
+    CALENDAR = "📅"
+    CLOCK = "🕐"
+    MONEY = "💰"
+    CHART = "📊"
+    GRAPH = "📈"
+    SHIELD = "🛡️"
+    BELL = "🔔"
+    BOOKMARK = "🔖"
+    TAG = "🏷️"
+    FILTER = "🔽"
+    SORT = "🔀"
+    SETTINGS = "⚙️"
+    HELP = "❓"
+    CLOSE = "❌"
+    MENU = "☰"
+    ARROW_LEFT = "←"
+    ARROW_RIGHT = "→"
+    ARROW_UP = "↑"
+    ARROW_DOWN = "↓"
+    EYE = "👁️"
+    EYE_SLASH = "🙈"
+    LOCK = "🔒"
+    UNLOCK = "🔓"
+    PERSON = "👤"
+    BUILDING = "🏢"
 
 icons = BootstrapIcons()
 
-def get_bootstrap_icon(icon_name, size="16", color="currentColor", extra_classes=""):
-    """Generate Bootstrap icon HTML"""
-    return f'<i class="bi bi-{icon_name} {extra_classes}" style="font-size: {size}px; color: {color};"></i>'
-
-def get_bootstrap_css():
-    """Get Bootstrap Icons CSS and custom styling"""
+def get_clean_css():
+    """Get clean CSS without Bootstrap Icons dependency"""
     return """
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     
@@ -105,12 +102,6 @@ def get_bootstrap_css():
     .main {
         font-family: 'Inter', sans-serif;
     }
-    
-    /* Bootstrap Icon Utilities */
-    .icon-sm { font-size: 14px; }
-    .icon-md { font-size: 18px; }
-    .icon-lg { font-size: 24px; }
-    .icon-xl { font-size: 32px; }
     
     /* Navigation Styles */
     .nav-item {
@@ -331,6 +322,25 @@ def get_bootstrap_css():
         color: #718096;
         line-height: 1.5;
     }
+    
+    /* Icon Styles */
+    .icon-text {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .icon-large {
+        font-size: 24px;
+    }
+    
+    .icon-medium {
+        font-size: 18px;
+    }
+    
+    .icon-small {
+        font-size: 14px;
+    }
     </style>
     """
 
@@ -351,10 +361,12 @@ def initialize_session_state():
     
     if 'language' not in st.session_state:
         st.session_state.language = 'English'
+    
+    if 'show_login_form' not in st.session_state:
+        st.session_state.show_login_form = False
 
 def authenticate_user(email, password):
     """Simulate user authentication"""
-    # Demo authentication - in production, this would validate against a database
     if email and password:
         return {
             'id': str(uuid.uuid4()),
@@ -368,7 +380,6 @@ def authenticate_user(email, password):
 
 def oauth_login(provider):
     """Simulate OAuth login"""
-    # Demo OAuth - in production, this would handle actual OAuth flow
     return {
         'id': str(uuid.uuid4()),
         'email': f'user@{provider.lower()}.com',
@@ -510,7 +521,7 @@ def render_language_selector():
     
     st.markdown(f"""
     <div class="language-selector">
-        {get_bootstrap_icon(icons.LANGUAGE, "16", "#4caf50")}
+        <span style="font-size: 16px;">{icons.LANGUAGE}</span>
         <span>{get_text('language', st.session_state.language)}</span>
     </div>
     """, unsafe_allow_html=True)
@@ -528,7 +539,7 @@ def render_language_selector():
         st.rerun()
 
 def render_navigation():
-    """Render sidebar navigation with Bootstrap icons"""
+    """Render sidebar navigation with icons"""
     if not st.session_state.authenticated:
         return
     
@@ -542,39 +553,32 @@ def render_navigation():
         ('profile', icons.PROFILE, get_text('profile', st.session_state.language))
     ]
     
-    for page_key, icon_name, label in nav_items:
+    for page_key, icon, label in nav_items:
         is_active = st.session_state.current_page == page_key
         
         if is_active:
             st.sidebar.markdown(f"""
             <div class="nav-item active">
-                {get_bootstrap_icon(icon_name, "18", "#2e7d32")}
+                <span style="font-size: 18px;">{icon}</span>
                 <span>{label}</span>
             </div>
             """, unsafe_allow_html=True)
         else:
-            if st.sidebar.button(f"{label}", key=f"nav_{page_key}", use_container_width=True):
+            if st.sidebar.button(f"{icon} {label}", key=f"nav_{page_key}", use_container_width=True):
                 st.session_state.current_page = page_key
                 st.rerun()
     
     # Logout button
     st.sidebar.markdown("---")
-    if st.sidebar.button(f"{get_text('logout', st.session_state.language)}", key="logout_btn", use_container_width=True):
+    if st.sidebar.button(f"{icons.LOGOUT} {get_text('logout', st.session_state.language)}", key="logout_btn", use_container_width=True):
         st.session_state.authenticated = False
         st.session_state.user_data = {}
         st.session_state.current_page = 'login'
         st.rerun()
 
-def render_social_login_button(provider, icon_name, btn_class):
-    """Render social login button with Bootstrap icon"""
-    button_html = f"""
-    <div class="btn-minimal {btn_class}" style="width: 100%; justify-content: center; margin-bottom: 8px;">
-        {get_bootstrap_icon(icon_name, "18")}
-        <span>Continue with {provider}</span>
-    </div>
-    """
-    
-    if st.button(f"Continue with {provider}", key=f"{provider.lower()}_login", use_container_width=True):
+def render_social_login_button(provider, icon, btn_class):
+    """Render social login button with icon"""
+    if st.button(f"{icon} Continue with {provider}", key=f"{provider.lower()}_login", use_container_width=True):
         user_data = oauth_login(provider)
         if user_data:
             st.session_state.authenticated = True
@@ -584,14 +588,14 @@ def render_social_login_button(provider, icon_name, btn_class):
             time.sleep(1)
             st.rerun()
 
-def render_document_upload_section(title, icon_name, required=True, help_text=""):
-    """Render document upload section with Bootstrap icon"""
+def render_document_upload_section(title, icon, required=True, help_text=""):
+    """Render document upload section with icon"""
     status_text = get_text('required', st.session_state.language) if required else get_text('optional', st.session_state.language)
     status_color = "#dc3545" if required else "#6c757d"
     
     st.markdown(f"""
     <div class="form-label">
-        {get_bootstrap_icon(icon_name, "16", "#4caf50")}
+        <span style="font-size: 16px; color: #4caf50;">{icon}</span>
         <span>{title}</span>
         <span style="color: {status_color}; font-size: 12px;">({status_text})</span>
     </div>
@@ -610,9 +614,9 @@ def render_document_upload_section(title, icon_name, required=True, help_text=""
     if uploaded_file:
         file_size = len(uploaded_file.getvalue()) / (1024 * 1024)  # Size in MB
         if file_size > 5:
-            st.error(f"{get_bootstrap_icon(icons.ERROR, '16')} File size exceeds 5MB limit")
+            st.error(f"{icons.ERROR} File size exceeds 5MB limit")
         else:
-            st.success(f"{get_bootstrap_icon(icons.SUCCESS, '16')} {uploaded_file.name} uploaded successfully ({file_size:.1f}MB)")
+            st.success(f"{icons.SUCCESS} {uploaded_file.name} uploaded successfully ({file_size:.1f}MB)")
     
     return uploaded_file
 
@@ -621,12 +625,12 @@ def render_document_upload_section(title, icon_name, required=True, help_text=""
 # ============================================================================
 
 def render_login_page():
-    """Render login page with Bootstrap icons"""
+    """Render login page with icons"""
     # Welcome section
     st.markdown(f"""
     <div class="welcome-section">
         <div class="welcome-title">
-            {get_bootstrap_icon(icons.HOME, "32", "#2e7d32")}
+            <span style="font-size: 32px; margin-right: 10px;">{icons.HOME}</span>
             {get_text('welcome_title', st.session_state.language)}
         </div>
         <p class="welcome-subtitle">{get_text('welcome_subtitle', st.session_state.language)}</p>
@@ -639,7 +643,7 @@ def render_login_page():
     # Get Started section
     st.markdown(f"""
     <div class="header-minimal">
-        {get_bootstrap_icon(icons.LOGIN, "24", "#4caf50")}
+        <span style="font-size: 24px; color: #4caf50;">{icons.LOGIN}</span>
         <h2 class="header-title">{get_text('get_started', st.session_state.language)}</h2>
     </div>
     """, unsafe_allow_html=True)
@@ -650,7 +654,7 @@ def render_login_page():
         st.markdown(f"""
         <div class="action-card">
             <div class="action-card-icon">
-                {get_bootstrap_icon(icons.LOGIN, "48", "#4caf50")}
+                <span style="font-size: 48px;">{icons.LOGIN}</span>
             </div>
             <div class="action-card-title">{get_text('existing_user', st.session_state.language)}</div>
             <div class="action-card-description">Sign in to your existing account</div>
@@ -665,7 +669,7 @@ def render_login_page():
         st.markdown(f"""
         <div class="action-card">
             <div class="action-card-icon">
-                {get_bootstrap_icon(icons.REGISTER, "48", "#4caf50")}
+                <span style="font-size: 48px;">{icons.REGISTER}</span>
             </div>
             <div class="action-card-title">{get_text('new_user', st.session_state.language)}</div>
             <div class="action-card-description">Create a new account to get started</div>
@@ -682,10 +686,10 @@ def render_login_page():
         render_login_form()
 
 def render_login_form():
-    """Render login form with Bootstrap icons"""
+    """Render login form with icons"""
     st.markdown(f"""
     <div class="header-minimal">
-        {get_bootstrap_icon(icons.LOGIN, "20", "#4caf50")}
+        <span style="font-size: 20px; color: #4caf50;">{icons.LOGIN}</span>
         <h3 style="margin: 0; color: #2e7d32;">{get_text('sign_in', st.session_state.language)}</h3>
     </div>
     """, unsafe_allow_html=True)
@@ -694,7 +698,7 @@ def render_login_form():
         # Email field
         st.markdown(f"""
         <div class="form-label">
-            {get_bootstrap_icon(icons.EMAIL, "16", "#4caf50")}
+            <span style="font-size: 16px; color: #4caf50;">{icons.EMAIL}</span>
             <span>{get_text('email', st.session_state.language)}</span>
         </div>
         """, unsafe_allow_html=True)
@@ -703,7 +707,7 @@ def render_login_form():
         # Password field
         st.markdown(f"""
         <div class="form-label">
-            {get_bootstrap_icon(icons.LOCK, "16", "#4caf50")}
+            <span style="font-size: 16px; color: #4caf50;">{icons.LOCK}</span>
             <span>{get_text('password', st.session_state.language)}</span>
         </div>
         """, unsafe_allow_html=True)
@@ -717,13 +721,13 @@ def render_login_form():
                     st.session_state.authenticated = True
                     st.session_state.user_data = user_data
                     st.session_state.current_page = 'home'
-                    st.success(f"{get_bootstrap_icon(icons.SUCCESS, '16')} Login successful!")
+                    st.success(f"{icons.SUCCESS} Login successful!")
                     time.sleep(1)
                     st.rerun()
                 else:
-                    st.error(f"{get_bootstrap_icon(icons.ERROR, '16')} Invalid credentials")
+                    st.error(f"{icons.ERROR} Invalid credentials")
             else:
-                st.error(f"{get_bootstrap_icon(icons.WARNING, '16')} Please fill in all fields")
+                st.error(f"{icons.WARNING} Please fill in all fields")
     
     # Social login options
     st.markdown("---")
@@ -736,11 +740,11 @@ def render_login_form():
         render_social_login_button("Facebook", icons.FACEBOOK, "btn-facebook")
 
 def render_register_page():
-    """Render registration page with Bootstrap icons"""
+    """Render registration page with icons"""
     st.markdown(f"""
     <div class="welcome-section">
         <div class="welcome-title">
-            {get_bootstrap_icon(icons.REGISTER, "32", "#2e7d32")}
+            <span style="font-size: 32px; margin-right: 10px;">{icons.REGISTER}</span>
             {get_text('create_account', st.session_state.language)}
         </div>
         <p class="welcome-subtitle">Help not just some people, but Help Humanity</p>
@@ -750,7 +754,7 @@ def render_register_page():
     # Account type selection
     st.markdown(f"""
     <div class="header-minimal">
-        {get_bootstrap_icon(icons.PERSON, "20", "#4caf50")}
+        <span style="font-size: 20px; color: #4caf50;">{icons.PERSON}</span>
         <h3 style="margin: 0; color: #2e7d32;">Account Type</h3>
     </div>
     """, unsafe_allow_html=True)
@@ -769,10 +773,10 @@ def render_register_page():
         render_organization_registration()
 
 def render_individual_registration():
-    """Render individual registration form with Bootstrap icons"""
+    """Render individual registration form with icons"""
     st.markdown(f"""
     <div class="header-minimal">
-        {get_bootstrap_icon(icons.PERSON, "20", "#4caf50")}
+        <span style="font-size: 20px; color: #4caf50;">{icons.PERSON}</span>
         <h4 style="margin: 0; color: #2e7d32;">Individual Account Registration</h4>
     </div>
     """, unsafe_allow_html=True)
@@ -784,7 +788,7 @@ def render_individual_registration():
             # Full Name
             st.markdown(f"""
             <div class="form-label">
-                {get_bootstrap_icon(icons.PERSON, "16", "#4caf50")}
+                <span style="font-size: 16px; color: #4caf50;">{icons.PERSON}</span>
                 <span>{get_text('full_name', st.session_state.language)} *</span>
             </div>
             """, unsafe_allow_html=True)
@@ -793,7 +797,7 @@ def render_individual_registration():
             # Email
             st.markdown(f"""
             <div class="form-label">
-                {get_bootstrap_icon(icons.EMAIL, "16", "#4caf50")}
+                <span style="font-size: 16px; color: #4caf50;">{icons.EMAIL}</span>
                 <span>{get_text('email', st.session_state.language)} *</span>
             </div>
             """, unsafe_allow_html=True)
@@ -802,7 +806,7 @@ def render_individual_registration():
             # Password
             st.markdown(f"""
             <div class="form-label">
-                {get_bootstrap_icon(icons.LOCK, "16", "#4caf50")}
+                <span style="font-size: 16px; color: #4caf50;">{icons.LOCK}</span>
                 <span>{get_text('password', st.session_state.language)} *</span>
             </div>
             """, unsafe_allow_html=True)
@@ -812,7 +816,7 @@ def render_individual_registration():
             # Phone
             st.markdown(f"""
             <div class="form-label">
-                {get_bootstrap_icon(icons.PHONE, "16", "#4caf50")}
+                <span style="font-size: 16px; color: #4caf50;">{icons.PHONE}</span>
                 <span>{get_text('phone', st.session_state.language)} *</span>
             </div>
             """, unsafe_allow_html=True)
@@ -821,7 +825,7 @@ def render_individual_registration():
             # Confirm Password
             st.markdown(f"""
             <div class="form-label">
-                {get_bootstrap_icon(icons.LOCK, "16", "#4caf50")}
+                <span style="font-size: 16px; color: #4caf50;">{icons.LOCK}</span>
                 <span>{get_text('confirm_password', st.session_state.language)} *</span>
             </div>
             """, unsafe_allow_html=True)
@@ -831,7 +835,7 @@ def render_individual_registration():
         st.markdown("---")
         st.markdown(f"""
         <div class="header-minimal">
-            {get_bootstrap_icon(icons.VERIFICATION, "20", "#4caf50")}
+            <span style="font-size: 20px; color: #4caf50;">{icons.VERIFICATION}</span>
             <h4 style="margin: 0; color: #2e7d32;">Document Verification</h4>
         </div>
         """, unsafe_allow_html=True)
@@ -870,9 +874,9 @@ def render_individual_registration():
         
         # Consent checkboxes
         st.markdown("---")
-        terms_accepted = st.checkbox(f"{get_bootstrap_icon(icons.VERIFICATION, '16')} {get_text('terms_conditions', st.session_state.language)}")
-        kyc_consent = st.checkbox(f"{get_bootstrap_icon(icons.SHIELD, '16')} {get_text('kyc_consent', st.session_state.language)}")
-        data_consent = st.checkbox(f"{get_bootstrap_icon(icons.SECURITY, '16')} {get_text('data_processing', st.session_state.language)}")
+        terms_accepted = st.checkbox(f"{icons.VERIFICATION} {get_text('terms_conditions', st.session_state.language)}")
+        kyc_consent = st.checkbox(f"{icons.SHIELD} {get_text('kyc_consent', st.session_state.language)}")
+        data_consent = st.checkbox(f"{icons.SECURITY} {get_text('data_processing', st.session_state.language)}")
         
         # Submit button
         if st.form_submit_button(get_text('register', st.session_state.language), use_container_width=True):
@@ -886,26 +890,26 @@ def render_individual_registration():
                         'full_name': full_name,
                         'phone': phone,
                         'account_type': 'individual',
-                        'verified': False,  # Will be verified after document review
+                        'verified': False,
                         'registration_time': datetime.now()
                     }
                     
                     st.session_state.authenticated = True
                     st.session_state.user_data = user_data
                     st.session_state.current_page = 'home'
-                    st.success(f"{get_bootstrap_icon(icons.SUCCESS, '16')} Registration successful! Your documents are under review.")
+                    st.success(f"{icons.SUCCESS} Registration successful! Your documents are under review.")
                     time.sleep(2)
                     st.rerun()
                 else:
-                    st.error(f"{get_bootstrap_icon(icons.ERROR, '16')} Passwords do not match")
+                    st.error(f"{icons.ERROR} Passwords do not match")
             else:
-                st.error(f"{get_bootstrap_icon(icons.WARNING, '16')} Please fill in all required fields and upload required documents")
+                st.error(f"{icons.WARNING} Please fill in all required fields and upload required documents")
 
 def render_organization_registration():
-    """Render organization registration form with Bootstrap icons"""
+    """Render organization registration form with icons"""
     st.markdown(f"""
     <div class="header-minimal">
-        {get_bootstrap_icon("building", "20", "#4caf50")}
+        <span style="font-size: 20px; color: #4caf50;">{icons.BUILDING}</span>
         <h4 style="margin: 0; color: #2e7d32;">Organization Account Registration</h4>
     </div>
     """, unsafe_allow_html=True)
@@ -917,7 +921,7 @@ def render_organization_registration():
             # Organization Name
             st.markdown(f"""
             <div class="form-label">
-                {get_bootstrap_icon("building", "16", "#4caf50")}
+                <span style="font-size: 16px; color: #4caf50;">{icons.BUILDING}</span>
                 <span>{get_text('organization_name', st.session_state.language)} *</span>
             </div>
             """, unsafe_allow_html=True)
@@ -926,7 +930,7 @@ def render_organization_registration():
             # Organization Type
             st.markdown(f"""
             <div class="form-label">
-                {get_bootstrap_icon(icons.TAG, "16", "#4caf50")}
+                <span style="font-size: 16px; color: #4caf50;">{icons.TAG}</span>
                 <span>{get_text('organization_type', st.session_state.language)} *</span>
             </div>
             """, unsafe_allow_html=True)
@@ -935,7 +939,7 @@ def render_organization_registration():
             # Contact Email
             st.markdown(f"""
             <div class="form-label">
-                {get_bootstrap_icon(icons.EMAIL, "16", "#4caf50")}
+                <span style="font-size: 16px; color: #4caf50;">{icons.EMAIL}</span>
                 <span>{get_text('email', st.session_state.language)} *</span>
             </div>
             """, unsafe_allow_html=True)
@@ -945,7 +949,7 @@ def render_organization_registration():
             # Registration Number
             st.markdown(f"""
             <div class="form-label">
-                {get_bootstrap_icon(icons.CERTIFICATE, "16", "#4caf50")}
+                <span style="font-size: 16px; color: #4caf50;">{icons.CERTIFICATE}</span>
                 <span>{get_text('registration_number', st.session_state.language)}</span>
             </div>
             """, unsafe_allow_html=True)
@@ -954,7 +958,7 @@ def render_organization_registration():
             # Contact Phone
             st.markdown(f"""
             <div class="form-label">
-                {get_bootstrap_icon(icons.PHONE, "16", "#4caf50")}
+                <span style="font-size: 16px; color: #4caf50;">{icons.PHONE}</span>
                 <span>{get_text('phone', st.session_state.language)} *</span>
             </div>
             """, unsafe_allow_html=True)
@@ -963,7 +967,7 @@ def render_organization_registration():
             # Password
             st.markdown(f"""
             <div class="form-label">
-                {get_bootstrap_icon(icons.LOCK, "16", "#4caf50")}
+                <span style="font-size: 16px; color: #4caf50;">{icons.LOCK}</span>
                 <span>{get_text('password', st.session_state.language)} *</span>
             </div>
             """, unsafe_allow_html=True)
@@ -972,7 +976,7 @@ def render_organization_registration():
         # Description
         st.markdown(f"""
         <div class="form-label">
-            {get_bootstrap_icon(icons.DOCUMENT, "16", "#4caf50")}
+            <span style="font-size: 16px; color: #4caf50;">{icons.DOCUMENT}</span>
             <span>{get_text('description', st.session_state.language)} *</span>
         </div>
         """, unsafe_allow_html=True)
@@ -982,7 +986,7 @@ def render_organization_registration():
         st.markdown("---")
         st.markdown(f"""
         <div class="header-minimal">
-            {get_bootstrap_icon(icons.VERIFICATION, "20", "#4caf50")}
+            <span style="font-size: 20px; color: #4caf50;">{icons.VERIFICATION}</span>
             <h4 style="margin: 0; color: #2e7d32;">Organization Documents</h4>
         </div>
         """, unsafe_allow_html=True)
@@ -1035,9 +1039,9 @@ def render_organization_registration():
         
         # Consent checkboxes
         st.markdown("---")
-        terms_accepted = st.checkbox(f"{get_bootstrap_icon(icons.VERIFICATION, '16')} {get_text('terms_conditions', st.session_state.language)}")
-        kyc_consent = st.checkbox(f"{get_bootstrap_icon(icons.SHIELD, '16')} {get_text('kyc_consent', st.session_state.language)}")
-        data_consent = st.checkbox(f"{get_bootstrap_icon(icons.SECURITY, '16')} {get_text('data_processing', st.session_state.language)}")
+        terms_accepted = st.checkbox(f"{icons.VERIFICATION} {get_text('terms_conditions', st.session_state.language)}")
+        kyc_consent = st.checkbox(f"{icons.SHIELD} {get_text('kyc_consent', st.session_state.language)}")
+        data_consent = st.checkbox(f"{icons.SECURITY} {get_text('data_processing', st.session_state.language)}")
         
         # Submit button
         if st.form_submit_button(get_text('register', st.session_state.language), use_container_width=True):
@@ -1052,21 +1056,21 @@ def render_organization_registration():
                     'description': description,
                     'registration_number': reg_number,
                     'account_type': 'organization',
-                    'verified': False,  # Will be verified after document review
+                    'verified': False,
                     'registration_time': datetime.now()
                 }
                 
                 st.session_state.authenticated = True
                 st.session_state.user_data = user_data
                 st.session_state.current_page = 'home'
-                st.success(f"{get_bootstrap_icon(icons.SUCCESS, '16')} Organization registration successful! Your documents are under review.")
+                st.success(f"{icons.SUCCESS} Organization registration successful! Your documents are under review.")
                 time.sleep(2)
                 st.rerun()
             else:
-                st.error(f"{get_bootstrap_icon(icons.WARNING, '16')} Please fill in all required fields and upload required documents")
+                st.error(f"{icons.WARNING} Please fill in all required fields and upload required documents")
 
 def render_home_page():
-    """Render home dashboard with Bootstrap icons"""
+    """Render home dashboard with icons"""
     user_data = st.session_state.user_data
     
     # Welcome header
@@ -1076,7 +1080,7 @@ def render_home_page():
     st.markdown(f"""
     <div class="welcome-section">
         <div class="welcome-title">
-            {get_bootstrap_icon(icons.HOME, "32", "#2e7d32")}
+            <span style="font-size: 32px; margin-right: 10px;">{icons.HOME}</span>
             Welcome back, {display_name}!
         </div>
         <p class="welcome-subtitle">Your impact dashboard and quick actions</p>
@@ -1086,7 +1090,7 @@ def render_home_page():
     # Quick actions
     st.markdown(f"""
     <div class="header-minimal">
-        {get_bootstrap_icon("lightning", "20", "#4caf50")}
+        <span style="font-size: 20px; color: #4caf50;">⚡</span>
         <h3 style="margin: 0; color: #2e7d32;">Quick Actions</h3>
     </div>
     """, unsafe_allow_html=True)
@@ -1097,7 +1101,7 @@ def render_home_page():
         st.markdown(f"""
         <div class="action-card">
             <div class="action-card-icon">
-                {get_bootstrap_icon(icons.CAMPAIGN, "48", "#4caf50")}
+                <span style="font-size: 48px;">{icons.CAMPAIGN}</span>
             </div>
             <div class="action-card-title">Create Campaign</div>
             <div class="action-card-description">Start a new fundraising campaign</div>
@@ -1112,7 +1116,7 @@ def render_home_page():
         st.markdown(f"""
         <div class="action-card">
             <div class="action-card-icon">
-                {get_bootstrap_icon(icons.EXPLORE, "48", "#4caf50")}
+                <span style="font-size: 48px;">{icons.EXPLORE}</span>
             </div>
             <div class="action-card-title">Browse Campaigns</div>
             <div class="action-card-description">Discover causes to support</div>
@@ -1127,7 +1131,7 @@ def render_home_page():
         st.markdown(f"""
         <div class="action-card">
             <div class="action-card-icon">
-                {get_bootstrap_icon(icons.HEART, "48", "#4caf50")}
+                <span style="font-size: 48px;">{icons.HEART}</span>
             </div>
             <div class="action-card-title">Make Donation</div>
             <div class="action-card-description">Support a cause directly</div>
@@ -1142,7 +1146,7 @@ def render_home_page():
     st.markdown("---")
     st.markdown(f"""
     <div class="header-minimal">
-        {get_bootstrap_icon(icons.CHART, "20", "#4caf50")}
+        <span style="font-size: 20px; color: #4caf50;">{icons.CHART}</span>
         <h3 style="margin: 0; color: #2e7d32;">Your Impact</h3>
     </div>
     """, unsafe_allow_html=True)
@@ -1151,34 +1155,34 @@ def render_home_page():
     
     with col1:
         st.metric(
-            label=f"{get_bootstrap_icon(icons.CAMPAIGN, '16')} Campaigns Created",
+            label=f"{icons.CAMPAIGN} Campaigns Created",
             value="0",
             delta="Start your first campaign"
         )
     
     with col2:
         st.metric(
-            label=f"{get_bootstrap_icon(icons.MONEY, '16')} Total Raised",
+            label=f"{icons.MONEY} Total Raised",
             value="₹0",
             delta="Begin fundraising"
         )
     
     with col3:
         st.metric(
-            label=f"{get_bootstrap_icon(icons.HEART, '16')} Donations Made",
+            label=f"{icons.HEART} Donations Made",
             value="0",
             delta="Support a cause"
         )
     
     with col4:
         st.metric(
-            label=f"{get_bootstrap_icon(icons.STAR, '16')} Impact Score",
+            label=f"{icons.STAR} Impact Score",
             value="0",
             delta="Build your reputation"
         )
 
 def render_other_pages():
-    """Render placeholder pages with Bootstrap icons"""
+    """Render placeholder pages with icons"""
     page_configs = {
         'campaign': {
             'icon': icons.CAMPAIGN,
@@ -1208,14 +1212,14 @@ def render_other_pages():
     st.markdown(f"""
     <div class="welcome-section">
         <div class="welcome-title">
-            {get_bootstrap_icon(config.get('icon', icons.INFO), "32", "#2e7d32")}
+            <span style="font-size: 32px; margin-right: 10px;">{config.get('icon', icons.INFO)}</span>
             {config.get('title', 'Page')}
         </div>
         <p class="welcome-subtitle">{config.get('description', 'Page description')}</p>
     </div>
     """, unsafe_allow_html=True)
     
-    st.info(f"{get_bootstrap_icon(icons.INFO, '16')} This page is under development. Full functionality will be available soon.")
+    st.info(f"{icons.INFO} This page is under development. Full functionality will be available soon.")
 
 # ============================================================================
 # MAIN APPLICATION
@@ -1231,8 +1235,8 @@ def main():
         initial_sidebar_state="expanded"
     )
     
-    # Load Bootstrap Icons CSS
-    st.markdown(get_bootstrap_css(), unsafe_allow_html=True)
+    # Load clean CSS
+    st.markdown(get_clean_css(), unsafe_allow_html=True)
     
     # Initialize session state
     initialize_session_state()
