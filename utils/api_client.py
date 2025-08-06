@@ -1,360 +1,297 @@
 """
-API Client for HAVEN Crowdfunding Platform Frontend
-Handles all backend API communication with proper error handling
+API Client for HAVEN Crowdfunding Platform
+Matches the repository structure of sudhindra-a700/haven-frontend
 """
 
 import requests
-import json
-import logging
-from typing import Dict, Any, Optional, List
-from datetime import datetime
 import streamlit as st
+from typing import Dict, Any, Optional, List, Tuple
+import logging
+import time
+from .config import get_config, get_api_endpoint
 
 logger = logging.getLogger(__name__)
 
-class APIError(Exception):
-    """Custom API error exception"""
-    def __init__(self, message: str, status_code: int = None, response_data: Dict = None):
-        self.message = message
-        self.status_code = status_code
-        self.response_data = response_data or {}
-        super().__init__(self.message)
-
 class APIClient:
-    """
-    API Client for backend communication
-    """
+    """API client for communicating with HAVEN backend"""
     
-    def __init__(self, base_url: str):
-        self.base_url = base_url.rstrip('/')
+    def __init__(self):
+        self.config = get_config()
+        self.base_url = self.config.get_backend_url()
+        self.timeout = self.config.get('backend.timeout', 30)
+        self.retry_attempts = self.config.get('backend.retry_attempts', 3)
         self.session = requests.Session()
         
         # Set default headers
         self.session.headers.update({
             'Content-Type': 'application/json',
-            'Accept': 'application/json',
             'User-Agent': 'HAVEN-Frontend/1.0'
         })
-        
-        # Set timeout
-        self.timeout = 30
     
-    def _get_auth_headers(self, token: str = None) -> Dict[str, str]:
-        """Get authentication headers"""
-        headers = {}
+    def _make_request(self, method: str, endpoint: str, data: Optional[Dict] = None, 
+                     params: Optional[Dict] = None, files: Optional[Dict] = None) -> Tuple[bool, Any]:
+        """Make HTTP request with retry logic"""
+        url = f"{self.base_url.rstrip('/')}{endpoint}"
         
-        # Use provided token or get from session state
-        auth_token = token or st.session_state.get('access_token')
-        
-        if auth_token:
-            headers['Authorization'] = f'Bearer {auth_token}'
-        
-        return headers
-    
-    def _make_request(
-        self,
-        method: str,
-        endpoint: str,
-        data: Dict = None,
-        params: Dict = None,
-        token: str = None,
-        files: Dict = None
-    ) -> Dict[str, Any]:
-        """Make HTTP request to backend API"""
-        try:
-            url = f"{self.base_url}{endpoint}"
-            
-            # Prepare headers
-            headers = self._get_auth_headers(token)
-            
-            # Prepare request arguments
-            request_kwargs = {
-                'timeout': self.timeout,
-                'params': params,
-                'headers': headers
-            }
-            
-            # Handle different content types
-            if files:
-                # For file uploads, don't set Content-Type (let requests handle it)
-                if 'Content-Type' in headers:
-                    del headers['Content-Type']
-                request_kwargs['files'] = files
-                if data:
-                    request_kwargs['data'] = data
-            else:
-                # For JSON data
-                if data:
-                    request_kwargs['json'] = data
-            
-            # Make request
-            response = self.session.request(method, url, **request_kwargs)
-            
-            # Handle response
-            if response.status_code == 204:
-                return {}
-            
+        for attempt in range(self.retry_attempts):
             try:
-                response_data = response.json()
-            except ValueError:
-                response_data = {'message': response.text}
-            
-            if response.status_code >= 400:
-                error_message = response_data.get('detail', f'API Error: {response.status_code}')
-                raise APIError(error_message, response.status_code, response_data)
-            
-            return response_data
-            
-        except requests.exceptions.Timeout:
-            raise APIError("Request timeout. Please try again.")
+                # Add authentication token if available
+                headers = {}
+                user = st.session_state.get('user', {})
+                if user.get('token'):
+                    headers['Authorization'] = f"Bearer {user['token']}"
+                
+                # Make request
+                if method.upper() == 'GET':
+                    response = self.session.get(url, params=params, headers=headers, timeout=self.timeout)
+                elif method.upper() == 'POST':
+                    if files:
+                        response = self.session.post(url, data=data, files=files, headers=headers, timeout=self.timeout)
+                    else:
+                        response = self.session.post(url, json=data, headers=headers, timeout=self.timeout)
+                elif method.upper() == 'PUT':
+                    response = self.session.put(url, json=data, headers=headers, timeout=self.timeout)
+                elif method.upper() == 'DELETE':
+                    response = self.session.delete(url, headers=headers, timeout=self.timeout)
+                else:
+                    return False, f"Unsupported HTTP method: {method}"
+                
+                # Handle response
+                if response.status_code < 400:
+                    try:
+                        return True, response.json()
+                    except ValueError:
+                        return True, response.text
+                else:
+                    error_msg = self._extract_error_message(response)
+                    logger.warning(f"API request failed: {response.status_code} - {error_msg}")
+                    return False, error_msg
+                    
+            except requests.RequestException as e:
+                logger.warning(f"API request attempt {attempt + 1} failed: {e}")
+                if attempt == self.retry_attempts - 1:
+                    return False, f"API request failed after {self.retry_attempts} attempts: {str(e)}"
+                time.sleep(1)  # Wait before retry
         
-        except requests.exceptions.ConnectionError:
-            raise APIError("Unable to connect to server. Please check your internet connection.")
-        
-        except requests.exceptions.RequestException as e:
-            raise APIError(f"Request failed: {str(e)}")
-        
-        except APIError:
-            raise
-        
-        except Exception as e:
-            logger.error(f"Unexpected API error: {e}")
-            raise APIError(f"Unexpected error: {str(e)}")
+        return False, "API request failed"
+    
+    def _extract_error_message(self, response: requests.Response) -> str:
+        """Extract error message from response"""
+        try:
+            error_data = response.json()
+            return error_data.get('detail', error_data.get('message', f"HTTP {response.status_code}"))
+        except ValueError:
+            return f"HTTP {response.status_code}: {response.text[:100]}"
     
     # Authentication endpoints
-    def login(self, email: str, password: str) -> Dict[str, Any]:
-        """Login with email and password"""
-        data = {
-            'email': email,
-            'password': password
-        }
-        return self._make_request('POST', '/auth/login', data=data)
+    def login(self, email: str, password: str) -> Tuple[bool, Any]:
+        """Login user"""
+        data = {'email': email, 'password': password}
+        return self._make_request('POST', '/api/auth/login', data)
     
-    def register(self, email: str, password: str, full_name: str, phone_number: str = None) -> Dict[str, Any]:
+    def register(self, user_data: Dict[str, Any]) -> Tuple[bool, Any]:
         """Register new user"""
-        data = {
-            'email': email,
-            'password': password,
-            'full_name': full_name,
-            'phone_number': phone_number
-        }
-        return self._make_request('POST', '/auth/register', data=data)
+        return self._make_request('POST', '/api/auth/register', user_data)
     
-    def logout(self, token: str = None) -> Dict[str, Any]:
+    def oauth_login(self, provider: str, oauth_data: Dict[str, Any]) -> Tuple[bool, Any]:
+        """OAuth login"""
+        data = {'provider': provider, **oauth_data}
+        return self._make_request('POST', '/api/auth/oauth/login', data)
+    
+    def logout(self) -> Tuple[bool, Any]:
         """Logout user"""
-        return self._make_request('POST', '/auth/logout', token=token)
+        return self._make_request('POST', '/api/auth/logout')
     
-    def refresh_token(self, refresh_token: str) -> Dict[str, Any]:
-        """Refresh access token"""
-        data = {'refresh_token': refresh_token}
-        return self._make_request('POST', '/auth/refresh', data=data)
-    
-    def get_current_user(self, token: str = None) -> Dict[str, Any]:
-        """Get current user information"""
-        return self._make_request('GET', '/auth/me', token=token)
-    
-    def get_google_auth_url(self, redirect_url: str = None) -> str:
-        """Get Google OAuth authorization URL"""
-        params = {}
-        if redirect_url:
-            params['redirect_url'] = redirect_url
-        
-        response = self._make_request('GET', '/auth/google', params=params)
-        return response.get('auth_url')
-    
-    def get_facebook_auth_url(self, redirect_url: str = None) -> str:
-        """Get Facebook OAuth authorization URL"""
-        params = {}
-        if redirect_url:
-            params['redirect_url'] = redirect_url
-        
-        response = self._make_request('GET', '/auth/facebook', params=params)
-        return response.get('auth_url')
-    
-    # User endpoints
-    def get_user_profile(self, user_id: int = None, token: str = None) -> Dict[str, Any]:
-        """Get user profile"""
-        if user_id:
-            endpoint = f'/users/{user_id}'
-        else:
-            endpoint = '/users/me'
-        
-        return self._make_request('GET', endpoint, token=token)
-    
-    def update_user_profile(self, profile_data: Dict[str, Any], token: str = None) -> Dict[str, Any]:
-        """Update user profile"""
-        return self._make_request('PUT', '/users/me', data=profile_data, token=token)
-    
-    def change_password(self, current_password: str, new_password: str, token: str = None) -> Dict[str, Any]:
-        """Change user password"""
-        data = {
-            'current_password': current_password,
-            'new_password': new_password
-        }
-        return self._make_request('POST', '/users/me/change-password', data=data, token=token)
-    
-    def get_user_stats(self, token: str = None) -> Dict[str, Any]:
-        """Get user statistics"""
-        return self._make_request('GET', '/users/me/stats', token=token)
-    
-    def get_user_campaigns(self, skip: int = 0, limit: int = 20, token: str = None) -> List[Dict[str, Any]]:
-        """Get user's campaigns"""
-        params = {'skip': skip, 'limit': limit}
-        return self._make_request('GET', '/users/me/campaigns', params=params, token=token)
-    
-    def get_user_donations(self, skip: int = 0, limit: int = 20, token: str = None) -> List[Dict[str, Any]]:
-        """Get user's donations"""
-        params = {'skip': skip, 'limit': limit}
-        return self._make_request('GET', '/users/me/donations', params=params, token=token)
+    def refresh_token(self) -> Tuple[bool, Any]:
+        """Refresh authentication token"""
+        return self._make_request('POST', '/api/auth/refresh')
     
     # Campaign endpoints
-    def get_campaigns(
-        self,
-        skip: int = 0,
-        limit: int = 20,
-        category: str = None,
-        status: str = None,
-        search: str = None,
-        sort_by: str = 'created_at',
-        sort_order: str = 'desc'
-    ) -> List[Dict[str, Any]]:
-        """Get campaigns with filtering"""
-        params = {
-            'skip': skip,
-            'limit': limit,
-            'sort_by': sort_by,
-            'sort_order': sort_order
-        }
-        
-        if category:
-            params['category'] = category
-        if status:
-            params['status'] = status
-        if search:
-            params['search'] = search
-        
-        return self._make_request('GET', '/campaigns/', params=params)
+    def get_campaigns(self, params: Optional[Dict] = None) -> Tuple[bool, Any]:
+        """Get campaigns list"""
+        return self._make_request('GET', '/api/campaigns', params=params)
     
-    def get_campaign(self, campaign_id: int) -> Dict[str, Any]:
-        """Get campaign by ID"""
-        return self._make_request('GET', f'/campaigns/{campaign_id}')
+    def get_campaign(self, campaign_id: str) -> Tuple[bool, Any]:
+        """Get specific campaign"""
+        return self._make_request('GET', f'/api/campaigns/{campaign_id}')
     
-    def create_campaign(self, campaign_data: Dict[str, Any], token: str = None) -> Dict[str, Any]:
+    def create_campaign(self, campaign_data: Dict[str, Any]) -> Tuple[bool, Any]:
         """Create new campaign"""
-        return self._make_request('POST', '/campaigns/', data=campaign_data, token=token)
+        return self._make_request('POST', '/api/campaigns', campaign_data)
     
-    def update_campaign(self, campaign_id: int, campaign_data: Dict[str, Any], token: str = None) -> Dict[str, Any]:
+    def update_campaign(self, campaign_id: str, campaign_data: Dict[str, Any]) -> Tuple[bool, Any]:
         """Update campaign"""
-        return self._make_request('PUT', f'/campaigns/{campaign_id}', data=campaign_data, token=token)
+        return self._make_request('PUT', f'/api/campaigns/{campaign_id}', campaign_data)
     
-    def delete_campaign(self, campaign_id: int, token: str = None) -> Dict[str, Any]:
+    def delete_campaign(self, campaign_id: str) -> Tuple[bool, Any]:
         """Delete campaign"""
-        return self._make_request('DELETE', f'/campaigns/{campaign_id}', token=token)
+        return self._make_request('DELETE', f'/api/campaigns/{campaign_id}')
     
-    def submit_campaign(self, campaign_id: int, token: str = None) -> Dict[str, Any]:
-        """Submit campaign for review"""
-        return self._make_request('POST', f'/campaigns/{campaign_id}/submit', token=token)
+    def search_campaigns(self, query: str, filters: Optional[Dict] = None) -> Tuple[bool, Any]:
+        """Search campaigns"""
+        params = {'q': query}
+        if filters:
+            params.update(filters)
+        return self._make_request('GET', '/api/campaigns/search', params=params)
     
-    def donate_to_campaign(self, campaign_id: int, donation_data: Dict[str, Any], token: str = None) -> Dict[str, Any]:
-        """Make donation to campaign"""
-        return self._make_request('POST', f'/campaigns/{campaign_id}/donate', data=donation_data, token=token)
+    def get_campaign_categories(self) -> Tuple[bool, Any]:
+        """Get campaign categories"""
+        return self._make_request('GET', '/api/campaigns/categories')
     
-    def create_campaign_update(self, campaign_id: int, update_data: Dict[str, Any], token: str = None) -> Dict[str, Any]:
-        """Create campaign update"""
-        return self._make_request('POST', f'/campaigns/{campaign_id}/updates', data=update_data, token=token)
+    # User endpoints
+    def get_user_profile(self, user_id: Optional[str] = None) -> Tuple[bool, Any]:
+        """Get user profile"""
+        endpoint = f'/api/users/{user_id}' if user_id else '/api/users/me'
+        return self._make_request('GET', endpoint)
     
-    def create_campaign_comment(self, campaign_id: int, comment_data: Dict[str, Any], token: str = None) -> Dict[str, Any]:
-        """Create campaign comment"""
-        return self._make_request('POST', f'/campaigns/{campaign_id}/comments', data=comment_data, token=token)
+    def update_user_profile(self, user_data: Dict[str, Any]) -> Tuple[bool, Any]:
+        """Update user profile"""
+        return self._make_request('PUT', '/api/users/me', user_data)
+    
+    def get_user_campaigns(self, user_id: Optional[str] = None) -> Tuple[bool, Any]:
+        """Get user's campaigns"""
+        endpoint = f'/api/users/{user_id}/campaigns' if user_id else '/api/users/me/campaigns'
+        return self._make_request('GET', endpoint)
+    
+    def get_user_donations(self, user_id: Optional[str] = None) -> Tuple[bool, Any]:
+        """Get user's donations"""
+        endpoint = f'/api/users/{user_id}/donations' if user_id else '/api/users/me/donations'
+        return self._make_request('GET', endpoint)
+    
+    # Fraud detection endpoints
+    def check_fraud(self, entity_data: Dict[str, Any]) -> Tuple[bool, Any]:
+        """Check entity for fraud"""
+        return self._make_request('POST', '/api/fraud-detection/check', entity_data)
+    
+    def get_fraud_score(self, entity_id: str) -> Tuple[bool, Any]:
+        """Get fraud score for entity"""
+        return self._make_request('GET', f'/api/fraud-detection/score/{entity_id}')
+    
+    def report_fraud(self, report_data: Dict[str, Any]) -> Tuple[bool, Any]:
+        """Report fraudulent activity"""
+        return self._make_request('POST', '/api/fraud-detection/report', report_data)
     
     # Translation endpoints
-    def translate_text(self, text: str, target_language: str, source_language: str = 'auto', token: str = None) -> Dict[str, Any]:
+    def translate_text(self, text: str, target_language: str, source_language: str = 'auto') -> Tuple[bool, Any]:
         """Translate text"""
         data = {
             'text': text,
             'target_language': target_language,
             'source_language': source_language
         }
-        return self._make_request('POST', '/translate/translate', data=data, token=token)
+        return self._make_request('POST', '/api/translation/translate', data)
     
-    def detect_language(self, text: str, token: str = None) -> Dict[str, Any]:
-        """Detect language of text"""
-        data = {'text': text}
-        return self._make_request('POST', '/translate/detect-language', data=data, token=token)
+    def get_supported_languages(self) -> Tuple[bool, Any]:
+        """Get supported languages for translation"""
+        return self._make_request('GET', '/api/translation/languages')
     
-    def get_supported_languages(self) -> Dict[str, Any]:
-        """Get supported languages"""
-        return self._make_request('GET', '/translate/languages')
-    
-    # Fraud detection endpoints
-    def analyze_campaign_fraud(self, campaign_data: Dict[str, Any], token: str = None) -> Dict[str, Any]:
-        """Analyze campaign for fraud"""
-        data = {'campaign_data': campaign_data}
-        return self._make_request('POST', '/fraud/analyze', data=data, token=token)
-    
-    def analyze_existing_campaign_fraud(self, campaign_id: int, token: str = None) -> Dict[str, Any]:
-        """Analyze existing campaign for fraud"""
-        return self._make_request('POST', f'/fraud/analyze/campaign/{campaign_id}', token=token)
-    
-    def report_fraud(self, campaign_id: int, reason: str, evidence: str = None, token: str = None) -> Dict[str, Any]:
-        """Report campaign as fraudulent"""
+    # Simplification endpoints
+    def simplify_text(self, text: str, complexity_level: str = 'simple') -> Tuple[bool, Any]:
+        """Simplify complex text"""
         data = {
-            'campaign_id': campaign_id,
-            'reason': reason,
-            'evidence': evidence
+            'text': text,
+            'complexity_level': complexity_level
         }
-        return self._make_request('POST', '/fraud/report', data=data, token=token)
+        return self._make_request('POST', '/api/simplification/simplify', data)
     
-    # Health and status endpoints
-    def get_health_status(self) -> Dict[str, Any]:
-        """Get API health status"""
-        return self._make_request('GET', '/health')
-    
-    def get_platform_stats(self) -> Dict[str, Any]:
-        """Get platform statistics"""
-        try:
-            # This endpoint might not exist, so we'll simulate it
-            campaigns = self.get_campaigns(limit=1000)  # Get all campaigns for stats
-            
-            total_campaigns = len(campaigns)
-            total_raised = sum(float(c.get('current_amount', 0)) for c in campaigns)
-            active_campaigns = len([c for c in campaigns if c.get('status') == 'active'])
-            
-            return {
-                'total_campaigns': total_campaigns,
-                'total_raised': total_raised,
-                'active_campaigns': active_campaigns,
-                'active_users': 100  # Placeholder
-            }
-        except:
-            return {
-                'total_campaigns': 0,
-                'total_raised': 0,
-                'active_campaigns': 0,
-                'active_users': 0
-            }
+    def get_term_explanation(self, term: str) -> Tuple[bool, Any]:
+        """Get explanation for a term"""
+        params = {'term': term}
+        return self._make_request('GET', '/api/simplification/explain', params=params)
     
     # File upload endpoints
-    def upload_file(self, file_data, file_type: str = 'image', token: str = None) -> Dict[str, Any]:
-        """Upload file to server"""
-        files = {'file': file_data}
-        data = {'file_type': file_type}
-        
-        return self._make_request('POST', '/upload', data=data, files=files, token=token)
+    def upload_file(self, file_data: bytes, filename: str, file_type: str) -> Tuple[bool, Any]:
+        """Upload file"""
+        files = {'file': (filename, file_data, file_type)}
+        return self._make_request('POST', '/api/upload', files=files)
     
-    # Utility methods
-    def test_connection(self) -> bool:
-        """Test connection to backend API"""
-        try:
-            self.get_health_status()
-            return True
-        except:
-            return False
+    def upload_campaign_image(self, campaign_id: str, image_data: bytes, filename: str) -> Tuple[bool, Any]:
+        """Upload campaign image"""
+        files = {'image': (filename, image_data, 'image/jpeg')}
+        return self._make_request('POST', f'/api/campaigns/{campaign_id}/upload-image', files=files)
     
-    def get_api_info(self) -> Dict[str, Any]:
-        """Get API information"""
-        try:
-            return self._make_request('GET', '/')
-        except:
-            return {'message': 'API information unavailable'}
+    # Analytics endpoints
+    def get_platform_stats(self) -> Tuple[bool, Any]:
+        """Get platform statistics"""
+        return self._make_request('GET', '/api/analytics/stats')
+    
+    def get_campaign_analytics(self, campaign_id: str) -> Tuple[bool, Any]:
+        """Get campaign analytics"""
+        return self._make_request('GET', f'/api/analytics/campaigns/{campaign_id}')
+    
+    def get_user_analytics(self, user_id: Optional[str] = None) -> Tuple[bool, Any]:
+        """Get user analytics"""
+        endpoint = f'/api/analytics/users/{user_id}' if user_id else '/api/analytics/users/me'
+        return self._make_request('GET', endpoint)
+    
+    # Donation endpoints
+    def create_donation(self, donation_data: Dict[str, Any]) -> Tuple[bool, Any]:
+        """Create donation"""
+        return self._make_request('POST', '/api/donations', donation_data)
+    
+    def get_donation(self, donation_id: str) -> Tuple[bool, Any]:
+        """Get donation details"""
+        return self._make_request('GET', f'/api/donations/{donation_id}')
+    
+    def process_payment(self, payment_data: Dict[str, Any]) -> Tuple[bool, Any]:
+        """Process payment"""
+        return self._make_request('POST', '/api/payments/process', payment_data)
+    
+    # Notification endpoints
+    def get_notifications(self) -> Tuple[bool, Any]:
+        """Get user notifications"""
+        return self._make_request('GET', '/api/notifications')
+    
+    def mark_notification_read(self, notification_id: str) -> Tuple[bool, Any]:
+        """Mark notification as read"""
+        return self._make_request('PUT', f'/api/notifications/{notification_id}/read')
+    
+    def get_notification_settings(self) -> Tuple[bool, Any]:
+        """Get notification settings"""
+        return self._make_request('GET', '/api/notifications/settings')
+    
+    def update_notification_settings(self, settings: Dict[str, Any]) -> Tuple[bool, Any]:
+        """Update notification settings"""
+        return self._make_request('PUT', '/api/notifications/settings', settings)
+    
+    # Health check
+    def health_check(self) -> Tuple[bool, Any]:
+        """Check API health"""
+        return self._make_request('GET', '/api/health')
+
+# Global API client instance
+api_client = APIClient()
+
+# Convenience functions
+def get_campaigns(params: Optional[Dict] = None) -> Tuple[bool, Any]:
+    """Get campaigns"""
+    return api_client.get_campaigns(params)
+
+def get_campaign(campaign_id: str) -> Tuple[bool, Any]:
+    """Get campaign"""
+    return api_client.get_campaign(campaign_id)
+
+def create_campaign(campaign_data: Dict[str, Any]) -> Tuple[bool, Any]:
+    """Create campaign"""
+    return api_client.create_campaign(campaign_data)
+
+def search_campaigns(query: str, filters: Optional[Dict] = None) -> Tuple[bool, Any]:
+    """Search campaigns"""
+    return api_client.search_campaigns(query, filters)
+
+def check_fraud(entity_data: Dict[str, Any]) -> Tuple[bool, Any]:
+    """Check fraud"""
+    return api_client.check_fraud(entity_data)
+
+def translate_text(text: str, target_language: str) -> Tuple[bool, Any]:
+    """Translate text"""
+    return api_client.translate_text(text, target_language)
+
+def simplify_text(text: str) -> Tuple[bool, Any]:
+    """Simplify text"""
+    return api_client.simplify_text(text)
+
+def get_platform_stats() -> Tuple[bool, Any]:
+    """Get platform statistics"""
+    return api_client.get_platform_stats()
 

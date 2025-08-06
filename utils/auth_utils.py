@@ -1,358 +1,419 @@
 """
-Authentication Utilities for HAVEN Crowdfunding Platform Frontend
-Handles OAuth, session management, and authentication flows
+Authentication utilities for HAVEN Crowdfunding Platform
+Matches the repository structure of sudhindra-a700/haven-frontend
 """
 
 import streamlit as st
-import jwt
+import requests
+import hashlib
 import time
-import webbrowser
-from typing import Dict, Any, Optional
-from datetime import datetime, timedelta
+from typing import Dict, Any, Optional, Tuple
 import logging
+from .config import get_config, get_api_endpoint
 
 logger = logging.getLogger(__name__)
 
-class AuthUtils:
-    """
-    Authentication utilities for frontend
-    """
+class AuthenticationManager:
+    """Manages user authentication and session handling"""
     
-    def __init__(self, api_client):
-        self.api_client = api_client
+    def __init__(self):
+        self.config = get_config()
+        self.session_timeout = self.config.get('security.session_timeout', 3600)
+        self.max_login_attempts = self.config.get('security.max_login_attempts', 5)
     
-    def validate_token(self, token: str) -> Optional[Dict[str, Any]]:
-        """Validate access token and return user info"""
+    def login(self, email: str, password: str) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+        """
+        Authenticate user with email and password
+        Returns: (success, message, user_data)
+        """
         try:
-            # Try to get user info with the token
-            user_info = self.api_client.get_current_user(token)
-            return user_info
-        except Exception as e:
-            logger.error(f"Token validation failed: {e}")
-            return None
-    
-    def is_token_expired(self, token: str) -> bool:
-        """Check if JWT token is expired"""
-        try:
-            # Decode without verification to check expiration
-            decoded = jwt.decode(token, options={"verify_signature": False})
-            exp = decoded.get('exp')
+            # Check login attempts
+            if self._is_login_blocked(email):
+                return False, "Too many failed login attempts. Please try again later.", None
             
-            if exp:
-                return datetime.utcnow().timestamp() > exp
+            # Validate input
+            if not email or not password:
+                return False, "Email and password are required.", None
             
-            return True  # If no expiration, consider expired
+            if not self._is_valid_email(email):
+                return False, "Please enter a valid email address.", None
             
-        except Exception:
-            return True
-    
-    def refresh_access_token(self) -> bool:
-        """Refresh access token using refresh token"""
-        try:
-            refresh_token = st.session_state.get('refresh_token')
-            if not refresh_token:
-                return False
+            # Hash password for security
+            password_hash = self._hash_password(password)
             
-            response = self.api_client.refresh_token(refresh_token)
+            # Prepare login data
+            login_data = {
+                'email': email,
+                'password': password_hash,
+                'timestamp': int(time.time())
+            }
             
-            if response and 'access_token' in response:
-                st.session_state.access_token = response['access_token']
-                return True
-            
-            return False
-            
-        except Exception as e:
-            logger.error(f"Token refresh failed: {e}")
-            return False
-    
-    def handle_oauth_login(self, provider: str) -> str:
-        """Handle OAuth login flow"""
-        try:
-            # Get current URL for redirect
-            current_url = st.experimental_get_query_params().get('redirect_url', [''])[0]
-            if not current_url:
-                current_url = "http://localhost:8501"  # Default Streamlit URL
-            
-            # Get OAuth URL from backend
-            if provider == 'google':
-                auth_url = self.api_client.get_google_auth_url(current_url)
-            elif provider == 'facebook':
-                auth_url = self.api_client.get_facebook_auth_url(current_url)
+            # Call backend API
+            if self.config.is_development_mode() or self.config.get('development.mock_api', False):
+                # Mock authentication for development
+                success, message, user_data = self._mock_login(email, password)
             else:
-                raise ValueError(f"Unsupported OAuth provider: {provider}")
+                # Real API call
+                success, message, user_data = self._api_login(login_data)
             
-            return auth_url
+            # Handle login result
+            if success:
+                self._create_session(user_data)
+                self._clear_login_attempts(email)
+                logger.info(f"User {email} logged in successfully")
+            else:
+                self._record_login_attempt(email)
+                logger.warning(f"Failed login attempt for {email}: {message}")
             
-        except Exception as e:
-            logger.error(f"OAuth URL generation failed: {e}")
-            raise
-    
-    def login_with_credentials(self, email: str, password: str) -> bool:
-        """Login with email and password"""
-        try:
-            response = self.api_client.login(email, password)
-            
-            if response and 'access_token' in response:
-                # Store authentication data
-                st.session_state.authenticated = True
-                st.session_state.access_token = response['access_token']
-                st.session_state.refresh_token = response.get('refresh_token')
-                st.session_state.user = response.get('user')
-                
-                return True
-            
-            return False
+            return success, message, user_data
             
         except Exception as e:
-            logger.error(f"Login failed: {e}")
-            raise
+            logger.error(f"Login error: {e}")
+            return False, "Login failed due to a system error. Please try again.", None
     
-    def register_user(self, email: str, password: str, full_name: str, phone_number: str = None) -> bool:
-        """Register new user"""
+    def oauth_login(self, provider: str, oauth_data: Dict[str, Any]) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+        """
+        Authenticate user with OAuth provider
+        Returns: (success, message, user_data)
+        """
         try:
-            response = self.api_client.register(email, password, full_name, phone_number)
+            if not self.config.is_oauth_enabled():
+                return False, "OAuth authentication is not enabled.", None
             
-            if response and 'access_token' in response:
-                # Store authentication data
-                st.session_state.authenticated = True
-                st.session_state.access_token = response['access_token']
-                st.session_state.refresh_token = response.get('refresh_token')
-                st.session_state.user = response.get('user')
-                
-                return True
+            # Validate OAuth data
+            if not oauth_data.get('email') or not oauth_data.get('id'):
+                return False, "Invalid OAuth data received.", None
             
-            return False
+            # Prepare OAuth login data
+            login_data = {
+                'provider': provider,
+                'oauth_id': oauth_data.get('id'),
+                'email': oauth_data.get('email'),
+                'name': oauth_data.get('name', ''),
+                'avatar': oauth_data.get('picture', ''),
+                'timestamp': int(time.time())
+            }
+            
+            # Call backend API
+            if self.config.is_development_mode():
+                # Mock OAuth for development
+                success, message, user_data = self._mock_oauth_login(login_data)
+            else:
+                # Real API call
+                success, message, user_data = self._api_oauth_login(login_data)
+            
+            if success:
+                self._create_session(user_data)
+                logger.info(f"User {oauth_data.get('email')} logged in via {provider}")
+            
+            return success, message, user_data
             
         except Exception as e:
-            logger.error(f"Registration failed: {e}")
-            raise
+            logger.error(f"OAuth login error: {e}")
+            return False, "OAuth login failed. Please try again.", None
     
-    def logout_user(self) -> bool:
-        """Logout current user"""
+    def register(self, user_data: Dict[str, Any]) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+        """
+        Register new user
+        Returns: (success, message, user_data)
+        """
         try:
-            # Call logout API
-            if st.session_state.get('access_token'):
-                self.api_client.logout(st.session_state.access_token)
+            # Validate registration data
+            validation_result = self._validate_registration_data(user_data)
+            if not validation_result[0]:
+                return validation_result
+            
+            # Hash password
+            if 'password' in user_data:
+                user_data['password'] = self._hash_password(user_data['password'])
+            
+            # Add timestamp
+            user_data['timestamp'] = int(time.time())
+            
+            # Call backend API
+            if self.config.is_development_mode():
+                # Mock registration for development
+                success, message, registered_user = self._mock_register(user_data)
+            else:
+                # Real API call
+                success, message, registered_user = self._api_register(user_data)
+            
+            if success:
+                self._create_session(registered_user)
+                logger.info(f"User {user_data.get('email')} registered successfully")
+            
+            return success, message, registered_user
+            
+        except Exception as e:
+            logger.error(f"Registration error: {e}")
+            return False, "Registration failed due to a system error. Please try again.", None
+    
+    def logout(self):
+        """Logout current user and clear session"""
+        try:
+            user_email = st.session_state.get('user', {}).get('email', 'Unknown')
             
             # Clear session state
-            self.clear_auth_session()
+            self._clear_session()
+            
+            # Call backend logout API if needed
+            if not self.config.is_development_mode():
+                try:
+                    self._api_logout()
+                except Exception as e:
+                    logger.warning(f"Backend logout API call failed: {e}")
+            
+            logger.info(f"User {user_email} logged out")
+            
+        except Exception as e:
+            logger.error(f"Logout error: {e}")
+    
+    def check_authentication(self) -> bool:
+        """Check if user is authenticated and session is valid"""
+        try:
+            if not st.session_state.get('authenticated', False):
+                return False
+            
+            # Check session timeout
+            login_time = st.session_state.get('login_time', 0)
+            current_time = time.time()
+            
+            if current_time - login_time > self.session_timeout:
+                self._clear_session()
+                logger.info("Session expired")
+                return False
+            
+            # Update last activity time
+            st.session_state.last_activity = current_time
             
             return True
             
         except Exception as e:
-            logger.error(f"Logout failed: {e}")
-            # Clear session anyway
-            self.clear_auth_session()
+            logger.error(f"Authentication check error: {e}")
             return False
     
-    def clear_auth_session(self):
-        """Clear authentication session data"""
-        keys_to_clear = [
-            'authenticated',
-            'access_token',
-            'refresh_token',
-            'user'
-        ]
+    def get_current_user(self) -> Optional[Dict[str, Any]]:
+        """Get current authenticated user data"""
+        if self.check_authentication():
+            return st.session_state.get('user', {})
+        return None
+    
+    def _create_session(self, user_data: Dict[str, Any]):
+        """Create user session"""
+        current_time = time.time()
         
-        for key in keys_to_clear:
+        st.session_state.authenticated = True
+        st.session_state.user = user_data
+        st.session_state.login_time = current_time
+        st.session_state.last_activity = current_time
+        st.session_state.current_page = 'home'
+    
+    def _clear_session(self):
+        """Clear user session"""
+        st.session_state.authenticated = False
+        st.session_state.user = {}
+        st.session_state.current_page = 'login'
+        
+        # Clear other session data
+        for key in ['login_time', 'last_activity', 'oauth_state']:
             if key in st.session_state:
                 del st.session_state[key]
     
-    def check_authentication(self) -> bool:
-        """Check if user is authenticated and token is valid"""
-        if not st.session_state.get('authenticated'):
-            return False
+    def _is_login_blocked(self, email: str) -> bool:
+        """Check if login is blocked due to too many attempts"""
+        attempts_key = f"login_attempts_{email}"
+        attempts = st.session_state.get(attempts_key, [])
         
-        token = st.session_state.get('access_token')
-        if not token:
-            return False
+        # Remove old attempts (older than 1 hour)
+        current_time = time.time()
+        attempts = [t for t in attempts if current_time - t < 3600]
+        st.session_state[attempts_key] = attempts
         
-        # Check if token is expired
-        if self.is_token_expired(token):
-            # Try to refresh token
-            if self.refresh_access_token():
-                return True
-            else:
-                # Refresh failed, clear session
-                self.clear_auth_session()
-                return False
-        
-        return True
+        return len(attempts) >= self.max_login_attempts
     
-    def require_authentication(self, redirect_to_login: bool = True) -> bool:
-        """Require authentication for protected pages"""
-        if self.check_authentication():
-            return True
-        
-        if redirect_to_login:
-            st.warning("Please login to access this page")
-            st.session_state.current_page = 'login'
-            st.experimental_rerun()
-        
-        return False
+    def _record_login_attempt(self, email: str):
+        """Record failed login attempt"""
+        attempts_key = f"login_attempts_{email}"
+        attempts = st.session_state.get(attempts_key, [])
+        attempts.append(time.time())
+        st.session_state[attempts_key] = attempts
     
-    def get_current_user(self) -> Optional[Dict[str, Any]]:
-        """Get current authenticated user"""
-        if not self.check_authentication():
-            return None
-        
-        return st.session_state.get('user')
+    def _clear_login_attempts(self, email: str):
+        """Clear login attempts for successful login"""
+        attempts_key = f"login_attempts_{email}"
+        if attempts_key in st.session_state:
+            del st.session_state[attempts_key]
     
-    def update_user_session(self, user_data: Dict[str, Any]):
-        """Update user data in session"""
-        if st.session_state.get('authenticated'):
-            st.session_state.user = user_data
-    
-    def has_permission(self, required_role: str) -> bool:
-        """Check if current user has required role"""
-        user = self.get_current_user()
-        if not user:
-            return False
-        
-        user_role = user.get('role', 'user')
-        
-        # Role hierarchy: admin > moderator > user
-        role_hierarchy = {
-            'user': 1,
-            'moderator': 2,
-            'admin': 3
-        }
-        
-        user_level = role_hierarchy.get(user_role, 0)
-        required_level = role_hierarchy.get(required_role, 0)
-        
-        return user_level >= required_level
-    
-    def is_admin(self) -> bool:
-        """Check if current user is admin"""
-        return self.has_permission('admin')
-    
-    def is_moderator(self) -> bool:
-        """Check if current user is moderator"""
-        return self.has_permission('moderator')
-    
-    def get_auth_header(self) -> Dict[str, str]:
-        """Get authorization header for API requests"""
-        token = st.session_state.get('access_token')
-        if token:
-            return {'Authorization': f'Bearer {token}'}
-        return {}
-    
-    def handle_auth_error(self, error: Exception):
-        """Handle authentication errors"""
-        error_message = str(error)
-        
-        if 'token' in error_message.lower() or 'unauthorized' in error_message.lower():
-            # Token-related error, clear session and redirect to login
-            self.clear_auth_session()
-            st.error("Your session has expired. Please login again.")
-            st.session_state.current_page = 'login'
-            st.experimental_rerun()
-        else:
-            # Other authentication error
-            st.error(f"Authentication error: {error_message}")
-    
-    def create_oauth_popup_script(self, auth_url: str, provider: str) -> str:
-        """Create JavaScript for OAuth popup window"""
-        return f"""
-        <script>
-        function openOAuthWindow() {{
-            const popup = window.open(
-                '{auth_url}',
-                '{provider}_oauth',
-                'width=500,height=600,scrollbars=yes,resizable=yes'
-            );
-            
-            // Check for popup completion
-            const checkClosed = setInterval(function() {{
-                if (popup.closed) {{
-                    clearInterval(checkClosed);
-                    // Reload the page to check for auth tokens
-                    window.location.reload();
-                }}
-            }}, 1000);
-        }}
-        
-        // Auto-open popup
-        openOAuthWindow();
-        </script>
-        """
-    
-    def render_oauth_buttons(self):
-        """Render OAuth login buttons"""
-        st.markdown("### Social Login")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.button("🔍 Login with Google", key="google_oauth", use_container_width=True):
-                try:
-                    auth_url = self.handle_oauth_login('google')
-                    
-                    # Create popup script
-                    popup_script = self.create_oauth_popup_script(auth_url, 'google')
-                    st.components.v1.html(popup_script, height=0)
-                    
-                    st.info("Opening Google login window...")
-                    
-                except Exception as e:
-                    st.error(f"Google login failed: {e}")
-        
-        with col2:
-            if st.button("📘 Login with Facebook", key="facebook_oauth", use_container_width=True):
-                try:
-                    auth_url = self.handle_oauth_login('facebook')
-                    
-                    # Create popup script
-                    popup_script = self.create_oauth_popup_script(auth_url, 'facebook')
-                    st.components.v1.html(popup_script, height=0)
-                    
-                    st.info("Opening Facebook login window...")
-                    
-                except Exception as e:
-                    st.error(f"Facebook login failed: {e}")
-    
-    def validate_password_strength(self, password: str) -> tuple[bool, str]:
-        """Validate password strength"""
-        if len(password) < 8:
-            return False, "Password must be at least 8 characters long"
-        
-        has_upper = any(c.isupper() for c in password)
-        has_lower = any(c.islower() for c in password)
-        has_digit = any(c.isdigit() for c in password)
-        has_special = any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in password)
-        
-        if not has_upper:
-            return False, "Password must contain at least one uppercase letter"
-        
-        if not has_lower:
-            return False, "Password must contain at least one lowercase letter"
-        
-        if not has_digit:
-            return False, "Password must contain at least one digit"
-        
-        if not has_special:
-            return False, "Password must contain at least one special character"
-        
-        return True, "Password is strong"
-    
-    def validate_email(self, email: str) -> tuple[bool, str]:
+    def _is_valid_email(self, email: str) -> bool:
         """Validate email format"""
         import re
-        
         pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        
-        if re.match(pattern, email):
-            return True, "Email is valid"
-        else:
-            return False, "Invalid email format"
+        return re.match(pattern, email) is not None
     
-    def get_session_info(self) -> Dict[str, Any]:
-        """Get current session information"""
-        return {
-            'authenticated': st.session_state.get('authenticated', False),
-            'user': st.session_state.get('user'),
-            'token_present': bool(st.session_state.get('access_token')),
-            'session_keys': list(st.session_state.keys())
+    def _hash_password(self, password: str) -> str:
+        """Hash password for security"""
+        return hashlib.sha256(password.encode()).hexdigest()
+    
+    def _validate_registration_data(self, user_data: Dict[str, Any]) -> Tuple[bool, str, None]:
+        """Validate user registration data"""
+        required_fields = ['name', 'email', 'password']
+        
+        for field in required_fields:
+            if not user_data.get(field):
+                return False, f"{field.title()} is required.", None
+        
+        if not self._is_valid_email(user_data['email']):
+            return False, "Please enter a valid email address.", None
+        
+        password = user_data['password']
+        min_length = self.config.get('security.password_min_length', 8)
+        
+        if len(password) < min_length:
+            return False, f"Password must be at least {min_length} characters long.", None
+        
+        return True, "Validation passed.", None
+    
+    def _mock_login(self, email: str, password: str) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+        """Mock login for development"""
+        # Simple mock authentication
+        if "@" in email and len(password) >= 6:
+            user_data = {
+                'id': 'mock_user_123',
+                'name': email.split('@')[0].title(),
+                'email': email,
+                'avatar': '👤',
+                'role': 'user',
+                'verified': True
+            }
+            return True, "Login successful!", user_data
+        else:
+            return False, "Invalid email or password.", None
+    
+    def _mock_oauth_login(self, oauth_data: Dict[str, Any]) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+        """Mock OAuth login for development"""
+        user_data = {
+            'id': f"mock_{oauth_data['provider']}_{oauth_data['oauth_id']}",
+            'name': oauth_data.get('name', 'OAuth User'),
+            'email': oauth_data['email'],
+            'avatar': oauth_data.get('avatar', '👤'),
+            'role': 'user',
+            'verified': True,
+            'oauth_provider': oauth_data['provider']
         }
+        return True, f"{oauth_data['provider'].title()} login successful!", user_data
+    
+    def _mock_register(self, user_data: Dict[str, Any]) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+        """Mock registration for development"""
+        registered_user = {
+            'id': f"mock_user_{int(time.time())}",
+            'name': user_data['name'],
+            'email': user_data['email'],
+            'avatar': '👤',
+            'role': 'user',
+            'verified': False
+        }
+        return True, "Registration successful!", registered_user
+    
+    def _api_login(self, login_data: Dict[str, Any]) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+        """Call backend login API"""
+        try:
+            url = get_api_endpoint('auth') + '/login'
+            response = requests.post(url, json=login_data, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                return True, result.get('message', 'Login successful!'), result.get('user')
+            else:
+                error_msg = response.json().get('detail', 'Login failed.')
+                return False, error_msg, None
+                
+        except requests.RequestException as e:
+            logger.error(f"API login error: {e}")
+            return False, "Unable to connect to authentication service.", None
+    
+    def _api_oauth_login(self, oauth_data: Dict[str, Any]) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+        """Call backend OAuth login API"""
+        try:
+            url = get_api_endpoint('auth') + '/oauth/login'
+            response = requests.post(url, json=oauth_data, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                return True, result.get('message', 'OAuth login successful!'), result.get('user')
+            else:
+                error_msg = response.json().get('detail', 'OAuth login failed.')
+                return False, error_msg, None
+                
+        except requests.RequestException as e:
+            logger.error(f"API OAuth login error: {e}")
+            return False, "Unable to connect to authentication service.", None
+    
+    def _api_register(self, user_data: Dict[str, Any]) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+        """Call backend registration API"""
+        try:
+            url = get_api_endpoint('auth') + '/register'
+            response = requests.post(url, json=user_data, timeout=30)
+            
+            if response.status_code == 201:
+                result = response.json()
+                return True, result.get('message', 'Registration successful!'), result.get('user')
+            else:
+                error_msg = response.json().get('detail', 'Registration failed.')
+                return False, error_msg, None
+                
+        except requests.RequestException as e:
+            logger.error(f"API registration error: {e}")
+            return False, "Unable to connect to registration service.", None
+    
+    def _api_logout(self):
+        """Call backend logout API"""
+        try:
+            url = get_api_endpoint('auth') + '/logout'
+            user_id = st.session_state.get('user', {}).get('id')
+            
+            if user_id:
+                response = requests.post(url, json={'user_id': user_id}, timeout=10)
+                if response.status_code != 200:
+                    logger.warning(f"Backend logout failed: {response.status_code}")
+                    
+        except requests.RequestException as e:
+            logger.warning(f"Backend logout API error: {e}")
+
+# Global authentication manager instance
+auth_manager = AuthenticationManager()
+
+def login(email: str, password: str) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+    """Login user with email and password"""
+    return auth_manager.login(email, password)
+
+def oauth_login(provider: str, oauth_data: Dict[str, Any]) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+    """Login user with OAuth"""
+    return auth_manager.oauth_login(provider, oauth_data)
+
+def register(user_data: Dict[str, Any]) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+    """Register new user"""
+    return auth_manager.register(user_data)
+
+def logout_user():
+    """Logout current user"""
+    auth_manager.logout()
+
+def check_authentication() -> bool:
+    """Check if user is authenticated"""
+    return auth_manager.check_authentication()
+
+def get_current_user() -> Optional[Dict[str, Any]]:
+    """Get current user data"""
+    return auth_manager.get_current_user()
+
+def require_authentication():
+    """Decorator/function to require authentication"""
+    if not check_authentication():
+        st.error("Please log in to access this page.")
+        st.stop()
+
+def is_admin() -> bool:
+    """Check if current user is admin"""
+    user = get_current_user()
+    return user and user.get('role') == 'admin'
 
