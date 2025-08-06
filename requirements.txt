@@ -34,5 +34,3 @@ validators>=0.20.0
 
 nltk
 uuid
-time
-datetime
