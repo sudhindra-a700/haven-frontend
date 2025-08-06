@@ -1,167 +1,49 @@
-# HAVEN Frontend - Python 3.10 Compatible Requirements
-# Streamlit application optimized for Python 3.10 stability
-# Last updated: August 2025
+# Core Streamlit and web framework
+streamlit>=1.28.0
+requests>=2.31.0
 
-# ============================================================================
-# CORE STREAMLIT FRAMEWORK (Python 3.10 Stable)
-# ============================================================================
-streamlit==1.26.0
-streamlit-authenticator==0.2.3
+# Data processing and analysis
+pandas>=2.0.0
+numpy>=1.24.0
 
-# ============================================================================
-# HTTP CLIENT (Python 3.10 Stable)
-# ============================================================================
-requests==2.31.0
-httpx==0.24.1
+# Image processing
+Pillow>=10.0.0
 
-# ============================================================================
-# AUTHENTICATION & SECURITY (Python 3.10 Stable)
-# ============================================================================
-PyJWT==2.8.0
-cryptography==41.0.4
-google-auth==2.22.0
-google-auth-oauthlib==1.0.0
+# Authentication and security
+PyJWT>=2.8.0
+cryptography>=41.0.0
 
-# ============================================================================
-# DATA PROCESSING (Python 3.10 Stable)
-# ============================================================================
-pandas==2.0.3
-numpy==1.24.4
+# HTTP client enhancements
+httpx>=0.24.0
+aiohttp>=3.8.0
 
-# ============================================================================
-# IMAGE PROCESSING (Python 3.10 Stable)
-# ============================================================================
-pillow>=7.1.0,<10
+# Date and time handling
+python-dateutil>=2.8.0
 
-# ============================================================================
-# DATE/TIME UTILITIES (Python 3.10 Stable)
-# ============================================================================
-python-dateutil==2.8.2
+# Environment and configuration
+python-dotenv>=1.0.0
 
-# ============================================================================
-# ENVIRONMENT CONFIGURATION (Python 3.10 Stable)
-# ============================================================================
-python-dotenv==1.0.0
+# Logging and monitoring
+structlog>=23.1.0
 
-# ============================================================================
-# VALIDATION (Python 3.10 Stable)
-# ============================================================================
-email-validator==2.0.0
+# UI enhancements
+streamlit-option-menu>=0.3.6
+streamlit-lottie>=0.0.5
+streamlit-aggrid>=0.3.4
 
-# ============================================================================
-# UTILITIES (Python 3.10 Stable)
-# ============================================================================
-python-slugify==8.0.1
+# File handling
+openpyxl>=3.1.0
+xlsxwriter>=3.1.0
 
-# ============================================================================
-# CHARTS & VISUALIZATION (Python 3.10 Stable)
-# ============================================================================
-plotly==5.15.0
-altair==5.0.1
+# API and data validation
+pydantic>=2.0.0
+validators>=0.20.0
 
-# ============================================================================
-# FILE HANDLING (Python 3.10 Stable)
-# ============================================================================
-aiofiles==23.1.0
+# Caching and performance
+streamlit-cache>=0.1.0
 
-# ============================================================================
-# UI COMPONENTS (Python 3.10 Stable)
-# ============================================================================
-streamlit-option-menu==0.3.6
-streamlit-elements==0.1.0
-streamlit-aggrid==0.3.4
-
-# ============================================================================
-# BASIC NLP (Python 3.10 Stable)
-# ============================================================================
-nltk==3.8.1
-
-# ============================================================================
-# JSON PROCESSING (Python 3.10 Stable)
-# ============================================================================
-orjson==3.9.5
-
-# ============================================================================
-# DEVELOPMENT (Optional, Python 3.10 Stable)
-# ============================================================================
-watchdog==3.0.0
-
-# ============================================================================
-# DEPLOYMENT CONFIGURATION
-# ============================================================================
-# Environment Variables:
-# PYTHON_VERSION=3.10.12
-# BACKEND_URL=https://haven-backend.onrender.com
-# ENVIRONMENT=production
-
-# Build Command:
-# pip install --upgrade pip && pip cache purge && pip install --force-reinstall -r requirements.txt && mkdir -p nltk_data && python -c "import nltk; nltk.data.path.append('./nltk_data'); nltk.download('punkt', download_dir='./nltk_data')"
-
-# Start Command:
-# export NLTK_DATA=./nltk_data && streamlit run app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true --server.enableCORS false --server.enableXsrfProtection false
-
-# ============================================================================
-# NOTES FOR PYTHON 3.10 DEPLOYMENT
-# ============================================================================
-# 1. Python 3.10 has the most mature package ecosystem
-# 2. All packages have stable, tested versions
-# 3. Streamlit has excellent Python 3.10 support
-# 4. pandas and numpy are fully optimized
-# 5. No experimental features - production ready
-# 6. Fastest build times due to pre-compiled wheels
-
-# ============================================================================
-# STREAMLIT OPTIMIZATIONS FOR PYTHON 3.10
-# ============================================================================
-# - Use built-in caching: @st.cache_data, @st.cache_resource
-# - Optimized for Render's Python 3.10 environment
-# - NLTK data properly configured for persistent storage
-# - All UI components tested and stable
-
-# ============================================================================
-# VISUALIZATION COMPATIBILITY
-# ============================================================================
-# - plotly 5.15.0: Full pandas DataFrame support
-# - altair 5.0.1: Excellent pandas integration
-# - streamlit-aggrid 0.3.4: Interactive data tables
-# - All charts work seamlessly with pandas data
-
-# ============================================================================
-# PERFORMANCE BENEFITS OF PYTHON 3.10
-# ============================================================================
-# - Mature ecosystem: 3+ years of package optimization
-# - Stable wheels: All packages have pre-compiled binaries
-# - Better memory management: Optimized for data processing
-# - Faster imports: Optimized module loading
-# - Pattern matching: Modern Python features available
-
-# ============================================================================
-# UI COMPONENT FEATURES
-# ============================================================================
-# streamlit-option-menu: Navigation menus
-# streamlit-elements: Advanced UI components
-# streamlit-aggrid: Interactive data grids with filtering/sorting
-# plotly: Interactive charts and dashboards
-# altair: Statistical visualizations
-
-# ============================================================================
-# CACHING STRATEGY FOR PYTHON 3.10
-# ============================================================================
-# Use Streamlit's built-in caching (recommended):
-# 
-# @st.cache_data
-# def load_campaign_data():
-#     return pd.read_csv('campaigns.csv')
-# 
-# @st.cache_resource
-# def get_api_client():
-#     return APIClient()
-
-# ============================================================================
-# TROUBLESHOOTING NOTES
-# ============================================================================
-# 1. If streamlit-aggrid causes issues, use st.dataframe() instead
-# 2. For large datasets, use st.data_editor() (Streamlit 1.26+)
-# 3. NLTK data downloads to ./nltk_data for persistence
-# 4. All packages compatible with Render's Python 3.10 environment
+# Development and testing (optional)
+pytest>=7.4.0
+black>=23.7.0
+flake8>=6.0.0
 
