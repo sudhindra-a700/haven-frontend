@@ -335,7 +335,7 @@ def render_login_card():
     st.markdown("---")
     
     # Import OAuth integration
-    from modules.oauth_integration import render_oauth_buttons
+    from oauth_integration import render_oauth_buttons
     render_oauth_buttons("individual")
 
 def render_register_card():
@@ -604,7 +604,7 @@ def main():
     initialize_auth()
     
     # Check for OAuth callback first
-    from modules.oauth_integration import check_oauth_callback
+    from oauth_integration import check_oauth_callback
     if check_oauth_callback():
         st.rerun()
     
