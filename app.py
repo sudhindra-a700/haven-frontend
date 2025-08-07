@@ -35,17 +35,6 @@ from corrected_authentication_flow import (
 
 # Import updated workflow utilities (these should be the corrected versions)
 try:
-    from updated_workflow_auth_utils import get_auth_manager
-    from updated_workflow_campaign_pages import render_create_campaign_page
-    from updated_workflow_registration_pages import show_registration_page
-    from updated_workflow_verification_funding import (
-        render_admin_review_page,
-        render_campaign_browse_page,
-        render_campaign_details_page,
-        render_donation_page
-    )
-except ImportError:
-    # Fallback to original workflow files if updated ones don't exist
     from workflow_auth_utils import get_auth_manager
     from workflow_campaign_pages import render_create_campaign_page
     from workflow_registration_pages import show_registration_page
@@ -55,6 +44,7 @@ except ImportError:
         render_campaign_details_page,
         render_donation_page
     )
+except ImportError:
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
