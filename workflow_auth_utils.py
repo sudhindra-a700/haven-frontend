@@ -14,7 +14,7 @@ from typing import Dict, Any, Tuple, Optional
 from datetime import datetime, timedelta
 
 # Import the fixed OAuth integration
-from fixed_oauth_integration import (
+from oauth_integration import (
     OAuthManager, 
     check_authentication_status, 
     get_user_info, 
