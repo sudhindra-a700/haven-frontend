@@ -1,413 +1,439 @@
 """
-UPDATED Enhanced Authentication Utilities for HAVEN Workflow-Based Frontend
-Integrates with the fixed OAuth authentication system
-Handles OAuth and email authentication with role-based registration and access control
+COMPATIBILITY UPDATED Workflow Authentication Utilities for HAVEN Platform
+Ensures compatibility with the fully integrated Streamlit app
+
+This module provides authentication utilities that work seamlessly with:
+1. fully_integrated_app.py
+2. corrected_authentication_flow.py
+3. Streamlit compatibility fixes
+4. Term simplification features
 """
 
 import streamlit as st
-import requests
 import logging
-import hashlib
-import secrets
-import time
-from typing import Dict, Any, Tuple, Optional
-from datetime import datetime, timedelta
-
-# Import the fixed OAuth integration
-from oauth_integration import (
-    OAuthManager, 
-    check_authentication_status, 
-    get_user_info, 
-    logout,
-    handle_oauth_callback
-)
+import requests
+import json
+from datetime import datetime
+from typing import Dict, Any, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-class AuthenticationManager:
-    """UPDATED: Manages authentication state and operations for workflow-based frontend with role-based access"""
+# Backend configuration
+BACKEND_URL = st.secrets.get('BACKEND_URL', 'https://haven-backend-9lw3.onrender.com')
+
+def safe_rerun():
+    """Safe rerun function that works with both old and new Streamlit versions"""
+    try:
+        if hasattr(st, 'rerun'):
+            st.rerun()
+        elif hasattr(st, 'experimental_rerun'):
+            st.experimental_rerun()
+        else:
+            st.markdown('<meta http-equiv="refresh" content="0">', unsafe_allow_html=True)
+    except Exception as e:
+        logger.error(f"Error in safe_rerun: {e}")
+
+def get_auth_manager():
+    """Get authentication manager instance"""
+    try:
+        from corrected_authentication_flow import auth_manager
+        return auth_manager
+    except ImportError:
+        logger.warning("Authentication flow module not available")
+        return None
+
+def check_user_authentication() -> bool:
+    """Check if user is authenticated with database verification"""
     
-    def __init__(self):
-        # Use fixed OAuth manager
-        self.oauth_manager = OAuthManager()
-        self.backend_url = self.oauth_manager.backend_url
-        self.session_timeout = 3600  # 1 hour
-        self.max_login_attempts = 5
-        
-        # Initialize authentication state
-        self.initialize_auth_state()
-        
-        logger.info("UPDATED AuthenticationManager initialized with fixed OAuth integration")
-    
-    def _get_backend_url(self) -> str:
-        """UPDATED: Get backend URL from fixed OAuth configuration"""
-        return self.oauth_manager.backend_url
-    
-    def initialize_auth_state(self):
-        """UPDATED: Initialize authentication-related session state with role-based fields"""
-        
-        # OAuth-related state (compatible with fixed OAuth integration)
-        if 'authenticated' not in st.session_state:
-            st.session_state.authenticated = False
-        
-        if 'auth_provider' not in st.session_state:
-            st.session_state.auth_provider = None
-        
-        if 'user_type' not in st.session_state:
-            st.session_state.user_type = None
-        
-        if 'auth_time' not in st.session_state:
-            st.session_state.auth_time = None
-        
-        # Legacy authentication state (for backward compatibility)
-        if 'auth_token' not in st.session_state:
-            st.session_state.auth_token = None
-        
-        if 'auth_expires' not in st.session_state:
-            st.session_state.auth_expires = 0
-        
-        if 'login_attempts' not in st.session_state:
-            st.session_state.login_attempts = 0
-        
-        if 'last_login_attempt' not in st.session_state:
-            st.session_state.last_login_attempt = 0
-        
-        if 'oauth_state' not in st.session_state:
-            st.session_state.oauth_state = None
-        
-        # Role-based authentication state
-        if 'user_role' not in st.session_state:
-            st.session_state.user_role = None
-        
-        if 'is_registered' not in st.session_state:
-            st.session_state.is_registered = False
-        
-        if 'registration_type' not in st.session_state:
-            st.session_state.registration_type = None
-        
-        if 'user_authenticated' not in st.session_state:
-            st.session_state.user_authenticated = False
-        
-        if 'user_data' not in st.session_state:
-            st.session_state.user_data = None
-    
-    def check_authentication(self) -> bool:
-        """UPDATED: Check if user is currently authenticated using fixed OAuth system"""
-        
-        # First check OAuth authentication status
-        oauth_authenticated = check_authentication_status()
-        
-        if oauth_authenticated:
-            # Update legacy session state for backward compatibility
-            st.session_state.user_authenticated = True
-            
-            # Get user info from OAuth system
-            user_info = get_user_info()
-            if user_info:
-                st.session_state.user_role = user_info.get('user_type', 'individual')
-                st.session_state.auth_provider = user_info.get('provider')
-            
-            return True
-        
-        # Check legacy token authentication (for backward compatibility)
-        if not st.session_state.user_authenticated:
-            return False
-        
-        # Check token expiration
-        if st.session_state.auth_token:
-            return self._validate_token(st.session_state.auth_token)
-        
-        return True
-    
-    def logout_user(self):
-        """UPDATED: Logout user and clear all session state"""
-        
-        # Use fixed OAuth logout
-        logout()
-        
-        # Clear legacy session state
-        st.session_state.auth_token = None
-        st.session_state.auth_expires = 0
-        st.session_state.user_authenticated = False
-        st.session_state.user_role = None
-        st.session_state.is_registered = False
-        st.session_state.registration_type = None
-        st.session_state.user_data = None
-        st.session_state.oauth_state = None
-        
-        logger.info("User logged out successfully")
+    # Check session state first
+    if not st.session_state.get('authenticated', False):
         return False
     
-    def _validate_token(self, token: str) -> bool:
-        """UPDATED: Validate authentication token with backend using fixed API endpoints"""
-        try:
-            headers = {'Authorization': f'Bearer {token}'}
-            # Use fixed API endpoint with /api/v1 prefix
-            response = requests.get(
-                f"{self.backend_url}/api/v1/auth/registration-status",
-                headers=headers,
-                timeout=10
-            )
+    # Verify user data exists
+    user_data = st.session_state.get('user_data')
+    user_type = st.session_state.get('user_type')
+    
+    if not user_data or not user_type:
+        logger.warning("User data missing, clearing authentication")
+        clear_authentication()
+        return False
+    
+    # Verify user still exists in database
+    try:
+        exists, _ = check_user_in_database(user_data.get('email'), user_type)
+        if not exists:
+            logger.warning("User no longer exists in database")
+            clear_authentication()
+            return False
+    except Exception as e:
+        logger.error(f"Error verifying user in database: {e}")
+        return False
+    
+    return True
+
+def check_user_in_database(email: str, user_type: str) -> Tuple[bool, Optional[Dict]]:
+    """Check if user exists in the appropriate database table"""
+    try:
+        table_name = "individuals" if user_type == "individual" else "organizations"
+        
+        response = requests.get(
+            f"{BACKEND_URL}/api/v1/users/check-existence",
+            params={
+                "email": email,
+                "table": table_name
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            return data.get('exists', False), data.get('user_data')
+        else:
+            logger.error(f"Error checking user existence: {response.status_code}")
+            return False, None
             
-            if response.status_code == 200:
-                data = response.json()
-                # Update session state with latest user info
-                st.session_state.user_role = data.get('role')
-                st.session_state.is_registered = data.get('is_registered', False)
-                st.session_state.registration_type = data.get('registration_type')
-                return True
-            else:
-                return False
-                
-        except Exception as e:
-            logger.warning(f"Token validation failed: {e}")
-            return False
-    
-    def login_user(self, method: str, credentials: Dict[str, Any]) -> Tuple[bool, Any]:
-        """UPDATED: Login user with specified method (OAuth or email)"""
-        
-        self.initialize_auth_state()
-        
-        # Check rate limiting
-        if not self._check_rate_limit():
-            return False, "Too many login attempts. Please try again later."
-        
-        try:
-            if method == 'email':
-                return self._login_with_email(credentials)
-            elif method in ['google', 'facebook']:
-                return self._login_with_oauth(method, credentials)
-            else:
-                return False, "Unsupported login method"
-                
-        except Exception as e:
-            logger.error(f"Login error: {e}")
-            return False, f"Login failed: {str(e)}"
-    
-    def _check_rate_limit(self) -> bool:
-        """Check if user has exceeded login attempt rate limit"""
-        current_time = time.time()
-        
-        # Reset attempts if enough time has passed
-        if current_time - st.session_state.last_login_attempt > 300:  # 5 minutes
-            st.session_state.login_attempts = 0
-        
-        if st.session_state.login_attempts >= self.max_login_attempts:
+    except Exception as e:
+        logger.error(f"Exception checking user in database: {e}")
+        return False, None
+
+def handle_user_login(provider: str, user_type: str) -> bool:
+    """Handle user login process"""
+    try:
+        # Generate OAuth URL
+        oauth_url = generate_oauth_url(provider, user_type)
+        if not oauth_url:
             return False
         
-        st.session_state.last_login_attempt = current_time
-        st.session_state.login_attempts += 1
+        # Store login attempt in session
+        st.session_state.login_attempt = {
+            'provider': provider,
+            'user_type': user_type,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # Open OAuth popup
+        st.markdown(f"""
+        <script>
+        window.open('{oauth_url}', 'oauth_popup', 'width=500,height=600,scrollbars=yes,resizable=yes');
+        </script>
+        """, unsafe_allow_html=True)
+        
+        st.success(f"🔄 {provider.title()} login window opened. Please complete authentication.")
         return True
-    
-    def _login_with_email(self, credentials: Dict[str, Any]) -> Tuple[bool, Any]:
-        """UPDATED: Login with email using fixed API endpoints"""
         
-        email = credentials.get('email')
-        password = credentials.get('password')
-        user_type = credentials.get('user_type', 'individual')
+    except Exception as e:
+        logger.error(f"Error in handle_user_login: {e}")
+        st.error(f"❌ Login error: {str(e)}")
+        return False
+
+def generate_oauth_url(provider: str, user_type: str) -> Optional[str]:
+    """Generate OAuth URL for the specified provider"""
+    try:
+        # Create state parameter with provider and user_type
+        state = json.dumps({
+            'provider': provider,
+            'user_type': user_type,
+            'timestamp': datetime.now().isoformat()
+        })
         
-        if not email or not password:
-            return False, "Email and password are required"
+        frontend_url = st.secrets.get('FRONTEND_URL', 'https://haven-frontend-65jr.onrender.com')
+        oauth_url = f"{BACKEND_URL}/api/v1/auth/{provider}/login"
+        oauth_url += f"?user_type={user_type}&state={state}&redirect_uri={frontend_url}"
         
-        try:
-            # Use fixed API endpoint with /api/v1 prefix
-            response = requests.post(
-                f"{self.backend_url}/api/v1/auth/email/login",
-                json={
-                    'email': email,
-                    'password': password,
-                    'user_type': user_type
-                },
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Update session state
-                st.session_state.auth_token = data.get('access_token')
-                st.session_state.auth_expires = time.time() + self.session_timeout
-                st.session_state.user_authenticated = True
-                st.session_state.user_role = user_type
-                st.session_state.user_data = data.get('user_data')
-                st.session_state.login_attempts = 0
-                
-                logger.info(f"Email login successful for user: {email}")
-                return True, data
-            else:
-                error_data = response.json() if response.content else {}
-                error_msg = error_data.get('detail', 'Login failed')
-                return False, error_msg
-                
-        except requests.exceptions.ConnectionError:
-            return False, "Cannot connect to authentication server"
-        except requests.exceptions.Timeout:
-            return False, "Authentication server timeout"
-        except Exception as e:
-            logger.error(f"Email login error: {e}")
-            return False, f"Login failed: {str(e)}"
-    
-    def _login_with_oauth(self, provider: str, credentials: Dict[str, Any]) -> Tuple[bool, Any]:
-        """UPDATED: Login with OAuth using fixed OAuth integration"""
+        return oauth_url
         
-        user_type = credentials.get('user_type', 'individual')
-        
-        try:
-            # Use fixed OAuth manager
-            if provider == 'google':
-                auth_url = self.oauth_manager.initiate_google_login(user_type)
-            elif provider == 'facebook':
-                auth_url = self.oauth_manager.initiate_facebook_login(user_type)
-            else:
-                return False, f"Unsupported OAuth provider: {provider}"
-            
-            if auth_url:
-                # Store OAuth state
-                st.session_state.oauth_state = {
-                    'provider': provider,
-                    'user_type': user_type,
-                    'initiated_at': time.time()
-                }
-                
-                return True, {'auth_url': auth_url, 'provider': provider}
-            else:
-                return False, f"Failed to initiate {provider} authentication"
-                
-        except Exception as e:
-            logger.error(f"OAuth login error: {e}")
-            return False, f"OAuth login failed: {str(e)}"
-    
-    def register_user(self, registration_data: Dict[str, Any]) -> Tuple[bool, Any]:
-        """UPDATED: Register user with fixed API endpoints"""
-        
-        try:
-            # Use fixed API endpoint with /api/v1 prefix
-            response = requests.post(
-                f"{self.backend_url}/api/v1/auth/register",
-                json=registration_data,
-                timeout=30
-            )
-            
-            if response.status_code == 201:
-                data = response.json()
-                
-                # Update session state
-                st.session_state.is_registered = True
-                st.session_state.registration_type = registration_data.get('user_type')
-                st.session_state.user_data = data.get('user_data')
-                
-                logger.info(f"User registration successful: {registration_data.get('email')}")
-                return True, data
-            else:
-                error_data = response.json() if response.content else {}
-                error_msg = error_data.get('detail', 'Registration failed')
-                return False, error_msg
-                
-        except requests.exceptions.ConnectionError:
-            return False, "Cannot connect to registration server"
-        except requests.exceptions.Timeout:
-            return False, "Registration server timeout"
-        except Exception as e:
-            logger.error(f"Registration error: {e}")
-            return False, f"Registration failed: {str(e)}"
-    
-    def get_registration_status(self) -> Dict[str, Any]:
-        """UPDATED: Get user registration status using fixed API endpoints"""
-        
-        if not self.check_authentication():
-            return {'error': 'User not authenticated'}
-        
-        try:
-            headers = {}
-            
-            # Use OAuth authentication if available
-            if st.session_state.authenticated and st.session_state.auth_token:
-                headers['Authorization'] = f'Bearer {st.session_state.auth_token}'
-            
-            # Use fixed API endpoint with /api/v1 prefix
-            response = requests.get(
-                f"{self.backend_url}/api/v1/auth/registration-status",
-                headers=headers,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                return response.json()
-            else:
-                return {'error': 'Failed to get registration status'}
-                
-        except Exception as e:
-            logger.error(f"Registration status check error: {e}")
-            return {'error': f'Registration status check failed: {str(e)}'}
-    
-    def require_authentication(self, redirect_to_login: bool = True) -> bool:
-        """UPDATED: Decorator-like function to require authentication"""
-        
-        if not self.check_authentication():
-            if redirect_to_login:
-                st.warning("🔐 Please log in to access this feature")
-                st.stop()
-            return False
-        return True
-    
-    def require_role(self, required_roles: list, redirect_to_login: bool = True) -> bool:
-        """UPDATED: Require specific user roles"""
-        
-        if not self.require_authentication(redirect_to_login):
-            return False
-        
-        user_role = st.session_state.user_role
-        if user_role not in required_roles:
-            st.error(f"❌ Access denied. Required roles: {', '.join(required_roles)}")
-            st.stop()
-            return False
-        
-        return True
-    
-    def get_user_role(self) -> Optional[str]:
-        """Get current user role"""
-        if self.check_authentication():
-            return st.session_state.user_role
+    except Exception as e:
+        logger.error(f"Error generating OAuth URL: {e}")
         return None
+
+def handle_user_logout():
+    """Handle user logout process"""
+    try:
+        # Clear authentication state
+        clear_authentication()
+        
+        # Clear any cached data
+        if 'login_attempt' in st.session_state:
+            del st.session_state.login_attempt
+        
+        # Reset to login page
+        st.session_state.current_page = 'login'
+        
+        logger.info("User logged out successfully")
+        st.success("✅ Logged out successfully!")
+        
+        # Rerun to refresh the app
+        safe_rerun()
+        
+    except Exception as e:
+        logger.error(f"Error in handle_user_logout: {e}")
+        st.error(f"❌ Logout error: {str(e)}")
+
+def clear_authentication():
+    """Clear all authentication-related session state"""
+    keys_to_clear = [
+        'authenticated', 'user_data', 'user_type', 
+        'selected_role', 'oauth_callback_handled'
+    ]
     
-    def get_user_data(self) -> Optional[Dict[str, Any]]:
-        """Get current user data"""
-        if self.check_authentication():
-            return st.session_state.user_data
-        return None
-    
-    def is_organization(self) -> bool:
-        """Check if current user is an organization"""
-        return self.get_user_role() == 'organization'
-    
-    def is_individual(self) -> bool:
-        """Check if current user is an individual"""
-        return self.get_user_role() == 'individual'
+    for key in keys_to_clear:
+        if key in st.session_state:
+            del st.session_state[key]
 
-# Utility functions for easy access
-def get_auth_manager() -> AuthenticationManager:
-    """Get or create authentication manager instance"""
-    if 'auth_manager' not in st.session_state:
-        st.session_state.auth_manager = AuthenticationManager()
-    return st.session_state.auth_manager
-
-def require_auth(redirect_to_login: bool = True) -> bool:
-    """Require authentication for current page"""
-    auth_manager = get_auth_manager()
-    return auth_manager.require_authentication(redirect_to_login)
-
-def require_role(roles: list, redirect_to_login: bool = True) -> bool:
-    """Require specific roles for current page"""
-    auth_manager = get_auth_manager()
-    return auth_manager.require_role(roles, redirect_to_login)
-
-def get_current_user_role() -> Optional[str]:
+def get_user_role() -> Optional[str]:
     """Get current user role"""
-    auth_manager = get_auth_manager()
-    return auth_manager.get_user_role()
+    return st.session_state.get('user_type')
 
-def is_authenticated() -> bool:
-    """Check if user is authenticated"""
-    auth_manager = get_auth_manager()
-    return auth_manager.check_authentication()
+def get_current_user_data() -> Optional[Dict[str, Any]]:
+    """Get current user data"""
+    return st.session_state.get('user_data')
+
+def require_authentication(redirect_to_login: bool = True) -> bool:
+    """Require user to be authenticated"""
+    if not check_user_authentication():
+        if redirect_to_login:
+            st.error("❌ Authentication required. Please log in.")
+            st.session_state.current_page = 'login'
+            safe_rerun()
+        return False
+    return True
+
+def require_role(required_role: str) -> bool:
+    """Require user to have specific role"""
+    if not require_authentication():
+        return False
+    
+    user_role = get_user_role()
+    if user_role != required_role:
+        st.error(f"❌ Access denied. {required_role.title()} role required.")
+        return False
+    
+    return True
+
+def show_login_form():
+    """Show login form with role selection"""
+    
+    st.markdown("### 🎯 Choose Your Role to Login")
+    
+    st.markdown("""
+    <div class='info-message'>
+        <h4>💡 Important</h4>
+        <p>You must be registered in our database before you can log in.</p>
+        <p><strong>Process:</strong> Registration → Database Storage → Login → Access</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Role selection
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        <div class='role-card'>
+            <h4>👤 Individual</h4>
+            <ul>
+                <li>🎯 Donate to campaigns</li>
+                <li>❤️ Support causes you care about</li>
+                <li>📊 Track donation history</li>
+                <li>🧾 Get tax receipts</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("Login as Individual", key="auth_login_individual", use_container_width=True, type="primary"):
+            st.session_state.selected_role = "individual"
+            safe_rerun()
+    
+    with col2:
+        st.markdown("""
+        <div class='role-card'>
+            <h4>🏢 Organization</h4>
+            <ul>
+                <li>🚀 Create fundraising campaigns</li>
+                <li>📈 Manage campaign updates</li>
+                <li>💰 Track donations received</li>
+                <li>🤝 Engage with donors</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("Login as Organization", key="auth_login_organization", use_container_width=True, type="primary"):
+            st.session_state.selected_role = "organization"
+            safe_rerun()
+    
+    # Show OAuth buttons if role is selected
+    if st.session_state.get("selected_role"):
+        st.markdown("---")
+        st.markdown(f"### 🔐 Login as {st.session_state.selected_role.title()}")
+        
+        st.markdown("""
+        <div class='warning-message'>
+            <h4>⚠️ Database Check</h4>
+            <p>We will verify that you exist in our database before allowing login.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        show_oauth_buttons(st.session_state.selected_role)
+        
+        # Back button
+        if st.button("⬅️ Back to Role Selection", key="auth_back_to_role"):
+            if "selected_role" in st.session_state:
+                del st.session_state.selected_role
+            safe_rerun()
+
+def show_oauth_buttons(user_type: str):
+    """Show OAuth authentication buttons"""
+    
+    # OAuth section with pulse effect
+    st.markdown("""
+    <div class='oauth-section'>
+        <h4 style='text-align: center; color: #4CAF50;'>🔐 Secure Login Options</h4>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🔍 Continue with Google", key=f"auth_google_{user_type}", use_container_width=True, type="primary"):
+            if handle_user_login("google", user_type):
+                st.markdown("""
+                <div class='info-message'>
+                    <p>🔄 Google authentication window opened. Please complete authentication and return to this page.</p>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    with col2:
+        if st.button("📘 Continue with Facebook", key=f"auth_facebook_{user_type}", use_container_width=True, type="primary"):
+            if handle_user_login("facebook", user_type):
+                st.markdown("""
+                <div class='info-message'>
+                    <p>🔄 Facebook authentication window opened. Please complete authentication and return to this page.</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+def show_role_selection() -> Optional[str]:
+    """Show role selection and return selected role"""
+    
+    st.markdown("### 🎯 Choose Your Role")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        <div class='role-card'>
+            <h4>👤 Individual</h4>
+            <p>Donate to campaigns and support causes</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("Select Individual", key="role_select_individual", use_container_width=True):
+            return "individual"
+    
+    with col2:
+        st.markdown("""
+        <div class='role-card'>
+            <h4>🏢 Organization</h4>
+            <p>Create and manage fundraising campaigns</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("Select Organization", key="role_select_organization", use_container_width=True):
+            return "organization"
+    
+    return None
+
+def show_authentication_status():
+    """Show current authentication status (for debugging)"""
+    
+    if st.checkbox("Show Authentication Status", key="auth_debug"):
+        st.markdown("### 🔍 Authentication Status")
+        
+        status_data = {
+            "Authenticated": st.session_state.get('authenticated', False),
+            "User Type": st.session_state.get('user_type', 'None'),
+            "User Email": st.session_state.get('user_data', {}).get('email', 'None'),
+            "Selected Role": st.session_state.get('selected_role', 'None'),
+            "Current Page": st.session_state.get('current_page', 'None'),
+            "Backend URL": BACKEND_URL
+        }
+        
+        for key, value in status_data.items():
+            st.write(f"**{key}:** {value}")
+
+def validate_user_session() -> bool:
+    """Validate current user session"""
+    try:
+        if not check_user_authentication():
+            return False
+        
+        user_data = get_current_user_data()
+        if not user_data:
+            return False
+        
+        # Additional validation can be added here
+        # e.g., token expiry, session timeout, etc.
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error validating user session: {e}")
+        return False
+
+def refresh_user_data():
+    """Refresh user data from backend"""
+    try:
+        user_data = get_current_user_data()
+        user_type = get_user_role()
+        
+        if not user_data or not user_type:
+            return False
+        
+        # Fetch fresh user data from backend
+        exists, fresh_data = check_user_in_database(user_data.get('email'), user_type)
+        
+        if exists and fresh_data:
+            st.session_state.user_data = fresh_data
+            logger.info("User data refreshed successfully")
+            return True
+        else:
+            logger.warning("Failed to refresh user data")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error refreshing user data: {e}")
+        return False
+
+# Compatibility functions for integration with main app
+def get_auth_status() -> Dict[str, Any]:
+    """Get comprehensive authentication status"""
+    return {
+        'authenticated': check_user_authentication(),
+        'user_data': get_current_user_data(),
+        'user_type': get_user_role(),
+        'session_valid': validate_user_session()
+    }
+
+def initialize_auth_state():
+    """Initialize authentication state"""
+    if 'auth_initialized' not in st.session_state:
+        st.session_state.auth_initialized = True
+        logger.info("Authentication state initialized")
+
+# Export functions for main app integration
+__all__ = [
+    'get_auth_manager',
+    'check_user_authentication', 
+    'handle_user_login',
+    'handle_user_logout',
+    'get_user_role',
+    'require_authentication',
+    'require_role',
+    'show_login_form',
+    'show_oauth_buttons',
+    'show_role_selection',
+    'get_current_user_data',
+    'validate_user_session',
+    'refresh_user_data',
+    'get_auth_status',
+    'initialize_auth_state'
+]
 
