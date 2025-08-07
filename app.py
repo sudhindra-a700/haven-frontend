@@ -10,12 +10,12 @@ import os
 from datetime import datetime
 
 # Import enhanced authentication and registration modules
-from modules.workflow_auth_utils import (
+from workflow_auth_utils import (
     initialize_auth, is_authenticated, login_user, logout_user,
     is_individual, is_organization, can_donate, can_create_campaigns,
     needs_registration, get_user_role_display, get_allowed_features
 )
-from modules.workflow_registration_pages import show_registration_workflow
+from workflow_registration_pages import show_registration_workflow
 
 # ===== CONFIGURATION =====
 st.set_page_config(
