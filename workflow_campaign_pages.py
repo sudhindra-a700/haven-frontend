@@ -1,194 +1,257 @@
 """
-UPDATED Campaign Creation and Submission Workflow Pages for HAVEN
-Integrates with fixed OAuth authentication system
-Implements the exact workflow: Create → Submit → AI Processing → Admin Review
+COMPATIBILITY UPDATED Workflow Campaign Pages for HAVEN Platform
+Ensures compatibility with the fully integrated Streamlit app
+
+This module provides campaign management functionality that works seamlessly with:
+1. fully_integrated_app.py
+2. corrected_authentication_flow.py
+3. Streamlit compatibility fixes
+4. Term simplification features
 """
 
 import streamlit as st
-from typing import Dict, Any, List, Optional
 import logging
-import time
-import uuid
+import requests
+import json
 from datetime import datetime, timedelta
-
-# Import updated authentication utilities
-from workflow_auth_utils import (
-    get_auth_manager, 
-    require_auth, 
-    require_role, 
-    get_current_user_role,
-    is_authenticated
-)
+from typing import Dict, Any, Optional, List
+import uuid
 
 logger = logging.getLogger(__name__)
 
-def render_create_campaign_page(workflow_manager):
-    """UPDATED: Render campaign creation page - multi-step form with authentication"""
+# Backend configuration
+BACKEND_URL = st.secrets.get('BACKEND_URL', 'https://haven-backend-9lw3.onrender.com')
+
+def safe_rerun():
+    """Safe rerun function that works with both old and new Streamlit versions"""
+    try:
+        if hasattr(st, 'rerun'):
+            st.rerun()
+        elif hasattr(st, 'experimental_rerun'):
+            st.experimental_rerun()
+        else:
+            st.markdown('<meta http-equiv="refresh" content="0">', unsafe_allow_html=True)
+    except Exception as e:
+        logger.error(f"Error in safe_rerun: {e}")
+
+def apply_term_simplification(text: str) -> str:
+    """Apply term simplification with 'i' icons if enabled"""
     
-    # Require authentication and organization role
-    if not require_auth():
-        return
+    if not st.session_state.get('simplification_active', False):
+        return text
     
-    if not require_role(['organization']):
-        return
-    
-    st.markdown("### 🚀 Create Your Campaign")
-    
-    # Initialize campaign data if not exists
-    if 'campaign_draft' not in st.session_state:
-        st.session_state.campaign_draft = {
-            'step': 1,
-            'basic_info': {},
-            'details': {},
-            'media': {},
-            'verification': {},
-            'funding': {}
+    # Campaign-specific simplifications
+    simplifications = {
+        'campaign': {
+            'simplified': 'fundraising project',
+            'explanation': 'A specific project or cause that is asking for money donations'
+        },
+        'fundraising': {
+            'simplified': 'collecting money',
+            'explanation': 'The process of collecting money from people to support a cause or project'
+        },
+        'donation': {
+            'simplified': 'money gift',
+            'explanation': 'Money given freely to support a cause without expecting anything back'
+        },
+        'goal': {
+            'simplified': 'target amount',
+            'explanation': 'The total amount of money the campaign hopes to raise'
+        },
+        'milestone': {
+            'simplified': 'progress point',
+            'explanation': 'Important points reached during the fundraising process'
         }
+    }
     
-    current_step = st.session_state.campaign_draft['step']
+    result_text = text
+    for original, data in simplifications.items():
+        if original.lower() in text.lower():
+            simplified = data['simplified']
+            explanation = data['explanation']
+            
+            # Create HTML with 'i' icon and hover explanation
+            replacement = f"""
+            <span class="simplified-term">
+                {simplified}
+                <i class="material-icons info-icon">info</i>
+                <div class="term-explanation">{explanation}</div>
+            </span>
+            """
+            
+            result_text = result_text.replace(original, replacement)
+    
+    return result_text
+
+def render_create_campaign_page(session_state):
+    """Render the create campaign page with multi-step form"""
+    
+    # Check authentication and role
+    if not session_state.get('authenticated', False):
+        st.error("❌ Authentication required")
+        return
+    
+    if session_state.get('user_type') != 'organization':
+        st.error("❌ Organization role required to create campaigns")
+        return
+    
+    # Page header with term simplification
+    title = "🚀 Create New Campaign"
+    subtitle = "Launch your fundraising campaign and make a difference"
+    
+    if session_state.get('simplification_active', False):
+        title = apply_term_simplification(title)
+        subtitle = apply_term_simplification(subtitle)
+    
+    st.markdown(f"""
+    <div class='main-header'>
+        <h1>{title}</h1>
+        <p>{subtitle}</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Initialize campaign creation state
+    if 'campaign_creation_step' not in session_state:
+        session_state.campaign_creation_step = 1
+    
+    if 'campaign_draft' not in session_state:
+        session_state.campaign_draft = {}
     
     # Progress indicator
-    progress_steps = ["Basic Info", "Campaign Details", "Media & Documents", "Verification", "Funding Goals"]
+    show_campaign_progress(session_state.campaign_creation_step)
     
-    st.markdown("#### 📊 Campaign Creation Progress")
-    progress_cols = st.columns(len(progress_steps))
-    
-    for i, step_name in enumerate(progress_steps, 1):
-        with progress_cols[i-1]:
-            if i < current_step:
-                st.markdown(f"✅ **{step_name}**")
-            elif i == current_step:
-                st.markdown(f"🔄 **{step_name}**")
-            else:
-                st.markdown(f"⏳ {step_name}")
-    
-    st.markdown("---")
-    
-    # Render current step
-    if current_step == 1:
-        render_basic_info_step(workflow_manager)
-    elif current_step == 2:
-        render_campaign_details_step(workflow_manager)
-    elif current_step == 3:
-        render_media_documents_step(workflow_manager)
-    elif current_step == 4:
-        render_verification_step(workflow_manager)
-    elif current_step == 5:
-        render_funding_goals_step(workflow_manager)
+    # Show appropriate step
+    if session_state.campaign_creation_step == 1:
+        show_campaign_basic_info(session_state)
+    elif session_state.campaign_creation_step == 2:
+        show_campaign_details(session_state)
+    elif session_state.campaign_creation_step == 3:
+        show_campaign_media(session_state)
+    elif session_state.campaign_creation_step == 4:
+        show_campaign_funding(session_state)
+    elif session_state.campaign_creation_step == 5:
+        show_campaign_review(session_state)
 
-def render_basic_info_step(workflow_manager):
-    """UPDATED: Step 1: Basic campaign information with authentication checks"""
+def show_campaign_progress(current_step: int):
+    """Show campaign creation progress"""
     
-    st.markdown("#### 📝 Step 1: Basic Information")
+    steps = [
+        "📝 Basic Info",
+        "📄 Details", 
+        "🖼️ Media",
+        "💰 Funding",
+        "✅ Review"
+    ]
     
-    with st.form("basic_info_form"):
+    # Progress bar
+    progress = (current_step - 1) / (len(steps) - 1)
+    st.progress(progress)
+    
+    # Step indicators
+    cols = st.columns(len(steps))
+    for i, (col, step) in enumerate(zip(cols, steps)):
+        with col:
+            if i + 1 == current_step:
+                st.markdown(f"**{step}** ✨")
+            elif i + 1 < current_step:
+                st.markdown(f"{step} ✅")
+            else:
+                st.markdown(f"{step}")
+
+def show_campaign_basic_info(session_state):
+    """Show basic campaign information form"""
+    
+    st.markdown("### 📝 Basic Campaign Information")
+    
+    with st.form("campaign_basic_info"):
         col1, col2 = st.columns(2)
         
         with col1:
             title = st.text_input(
                 "Campaign Title *",
-                value=st.session_state.campaign_draft['basic_info'].get('title', ''),
+                value=session_state.campaign_draft.get('title', ''),
                 placeholder="Enter a compelling campaign title",
-                help="Choose a clear, descriptive title that explains your cause"
+                help="Choose a clear, engaging title that describes your cause"
             )
             
             category = st.selectbox(
                 "Campaign Category *",
-                options=[
-                    "", "Medical", "Education", "Disaster Relief", "Community Development",
-                    "Environment", "Animal Welfare", "Sports", "Arts & Culture", "Technology"
-                ],
-                index=0 if not st.session_state.campaign_draft['basic_info'].get('category') else 
-                      ["", "Medical", "Education", "Disaster Relief", "Community Development",
-                       "Environment", "Animal Welfare", "Sports", "Arts & Culture", "Technology"].index(
-                          st.session_state.campaign_draft['basic_info'].get('category', '')
-                      )
+                ["Medical", "Education", "Environment", "Community", "Emergency", "Arts", "Sports", "Technology", "Other"],
+                index=0 if not session_state.campaign_draft.get('category') else 
+                      ["Medical", "Education", "Environment", "Community", "Emergency", "Arts", "Sports", "Technology", "Other"].index(session_state.campaign_draft.get('category', 'Medical'))
             )
             
             location = st.text_input(
-                "Location *",
-                value=st.session_state.campaign_draft['basic_info'].get('location', ''),
-                placeholder="City, State, Country"
+                "Campaign Location *",
+                value=session_state.campaign_draft.get('location', ''),
+                placeholder="City, Country",
+                help="Where is this campaign taking place?"
             )
         
         with col2:
             short_description = st.text_area(
                 "Short Description *",
-                value=st.session_state.campaign_draft['basic_info'].get('short_description', ''),
+                value=session_state.campaign_draft.get('short_description', ''),
                 placeholder="Brief summary of your campaign (max 200 characters)",
                 max_chars=200,
-                height=100
+                help="This will appear in campaign previews"
             )
             
-            beneficiary_type = st.selectbox(
-                "Beneficiary Type *",
-                options=["", "Individual", "Community", "Organization", "Environment", "Animals"],
-                index=0 if not st.session_state.campaign_draft['basic_info'].get('beneficiary_type') else
-                      ["", "Individual", "Community", "Organization", "Environment", "Animals"].index(
-                          st.session_state.campaign_draft['basic_info'].get('beneficiary_type', '')
-                      )
-            )
-            
-            urgency_level = st.selectbox(
-                "Urgency Level *",
-                options=["", "Low", "Medium", "High", "Critical"],
-                index=0 if not st.session_state.campaign_draft['basic_info'].get('urgency_level') else
-                      ["", "Low", "Medium", "High", "Critical"].index(
-                          st.session_state.campaign_draft['basic_info'].get('urgency_level', '')
-                      )
+            tags = st.text_input(
+                "Tags",
+                value=session_state.campaign_draft.get('tags', ''),
+                placeholder="health, children, emergency (comma-separated)",
+                help="Add relevant tags to help people find your campaign"
             )
         
         # Form submission
         col1, col2, col3 = st.columns([1, 1, 1])
         
         with col2:
-            submitted = st.form_submit_button("Continue to Details →", use_container_width=True, type="primary")
+            submitted = st.form_submit_button("Next: Campaign Details →", use_container_width=True, type="primary")
+        
+        with col3:
+            if st.form_submit_button("Save Draft", use_container_width=True):
+                save_campaign_draft(session_state, {
+                    'title': title,
+                    'category': category,
+                    'location': location,
+                    'short_description': short_description,
+                    'tags': tags
+                })
+                st.success("✅ Draft saved!")
         
         if submitted:
-            # Validation
-            errors = []
-            if not title.strip():
-                errors.append("Campaign title is required")
-            if not category:
-                errors.append("Campaign category is required")
-            if not location.strip():
-                errors.append("Location is required")
-            if not short_description.strip():
-                errors.append("Short description is required")
-            if not beneficiary_type:
-                errors.append("Beneficiary type is required")
-            if not urgency_level:
-                errors.append("Urgency level is required")
+            # Validate required fields
+            if not all([title, category, location, short_description]):
+                st.error("❌ Please fill in all required fields")
+                return
             
-            if errors:
-                for error in errors:
-                    st.error(f"❌ {error}")
-            else:
-                # Save data and proceed
-                st.session_state.campaign_draft['basic_info'] = {
-                    'title': title.strip(),
-                    'category': category,
-                    'location': location.strip(),
-                    'short_description': short_description.strip(),
-                    'beneficiary_type': beneficiary_type,
-                    'urgency_level': urgency_level
-                }
-                st.session_state.campaign_draft['step'] = 2
-                st.experimental_rerun()
+            # Save to draft and proceed
+            session_state.campaign_draft.update({
+                'title': title,
+                'category': category,
+                'location': location,
+                'short_description': short_description,
+                'tags': tags
+            })
+            
+            session_state.campaign_creation_step = 2
+            safe_rerun()
 
-def render_campaign_details_step(workflow_manager):
-    """UPDATED: Step 2: Detailed campaign information with authentication checks"""
+def show_campaign_details(session_state):
+    """Show detailed campaign information form"""
     
-    st.markdown("#### 📖 Step 2: Campaign Details")
+    st.markdown("### 📄 Campaign Details")
     
-    with st.form("campaign_details_form"):
+    with st.form("campaign_details"):
         # Full description
         full_description = st.text_area(
             "Full Campaign Description *",
-            value=st.session_state.campaign_draft['details'].get('full_description', ''),
-            placeholder="Provide a detailed description of your campaign, including background, goals, and impact...",
+            value=session_state.campaign_draft.get('full_description', ''),
+            placeholder="Provide a detailed description of your campaign, including the problem you're solving, your solution, and how donations will be used.",
             height=200,
-            help="Explain your cause in detail. Include background information, specific goals, and expected impact."
+            help="Be specific about your goals and how funds will be used"
         )
         
         col1, col2 = st.columns(2)
@@ -197,470 +260,588 @@ def render_campaign_details_step(workflow_manager):
             # Problem statement
             problem_statement = st.text_area(
                 "Problem Statement *",
-                value=st.session_state.campaign_draft['details'].get('problem_statement', ''),
-                placeholder="Clearly describe the problem you're addressing...",
-                height=120
+                value=session_state.campaign_draft.get('problem_statement', ''),
+                placeholder="What problem are you trying to solve?",
+                height=100
             )
             
             # Target beneficiaries
             target_beneficiaries = st.text_input(
                 "Target Beneficiaries *",
-                value=st.session_state.campaign_draft['details'].get('target_beneficiaries', ''),
-                placeholder="Who will benefit from this campaign?"
+                value=session_state.campaign_draft.get('target_beneficiaries', ''),
+                placeholder="Who will benefit from this campaign?",
+                help="e.g., 100 children, local community, patients"
             )
         
         with col2:
             # Solution approach
             solution_approach = st.text_area(
                 "Solution Approach *",
-                value=st.session_state.campaign_draft['details'].get('solution_approach', ''),
-                placeholder="How will you solve the problem?",
-                height=120
+                value=session_state.campaign_draft.get('solution_approach', ''),
+                placeholder="How will you solve this problem?",
+                height=100
             )
             
             # Expected impact
-            expected_impact = st.text_input(
-                "Expected Impact *",
-                value=st.session_state.campaign_draft['details'].get('expected_impact', ''),
-                placeholder="What impact do you expect to achieve?"
-            )
-        
-        # Timeline
-        st.markdown("**Campaign Timeline**")
-        timeline_col1, timeline_col2 = st.columns(2)
-        
-        with timeline_col1:
-            start_date = st.date_input(
-                "Campaign Start Date *",
-                value=st.session_state.campaign_draft['details'].get('start_date', datetime.now().date()),
-                min_value=datetime.now().date()
-            )
-        
-        with timeline_col2:
-            end_date = st.date_input(
-                "Campaign End Date *",
-                value=st.session_state.campaign_draft['details'].get('end_date', 
-                    (datetime.now() + timedelta(days=30)).date()),
-                min_value=datetime.now().date()
+            expected_impact = st.text_area(
+                "Expected Impact",
+                value=session_state.campaign_draft.get('expected_impact', ''),
+                placeholder="What impact do you expect to achieve?",
+                height=100
             )
         
         # Navigation buttons
-        col1, col2, col3 = st.columns([1, 1, 1])
+        col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
         
         with col1:
-            back_clicked = st.form_submit_button("← Back to Basic Info", use_container_width=True)
+            if st.form_submit_button("← Previous", use_container_width=True):
+                session_state.campaign_creation_step = 1
+                safe_rerun()
+        
+        with col2:
+            if st.form_submit_button("Save Draft", use_container_width=True):
+                save_campaign_draft(session_state, {
+                    'full_description': full_description,
+                    'problem_statement': problem_statement,
+                    'solution_approach': solution_approach,
+                    'target_beneficiaries': target_beneficiaries,
+                    'expected_impact': expected_impact
+                })
+                st.success("✅ Draft saved!")
         
         with col3:
-            next_clicked = st.form_submit_button("Continue to Media →", use_container_width=True, type="primary")
+            submitted = st.form_submit_button("Next: Media →", use_container_width=True, type="primary")
         
-        if back_clicked:
-            st.session_state.campaign_draft['step'] = 1
-            st.experimental_rerun()
-        
-        if next_clicked:
-            # Validation
-            errors = []
-            if not full_description.strip():
-                errors.append("Full description is required")
-            if not problem_statement.strip():
-                errors.append("Problem statement is required")
-            if not solution_approach.strip():
-                errors.append("Solution approach is required")
-            if not target_beneficiaries.strip():
-                errors.append("Target beneficiaries is required")
-            if not expected_impact.strip():
-                errors.append("Expected impact is required")
-            if end_date <= start_date:
-                errors.append("End date must be after start date")
+        if submitted:
+            # Validate required fields
+            if not all([full_description, problem_statement, solution_approach, target_beneficiaries]):
+                st.error("❌ Please fill in all required fields")
+                return
             
-            if errors:
-                for error in errors:
-                    st.error(f"❌ {error}")
-            else:
-                # Save data and proceed
-                st.session_state.campaign_draft['details'] = {
-                    'full_description': full_description.strip(),
-                    'problem_statement': problem_statement.strip(),
-                    'solution_approach': solution_approach.strip(),
-                    'target_beneficiaries': target_beneficiaries.strip(),
-                    'expected_impact': expected_impact.strip(),
-                    'start_date': start_date,
-                    'end_date': end_date
-                }
-                st.session_state.campaign_draft['step'] = 3
-                st.experimental_rerun()
+            # Save to draft and proceed
+            session_state.campaign_draft.update({
+                'full_description': full_description,
+                'problem_statement': problem_statement,
+                'solution_approach': solution_approach,
+                'target_beneficiaries': target_beneficiaries,
+                'expected_impact': expected_impact
+            })
+            
+            session_state.campaign_creation_step = 3
+            safe_rerun()
 
-def render_media_documents_step(workflow_manager):
-    """UPDATED: Step 3: Media and documents with authentication checks"""
+def show_campaign_media(session_state):
+    """Show campaign media upload form"""
     
-    st.markdown("#### 📸 Step 3: Media & Documents")
+    st.markdown("### 🖼️ Campaign Media")
     
-    with st.form("media_documents_form"):
-        st.info("📝 **Note**: Upload compelling images and documents that support your campaign story.")
-        
-        # Campaign image
-        st.markdown("**Campaign Cover Image**")
-        campaign_image = st.file_uploader(
-            "Upload Campaign Cover Image *",
+    st.markdown("""
+    <div class='info-message'>
+        <h4>📸 Media Guidelines</h4>
+        <p>High-quality images and videos help tell your story and build trust with donors.</p>
+        <ul>
+            <li>Use clear, high-resolution images</li>
+            <li>Show the people or cause you're helping</li>
+            <li>Include progress photos if applicable</li>
+            <li>Videos should be under 5 minutes</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.form("campaign_media"):
+        # Main campaign image
+        st.markdown("#### 🖼️ Main Campaign Image *")
+        main_image = st.file_uploader(
+            "Upload main campaign image",
             type=['jpg', 'jpeg', 'png'],
-            help="Upload a high-quality image that represents your campaign (max 5MB)"
+            help="This will be the primary image for your campaign"
         )
         
         # Additional images
-        st.markdown("**Additional Images**")
+        st.markdown("#### 📸 Additional Images")
         additional_images = st.file_uploader(
-            "Upload Additional Images (Optional)",
+            "Upload additional images",
             type=['jpg', 'jpeg', 'png'],
             accept_multiple_files=True,
-            help="Upload up to 5 additional images to support your campaign"
+            help="Upload up to 5 additional images"
         )
         
-        # Supporting documents
-        st.markdown("**Supporting Documents**")
-        supporting_docs = st.file_uploader(
-            "Upload Supporting Documents (Optional)",
+        # Campaign video
+        st.markdown("#### 🎥 Campaign Video (Optional)")
+        video_url = st.text_input(
+            "Video URL",
+            value=session_state.campaign_draft.get('video_url', ''),
+            placeholder="https://youtube.com/watch?v=...",
+            help="YouTube, Vimeo, or other video platform URL"
+        )
+        
+        # Documents
+        st.markdown("#### 📄 Supporting Documents (Optional)")
+        documents = st.file_uploader(
+            "Upload supporting documents",
             type=['pdf', 'doc', 'docx'],
             accept_multiple_files=True,
-            help="Upload relevant documents like medical reports, certificates, etc."
-        )
-        
-        # Video link
-        video_link = st.text_input(
-            "Video Link (Optional)",
-            value=st.session_state.campaign_draft['media'].get('video_link', ''),
-            placeholder="YouTube, Vimeo, or other video platform link",
-            help="Add a video to make your campaign more compelling"
+            help="Medical reports, certificates, project plans, etc."
         )
         
         # Navigation buttons
-        col1, col2, col3 = st.columns([1, 1, 1])
+        col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
         
         with col1:
-            back_clicked = st.form_submit_button("← Back to Details", use_container_width=True)
-        
-        with col3:
-            next_clicked = st.form_submit_button("Continue to Verification →", use_container_width=True, type="primary")
-        
-        if back_clicked:
-            st.session_state.campaign_draft['step'] = 2
-            st.experimental_rerun()
-        
-        if next_clicked:
-            # Validation
-            errors = []
-            if not campaign_image:
-                errors.append("Campaign cover image is required")
-            
-            if errors:
-                for error in errors:
-                    st.error(f"❌ {error}")
-            else:
-                # Save data and proceed
-                st.session_state.campaign_draft['media'] = {
-                    'campaign_image': campaign_image,
-                    'additional_images': additional_images,
-                    'supporting_docs': supporting_docs,
-                    'video_link': video_link.strip() if video_link else None
-                }
-                st.session_state.campaign_draft['step'] = 4
-                st.experimental_rerun()
-
-def render_verification_step(workflow_manager):
-    """UPDATED: Step 4: Verification with authentication checks"""
-    
-    st.markdown("#### ✅ Step 4: Verification")
-    
-    with st.form("verification_form"):
-        st.info("🔍 **Identity Verification**: Please provide information to verify your identity and campaign authenticity.")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Organization details
-            org_name = st.text_input(
-                "Organization Name *",
-                value=st.session_state.campaign_draft['verification'].get('org_name', ''),
-                placeholder="Official organization name"
-            )
-            
-            org_registration = st.text_input(
-                "Registration Number *",
-                value=st.session_state.campaign_draft['verification'].get('org_registration', ''),
-                placeholder="Official registration/license number"
-            )
-            
-            contact_person = st.text_input(
-                "Contact Person *",
-                value=st.session_state.campaign_draft['verification'].get('contact_person', ''),
-                placeholder="Primary contact person name"
-            )
+            if st.form_submit_button("← Previous", use_container_width=True):
+                session_state.campaign_creation_step = 2
+                safe_rerun()
         
         with col2:
-            contact_phone = st.text_input(
-                "Contact Phone *",
-                value=st.session_state.campaign_draft['verification'].get('contact_phone', ''),
-                placeholder="+1234567890"
-            )
-            
-            contact_email = st.text_input(
-                "Contact Email *",
-                value=st.session_state.campaign_draft['verification'].get('contact_email', ''),
-                placeholder="contact@organization.org"
-            )
-            
-            website = st.text_input(
-                "Website (Optional)",
-                value=st.session_state.campaign_draft['verification'].get('website', ''),
-                placeholder="https://www.organization.org"
-            )
-        
-        # Verification documents
-        st.markdown("**Verification Documents**")
-        verification_docs = st.file_uploader(
-            "Upload Verification Documents *",
-            type=['pdf', 'jpg', 'jpeg', 'png'],
-            accept_multiple_files=True,
-            help="Upload organization registration, tax exemption, or other official documents"
-        )
-        
-        # Terms and conditions
-        terms_accepted = st.checkbox(
-            "I agree to the Terms of Service and Privacy Policy *",
-            value=st.session_state.campaign_draft['verification'].get('terms_accepted', False)
-        )
-        
-        authenticity_confirmed = st.checkbox(
-            "I confirm that all information provided is accurate and authentic *",
-            value=st.session_state.campaign_draft['verification'].get('authenticity_confirmed', False)
-        )
-        
-        # Navigation buttons
-        col1, col2, col3 = st.columns([1, 1, 1])
-        
-        with col1:
-            back_clicked = st.form_submit_button("← Back to Media", use_container_width=True)
+            if st.form_submit_button("Save Draft", use_container_width=True):
+                save_campaign_draft(session_state, {
+                    'video_url': video_url,
+                    'main_image_uploaded': main_image is not None,
+                    'additional_images_count': len(additional_images) if additional_images else 0,
+                    'documents_count': len(documents) if documents else 0
+                })
+                st.success("✅ Draft saved!")
         
         with col3:
-            next_clicked = st.form_submit_button("Continue to Funding →", use_container_width=True, type="primary")
+            submitted = st.form_submit_button("Next: Funding →", use_container_width=True, type="primary")
         
-        if back_clicked:
-            st.session_state.campaign_draft['step'] = 3
-            st.experimental_rerun()
-        
-        if next_clicked:
-            # Validation
-            errors = []
-            if not org_name.strip():
-                errors.append("Organization name is required")
-            if not org_registration.strip():
-                errors.append("Registration number is required")
-            if not contact_person.strip():
-                errors.append("Contact person is required")
-            if not contact_phone.strip():
-                errors.append("Contact phone is required")
-            if not contact_email.strip():
-                errors.append("Contact email is required")
-            if not verification_docs:
-                errors.append("Verification documents are required")
-            if not terms_accepted:
-                errors.append("You must accept the terms and conditions")
-            if not authenticity_confirmed:
-                errors.append("You must confirm the authenticity of information")
+        if submitted:
+            # Validate required fields
+            if not main_image:
+                st.error("❌ Please upload a main campaign image")
+                return
             
-            if errors:
-                for error in errors:
-                    st.error(f"❌ {error}")
-            else:
-                # Save data and proceed
-                st.session_state.campaign_draft['verification'] = {
-                    'org_name': org_name.strip(),
-                    'org_registration': org_registration.strip(),
-                    'contact_person': contact_person.strip(),
-                    'contact_phone': contact_phone.strip(),
-                    'contact_email': contact_email.strip(),
-                    'website': website.strip() if website else None,
-                    'verification_docs': verification_docs,
-                    'terms_accepted': terms_accepted,
-                    'authenticity_confirmed': authenticity_confirmed
-                }
-                st.session_state.campaign_draft['step'] = 5
-                st.experimental_rerun()
+            # Save media information to draft
+            session_state.campaign_draft.update({
+                'video_url': video_url,
+                'main_image': main_image,
+                'additional_images': additional_images,
+                'documents': documents
+            })
+            
+            session_state.campaign_creation_step = 4
+            safe_rerun()
 
-def render_funding_goals_step(workflow_manager):
-    """UPDATED: Step 5: Funding goals with authentication checks"""
+def show_campaign_funding(session_state):
+    """Show campaign funding configuration form"""
     
-    st.markdown("#### 💰 Step 5: Funding Goals")
+    st.markdown("### 💰 Funding Configuration")
     
-    with st.form("funding_goals_form"):
+    with st.form("campaign_funding"):
         col1, col2 = st.columns(2)
         
         with col1:
-            # Funding target
-            funding_target = st.number_input(
-                "Funding Target (USD) *",
+            # Funding goal
+            funding_goal = st.number_input(
+                "Funding Goal (USD) *",
                 min_value=100,
                 max_value=1000000,
-                value=st.session_state.campaign_draft['funding'].get('funding_target', 1000),
+                value=session_state.campaign_draft.get('funding_goal', 5000),
                 step=100,
-                help="Set a realistic funding goal for your campaign"
+                help="How much money do you need to raise?"
             )
             
-            # Minimum funding
-            minimum_funding = st.number_input(
-                "Minimum Funding Required (USD) *",
-                min_value=50,
-                max_value=funding_target,
-                value=st.session_state.campaign_draft['funding'].get('minimum_funding', 
-                    min(500, funding_target // 2)),
-                step=50,
-                help="Minimum amount needed to proceed with the campaign"
+            # Campaign duration
+            duration_days = st.number_input(
+                "Campaign Duration (Days) *",
+                min_value=7,
+                max_value=365,
+                value=session_state.campaign_draft.get('duration_days', 30),
+                step=1,
+                help="How long will your campaign run?"
+            )
+            
+            # Minimum donation
+            min_donation = st.number_input(
+                "Minimum Donation (USD)",
+                min_value=1,
+                max_value=1000,
+                value=session_state.campaign_draft.get('min_donation', 10),
+                step=1,
+                help="Minimum amount donors can contribute"
             )
         
         with col2:
-            # Currency
-            currency = st.selectbox(
-                "Currency *",
-                options=["USD", "EUR", "GBP", "INR", "CAD", "AUD"],
-                index=0 if not st.session_state.campaign_draft['funding'].get('currency') else
-                      ["USD", "EUR", "GBP", "INR", "CAD", "AUD"].index(
-                          st.session_state.campaign_draft['funding'].get('currency', 'USD')
-                      )
-            )
-            
             # Funding type
             funding_type = st.selectbox(
                 "Funding Type *",
-                options=["All or Nothing", "Keep What You Raise"],
-                index=0 if not st.session_state.campaign_draft['funding'].get('funding_type') else
-                      ["All or Nothing", "Keep What You Raise"].index(
-                          st.session_state.campaign_draft['funding'].get('funding_type', 'All or Nothing')
-                      ),
-                help="All or Nothing: Get funds only if target is reached. Keep What You Raise: Keep all funds raised."
+                ["All or Nothing", "Keep What You Raise"],
+                index=0 if session_state.campaign_draft.get('funding_type') == "All or Nothing" else 1,
+                help="All or Nothing: Only receive funds if goal is met. Keep What You Raise: Keep all donations regardless of goal."
             )
+            
+            # End date calculation
+            start_date = datetime.now()
+            end_date = start_date + timedelta(days=duration_days)
+            
+            st.markdown(f"""
+            **Campaign Timeline:**
+            - **Start Date:** {start_date.strftime('%B %d, %Y')}
+            - **End Date:** {end_date.strftime('%B %d, %Y')}
+            - **Duration:** {duration_days} days
+            """)
         
-        # Budget breakdown
-        st.markdown("**Budget Breakdown**")
-        budget_breakdown = st.text_area(
-            "Detailed Budget Breakdown *",
-            value=st.session_state.campaign_draft['funding'].get('budget_breakdown', ''),
-            placeholder="Provide a detailed breakdown of how the funds will be used...",
-            height=150,
-            help="Explain how each dollar will be spent. Be transparent and specific."
-        )
+        # Milestones
+        st.markdown("#### 🎯 Funding Milestones (Optional)")
         
-        # Use of funds
-        use_of_funds = st.text_area(
-            "Use of Funds *",
-            value=st.session_state.campaign_draft['funding'].get('use_of_funds', ''),
-            placeholder="Describe how the funds will be used to achieve your campaign goals...",
-            height=100
-        )
+        milestones = []
+        for i in range(3):
+            col1, col2 = st.columns(2)
+            with col1:
+                milestone_amount = st.number_input(
+                    f"Milestone {i+1} Amount",
+                    min_value=0,
+                    max_value=funding_goal,
+                    value=0,
+                    key=f"milestone_amount_{i}"
+                )
+            with col2:
+                milestone_description = st.text_input(
+                    f"Milestone {i+1} Description",
+                    placeholder="What will be achieved at this milestone?",
+                    key=f"milestone_desc_{i}"
+                )
+            
+            if milestone_amount > 0 and milestone_description:
+                milestones.append({
+                    'amount': milestone_amount,
+                    'description': milestone_description
+                })
         
-        # Navigation and submission buttons
-        col1, col2, col3 = st.columns([1, 1, 1])
+        # Navigation buttons
+        col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
         
         with col1:
-            back_clicked = st.form_submit_button("← Back to Verification", use_container_width=True)
+            if st.form_submit_button("← Previous", use_container_width=True):
+                session_state.campaign_creation_step = 3
+                safe_rerun()
+        
+        with col2:
+            if st.form_submit_button("Save Draft", use_container_width=True):
+                save_campaign_draft(session_state, {
+                    'funding_goal': funding_goal,
+                    'duration_days': duration_days,
+                    'min_donation': min_donation,
+                    'funding_type': funding_type,
+                    'milestones': milestones
+                })
+                st.success("✅ Draft saved!")
         
         with col3:
-            submit_clicked = st.form_submit_button("🚀 Submit Campaign", use_container_width=True, type="primary")
+            submitted = st.form_submit_button("Next: Review →", use_container_width=True, type="primary")
         
-        if back_clicked:
-            st.session_state.campaign_draft['step'] = 4
-            st.experimental_rerun()
-        
-        if submit_clicked:
-            # Validation
-            errors = []
-            if funding_target < 100:
-                errors.append("Funding target must be at least $100")
-            if minimum_funding >= funding_target:
-                errors.append("Minimum funding must be less than funding target")
-            if not budget_breakdown.strip():
-                errors.append("Budget breakdown is required")
-            if not use_of_funds.strip():
-                errors.append("Use of funds description is required")
+        if submitted:
+            # Validate required fields
+            if funding_goal < 100:
+                st.error("❌ Funding goal must be at least $100")
+                return
             
-            if errors:
-                for error in errors:
-                    st.error(f"❌ {error}")
-            else:
-                # Save data and submit campaign
-                st.session_state.campaign_draft['funding'] = {
-                    'funding_target': funding_target,
-                    'minimum_funding': minimum_funding,
-                    'currency': currency,
-                    'funding_type': funding_type,
-                    'budget_breakdown': budget_breakdown.strip(),
-                    'use_of_funds': use_of_funds.strip()
-                }
-                
-                # Submit campaign
-                submit_campaign(workflow_manager)
+            # Save to draft and proceed
+            session_state.campaign_draft.update({
+                'funding_goal': funding_goal,
+                'duration_days': duration_days,
+                'min_donation': min_donation,
+                'funding_type': funding_type,
+                'milestones': milestones,
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat()
+            })
+            
+            session_state.campaign_creation_step = 5
+            safe_rerun()
 
-def submit_campaign(workflow_manager):
-    """UPDATED: Submit campaign for review with authentication"""
+def show_campaign_review(session_state):
+    """Show campaign review and submission"""
+    
+    st.markdown("### ✅ Review Your Campaign")
+    
+    draft = session_state.campaign_draft
+    
+    # Campaign preview
+    st.markdown("#### 📋 Campaign Summary")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown(f"""
+        **Title:** {draft.get('title', 'N/A')}
+        
+        **Category:** {draft.get('category', 'N/A')}
+        
+        **Location:** {draft.get('location', 'N/A')}
+        
+        **Short Description:** {draft.get('short_description', 'N/A')}
+        
+        **Funding Goal:** ${draft.get('funding_goal', 0):,}
+        
+        **Duration:** {draft.get('duration_days', 0)} days
+        
+        **Funding Type:** {draft.get('funding_type', 'N/A')}
+        """)
+    
+    with col2:
+        st.markdown("**Media Uploaded:**")
+        st.write(f"✅ Main Image: {'Yes' if draft.get('main_image') else 'No'}")
+        st.write(f"📸 Additional Images: {len(draft.get('additional_images', []))}")
+        st.write(f"🎥 Video: {'Yes' if draft.get('video_url') else 'No'}")
+        st.write(f"📄 Documents: {len(draft.get('documents', []))}")
+    
+    # Terms and conditions
+    st.markdown("#### 📜 Terms and Conditions")
+    
+    terms_accepted = st.checkbox(
+        "I agree to the Terms of Service and Campaign Guidelines",
+        help="You must agree to the terms to submit your campaign"
+    )
+    
+    verification_consent = st.checkbox(
+        "I consent to campaign verification process",
+        help="Your campaign will be reviewed before going live"
+    )
+    
+    # Submission buttons
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+    
+    with col1:
+        if st.button("← Previous", use_container_width=True):
+            session_state.campaign_creation_step = 4
+            safe_rerun()
+    
+    with col2:
+        if st.button("Save Draft", use_container_width=True):
+            save_campaign_draft(session_state, draft)
+            st.success("✅ Draft saved!")
+    
+    with col3:
+        if st.button("Preview Campaign", use_container_width=True):
+            show_campaign_preview(draft)
+    
+    with col4:
+        if st.button("🚀 Submit Campaign", use_container_width=True, type="primary"):
+            if not terms_accepted or not verification_consent:
+                st.error("❌ Please accept the terms and consent to verification")
+                return
+            
+            if handle_campaign_submission(session_state, draft):
+                st.success("🎉 Campaign submitted successfully!")
+                st.balloons()
+                
+                # Reset campaign creation state
+                session_state.campaign_creation_step = 1
+                session_state.campaign_draft = {}
+                
+                # Redirect to my campaigns
+                session_state.current_page = 'my_campaigns'
+                safe_rerun()
+
+def save_campaign_draft(session_state, data: Dict[str, Any]):
+    """Save campaign draft to session state"""
+    session_state.campaign_draft.update(data)
+    session_state.campaign_draft['last_saved'] = datetime.now().isoformat()
+
+def show_campaign_preview(draft: Dict[str, Any]):
+    """Show campaign preview"""
+    
+    with st.expander("📋 Campaign Preview", expanded=True):
+        st.markdown(f"# {draft.get('title', 'Campaign Title')}")
+        st.markdown(f"**Category:** {draft.get('category')} | **Location:** {draft.get('location')}")
+        
+        # Progress bar (mock)
+        st.progress(0.0)
+        st.markdown(f"**Goal:** ${draft.get('funding_goal', 0):,} | **Raised:** $0 | **Days Left:** {draft.get('duration_days', 0)}")
+        
+        st.markdown("### About This Campaign")
+        st.write(draft.get('full_description', 'No description provided'))
+        
+        if draft.get('milestones'):
+            st.markdown("### Milestones")
+            for i, milestone in enumerate(draft.get('milestones', [])):
+                st.write(f"🎯 ${milestone['amount']:,}: {milestone['description']}")
+
+def handle_campaign_submission(session_state, draft: Dict[str, Any]) -> bool:
+    """Handle campaign submission to backend"""
     
     try:
-        # Get authentication manager
-        auth_manager = get_auth_manager()
+        user_data = session_state.get('user_data')
+        if not user_data:
+            st.error("❌ User data not found")
+            return False
         
-        # Prepare campaign data
+        # Prepare campaign data for submission
         campaign_data = {
-            'id': str(uuid.uuid4()),
-            'created_at': datetime.now().isoformat(),
-            'user_role': get_current_user_role(),
+            'title': draft.get('title'),
+            'category': draft.get('category'),
+            'location': draft.get('location'),
+            'short_description': draft.get('short_description'),
+            'full_description': draft.get('full_description'),
+            'problem_statement': draft.get('problem_statement'),
+            'solution_approach': draft.get('solution_approach'),
+            'target_beneficiaries': draft.get('target_beneficiaries'),
+            'expected_impact': draft.get('expected_impact'),
+            'funding_goal': draft.get('funding_goal'),
+            'duration_days': draft.get('duration_days'),
+            'min_donation': draft.get('min_donation'),
+            'funding_type': draft.get('funding_type'),
+            'video_url': draft.get('video_url'),
+            'tags': draft.get('tags'),
+            'milestones': draft.get('milestones', []),
+            'start_date': draft.get('start_date'),
+            'end_date': draft.get('end_date'),
+            'organization_id': user_data.get('id'),
+            'organization_email': user_data.get('email'),
             'status': 'pending_review',
-            **st.session_state.campaign_draft
+            'created_at': datetime.now().isoformat()
         }
         
-        # Here you would normally submit to backend
-        # For now, we'll simulate successful submission
+        # Submit to backend
+        response = requests.post(
+            f"{BACKEND_URL}/api/v1/campaigns/create",
+            json=campaign_data,
+            timeout=15
+        )
         
-        # Clear draft and show success
-        del st.session_state.campaign_draft
-        
-        st.success("🎉 **Campaign Submitted Successfully!**")
-        st.info("""
-        **What happens next?**
-        
-        1. **AI Processing** (2-4 hours): Our AI system will review your campaign for completeness and compliance
-        2. **Admin Review** (24-48 hours): Our team will manually review your campaign
-        3. **Approval & Launch**: Once approved, your campaign will go live on the platform
-        
-        You'll receive email notifications at each stage of the review process.
-        """)
-        
-        if st.button("🏠 Return to Dashboard", use_container_width=True, type="primary"):
-            st.experimental_rerun()
+        if response.status_code == 201:
+            logger.info(f"Campaign '{draft.get('title')}' submitted successfully")
+            return True
+        else:
+            logger.error(f"Campaign submission failed: {response.status_code}")
+            st.error(f"❌ Submission failed: {response.text}")
+            return False
             
     except Exception as e:
-        logger.error(f"Campaign submission error: {e}")
-        st.error(f"❌ Failed to submit campaign: {str(e)}")
+        logger.error(f"Exception during campaign submission: {e}")
+        st.error(f"❌ Submission error: {str(e)}")
+        return False
 
-# Utility functions for campaign management
-def get_user_campaigns(user_id: str) -> List[Dict[str, Any]]:
-    """UPDATED: Get campaigns for authenticated user"""
+def render_campaign_management_page(session_state):
+    """Render campaign management page for organizations"""
     
-    if not is_authenticated():
-        return []
+    st.markdown("### 📊 My Campaigns")
     
-    # Here you would fetch from backend API
-    # For now, return empty list
-    return []
+    # Check authentication and role
+    if not session_state.get('authenticated', False):
+        st.error("❌ Authentication required")
+        return
+    
+    if session_state.get('user_type') != 'organization':
+        st.error("❌ Organization role required")
+        return
+    
+    # Show campaigns list
+    show_my_campaigns_list(session_state)
 
-def get_campaign_status(campaign_id: str) -> Dict[str, Any]:
-    """UPDATED: Get campaign status with authentication"""
+def show_my_campaigns_list(session_state):
+    """Show list of organization's campaigns"""
     
-    if not is_authenticated():
-        return {'error': 'Authentication required'}
+    # Mock campaign data (in real app, fetch from backend)
+    campaigns = [
+        {
+            'id': '1',
+            'title': 'Emergency Medical Fund',
+            'status': 'active',
+            'goal': 50000,
+            'raised': 37500,
+            'donors': 89,
+            'days_left': 15,
+            'created_at': '2024-01-15'
+        },
+        {
+            'id': '2', 
+            'title': 'School Renovation Project',
+            'status': 'pending_review',
+            'goal': 25000,
+            'raised': 0,
+            'donors': 0,
+            'days_left': 30,
+            'created_at': '2024-02-01'
+        }
+    ]
     
-    # Here you would fetch from backend API
-    # For now, return mock status
-    return {
-        'id': campaign_id,
-        'status': 'pending_review',
-        'created_at': datetime.now().isoformat(),
-        'review_stage': 'ai_processing'
-    }
+    # Campaign stats
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total Campaigns", len(campaigns))
+    
+    with col2:
+        active_campaigns = len([c for c in campaigns if c['status'] == 'active'])
+        st.metric("Active Campaigns", active_campaigns)
+    
+    with col3:
+        total_raised = sum(c['raised'] for c in campaigns)
+        st.metric("Total Raised", f"${total_raised:,}")
+    
+    with col4:
+        total_donors = sum(c['donors'] for c in campaigns)
+        st.metric("Total Donors", total_donors)
+    
+    # Campaigns list
+    st.markdown("#### 📋 Your Campaigns")
+    
+    for campaign in campaigns:
+        with st.container():
+            col1, col2, col3 = st.columns([3, 1, 1])
+            
+            with col1:
+                st.markdown(f"**{campaign['title']}**")
+                
+                # Progress bar
+                progress = campaign['raised'] / campaign['goal'] if campaign['goal'] > 0 else 0
+                st.progress(progress)
+                
+                st.markdown(f"${campaign['raised']:,} raised of ${campaign['goal']:,} goal")
+                st.markdown(f"👥 {campaign['donors']} donors • ⏰ {campaign['days_left']} days left")
+            
+            with col2:
+                # Status badge
+                status_color = {
+                    'active': '🟢',
+                    'pending_review': '🟡',
+                    'completed': '✅',
+                    'cancelled': '🔴'
+                }
+                st.markdown(f"{status_color.get(campaign['status'], '⚪')} {campaign['status'].replace('_', ' ').title()}")
+            
+            with col3:
+                if st.button("View Details", key=f"view_{campaign['id']}", use_container_width=True):
+                    session_state.selected_campaign = campaign['id']
+                    session_state.current_page = 'campaign_details'
+                    safe_rerun()
+                
+                if st.button("Edit", key=f"edit_{campaign['id']}", use_container_width=True):
+                    st.info("🔧 Campaign editing coming soon!")
+            
+            st.markdown("---")
+
+def handle_campaign_update(session_state, campaign_id: str, updates: Dict[str, Any]) -> bool:
+    """Handle campaign update"""
+    
+    try:
+        response = requests.put(
+            f"{BACKEND_URL}/api/v1/campaigns/{campaign_id}",
+            json=updates,
+            timeout=15
+        )
+        
+        if response.status_code == 200:
+            logger.info(f"Campaign {campaign_id} updated successfully")
+            return True
+        else:
+            logger.error(f"Campaign update failed: {response.status_code}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Exception during campaign update: {e}")
+        return False
+
+# Export functions for main app integration
+__all__ = [
+    'render_create_campaign_page',
+    'show_campaign_creation_form',
+    'handle_campaign_submission',
+    'show_campaign_progress',
+    'render_campaign_management_page',
+    'show_my_campaigns_list',
+    'handle_campaign_update'
+]
 
