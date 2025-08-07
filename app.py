@@ -1,50 +1,22 @@
 """
-COMPLETELY UPDATED Frontend Application for HAVEN Crowdfunding Platform
-Integrates all latest OAuth fixes and workflow updates in tandem
+FIXED Frontend Application for HAVEN Crowdfunding Platform
+Fixes Streamlit compatibility issues and implements proper authentication flow
 
-This file contains the corrected Streamlit application that fixes:
-1. OAuth integration with proper error handling
-2. Environment variable usage
-3. User interface improvements
-4. Session management
-5. Complete workflow integration
-6. Role-based access control
-7. MaterializeCSS styling with light green theme
+This file fixes:
+1. st.experimental_rerun() → st.rerun()
+2. st.experimental_get_query_params() → st.query_params
+3. st.experimental_set_query_params() → st.query_params
+4. Proper authentication flow: Registration → Database Storage → Login → Navbar Access
+5. Term simplification with 'i' icons and MaterializeCSS styling
 """
 
 import streamlit as st
 import os
 import logging
+import requests
+import json
 from datetime import datetime
-from typing import Dict, Any, Optional
-
-# Import fixed OAuth integration
-from oauth_integration import (
-    handle_oauth_callback,
-    check_authentication_status,
-    render_oauth_buttons,
-    logout,
-    get_user_info
-)
-
-# Import updated workflow utilities
-from workflow_auth_utils import (
-    get_auth_manager, 
-    require_auth, 
-    require_role, 
-    get_current_user_role,
-    is_authenticated
-)
-
-# Import updated workflow pages
-from workflow_campaign_pages import render_create_campaign_page
-from workflow_registration_pages import show_registration_page
-from workflow_verification_funding import (
-    render_admin_review_page,
-    render_campaign_browse_page,
-    render_campaign_details_page,
-    render_donation_page
-)
+from typing import Dict, Any, Optional, Tuple
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -55,205 +27,404 @@ st.set_page_config(
     page_title="Haven - Crowdfunding Platform",
     page_icon="🏠",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# Custom CSS for better styling with light green theme and MaterializeCSS
-st.markdown("""
-<style>
-    /* Main header styling */
-    .main-header {
-        text-align: center;
-        padding: 2rem 0;
-        background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-        color: white;
-        border-radius: 10px;
-        margin-bottom: 2rem;
-    }
-    
-    /* Role card styling */
-    .role-card {
-        background: #f8f9fa;
-        padding: 1.5rem;
-        border-radius: 10px;
-        border-left: 4px solid #4CAF50;
-        margin: 1rem 0;
-        transition: transform 0.2s ease;
-    }
-    
-    .role-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
-    
-    /* OAuth section styling */
-    .oauth-section {
-        background: #ffffff;
-        padding: 2rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin: 1rem 0;
-    }
-    
-    /* Status card styling */
-    .status-card {
-        background: #e8f5e8;
-        padding: 1rem;
-        border-radius: 8px;
-        border: 1px solid #4CAF50;
-        margin: 1rem 0;
-    }
-    
-    /* Navigation styling */
-    .nav-item {
-        padding: 0.5rem 1rem;
-        margin: 0.2rem 0;
-        border-radius: 5px;
-        transition: background-color 0.2s ease;
-    }
-    
-    .nav-item:hover {
-        background-color: #e8f5e8;
-    }
-    
-    /* Button styling with MaterializeCSS-like effects */
-    .stButton > button {
-        background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-        color: white;
-        border: none;
-        border-radius: 5px;
-        padding: 0.5rem 1rem;
-        transition: all 0.2s ease;
-    }
-    
-    .stButton > button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
-    }
-    
-    /* Floating action button style for Create Campaign */
-    .fab-button {
-        position: fixed;
-        bottom: 2rem;
-        right: 2rem;
-        width: 56px;
-        height: 56px;
-        border-radius: 50%;
-        background: #f44336;
-        color: white;
-        border: none;
-        font-size: 24px;
-        cursor: pointer;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        transition: all 0.2s ease;
-        z-index: 1000;
-    }
-    
-    .fab-button:hover {
-        transform: scale(1.1);
-        box-shadow: 0 6px 12px rgba(0,0,0,0.3);
-    }
-    
-    /* Card panel for hover information */
-    .info-card {
-        background: #009688;
-        color: white;
-        padding: 1rem;
-        border-radius: 5px;
-        margin: 0.5rem 0;
-    }
-    
-    /* Pulse effect for OAuth buttons */
-    .pulse-button {
-        animation: pulse 2s infinite;
-    }
-    
-    @keyframes pulse {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.05); }
-        100% { transform: scale(1); }
-    }
-    
-    /* Sidebar styling */
-    .sidebar .sidebar-content {
-        background: linear-gradient(180deg, #e8f5e8 0%, #f1f8e9 100%);
-    }
-    
-    /* Success/Error message styling */
-    .success-message {
-        background: #d4edda;
-        color: #155724;
-        padding: 1rem;
-        border-radius: 5px;
-        border-left: 4px solid #28a745;
-        margin: 1rem 0;
-    }
-    
-    .error-message {
-        background: #f8d7da;
-        color: #721c24;
-        padding: 1rem;
-        border-radius: 5px;
-        border-left: 4px solid #dc3545;
-        margin: 1rem 0;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Backend configuration
+BACKEND_URL = os.getenv('BACKEND_URL', 'https://haven-backend-9lw3.onrender.com')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://haven-frontend-65jr.onrender.com')
 
-def main():
-    """Main application function with complete OAuth and workflow integration"""
+def add_custom_css():
+    """Add custom CSS with MaterializeCSS styling and term simplification support"""
     
-    try:
-        # Initialize session state
-        initialize_session_state()
+    st.markdown("""
+    <style>
+        /* Import Material Icons */
+        @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
         
-        # Handle OAuth callback first
-        handle_oauth_callback()
+        /* Light green background */
+        .stApp {
+            background: linear-gradient(135deg, #f1f8e9 0%, #e8f5e8 100%);
+        }
         
-        # Check authentication status
-        if check_authentication_status():
-            show_authenticated_app()
-        else:
-            show_login_page()
+        /* Main header styling */
+        .main-header {
+            text-align: center;
+            padding: 2rem 0;
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        /* Role card styling */
+        .role-card {
+            background: #ffffff;
+            padding: 1.5rem;
+            border-radius: 10px;
+            border-left: 4px solid #4CAF50;
+            margin: 1rem 0;
+            transition: transform 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .role-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        /* OAuth section styling with pulse effect */
+        .oauth-section {
+            background: #ffffff;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin: 1rem 0;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+        
+        /* Status card styling */
+        .status-card {
+            background: #e8f5e8;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid #4CAF50;
+            margin: 1rem 0;
+        }
+        
+        /* Button styling with MaterializeCSS-like effects */
+        .stButton > button {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 0.75rem 1.5rem;
+            transition: all 0.2s ease;
+            min-height: 44px;
+            font-weight: 500;
+        }
+        
+        .stButton > button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+        }
+        
+        /* Error message styling */
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 1rem;
+            border-radius: 5px;
+            border-left: 4px solid #f44336;
+            margin: 1rem 0;
+        }
+        
+        /* Success message styling */
+        .success-message {
+            background: #e8f5e8;
+            color: #2e7d32;
+            padding: 1rem;
+            border-radius: 5px;
+            border-left: 4px solid #4CAF50;
+            margin: 1rem 0;
+        }
+        
+        /* Info message styling */
+        .info-message {
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 1rem;
+            border-radius: 5px;
+            border-left: 4px solid #2196f3;
+            margin: 1rem 0;
+        }
+        
+        /* Warning message styling */
+        .warning-message {
+            background: #fff3e0;
+            color: #ef6c00;
+            padding: 1rem;
+            border-radius: 5px;
+            border-left: 4px solid #ff9800;
+            margin: 1rem 0;
+        }
+        
+        /* Term simplification styling */
+        .simplified-term {
+            position: relative;
+            display: inline-block;
+            background: #e8f5e8;
+            padding: 2px 4px;
+            border-radius: 3px;
+            border-bottom: 1px dotted #4CAF50;
+        }
+        
+        .simplified-term .info-icon {
+            color: #009688;
+            font-size: 14px !important;
+            margin-left: 2px;
+            cursor: help;
+            vertical-align: super;
+        }
+        
+        /* MaterializeCSS card panel for hover information */
+        .term-explanation {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #009688;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            white-space: nowrap;
+            z-index: 1000;
+            font-size: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+            max-width: 300px;
+            white-space: normal;
+        }
+        
+        .simplified-term:hover .term-explanation {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .stButton > button {
+                padding: 1rem;
+                font-size: 16px;
+                min-height: 48px;
+            }
             
-    except Exception as e:
-        logger.error(f"Application error: {e}")
-        st.error(f"❌ Application error: {str(e)}")
-        st.info("🔄 Please refresh the page or contact support if the issue persists.")
+            .role-card {
+                margin: 0.5rem 0;
+                padding: 1rem;
+            }
+            
+            .main-header {
+                padding: 1rem;
+                font-size: 1.2rem;
+            }
+        }
+        
+        /* Hide Streamlit elements until authenticated */
+        .main .block-container {
+            padding-top: 1rem;
+        }
+        
+        /* Sidebar styling */
+        .css-1d391kg {
+            background: linear-gradient(180deg, #e8f5e8 0%, #f1f8e9 100%);
+        }
+    </style>
+    """, unsafe_allow_html=True)
 
 def initialize_session_state():
     """Initialize session state variables"""
     
-    # Authentication state
+    # Authentication state - start as false
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
     
     # User information
-    if 'user_info' not in st.session_state:
-        st.session_state.user_info = None
+    if 'user_data' not in st.session_state:
+        st.session_state.user_data = None
     
-    # Current page
+    # User type
+    if 'user_type' not in st.session_state:
+        st.session_state.user_type = None
+    
+    # Current page - start with login
     if 'current_page' not in st.session_state:
-        st.session_state.current_page = 'dashboard'
+        st.session_state.current_page = 'login'
     
-    # Selected campaign for viewing/donating
-    if 'selected_campaign' not in st.session_state:
-        st.session_state.selected_campaign = None
-    
-    # Navigation state
-    if 'navigation_expanded' not in st.session_state:
-        st.session_state.navigation_expanded = True
+    # Selected role for login
+    if 'selected_role' not in st.session_state:
+        st.session_state.selected_role = None
     
     # Feature flags
     if 'features' not in st.session_state:
         st.session_state.features = {
-            'oauth_enabled': os.getenv('FEATURES_OAUTH_ENABLED', 'true').lower() == 'true',
+            'oauth_enabled': os.getenv('OAUTH_ENABLED', 'true').lower() == 'true',
             'registration_enabled': os.getenv('FEATURES_REGISTRATION_ENABLED', 'true').lower() == 'true',
-            'campaign_creation_enabled': os.getenv('FEATURES_CAMPAIGN_CREATION_ENABLED', 'true').lower() == 'true'
+            'simplification_enabled': os.getenv('SIMPLIFICATION_ENABLED', 'true').lower() == 'true'
         }
 
+def safe_rerun():
+    """Safe rerun function that works with both old and new Streamlit versions"""
+    try:
+        # Try new method first (Streamlit >= 1.27.0)
+        if hasattr(st, 'rerun'):
+            st.rerun()
+        # Fallback to experimental method (Streamlit < 1.27.0)
+        elif hasattr(st, 'experimental_rerun'):
+            st.experimental_rerun()
+        else:
+            # Force page refresh as fallback
+            st.markdown('<meta http-equiv="refresh" content="0">', unsafe_allow_html=True)
+    except Exception as e:
+        logger.error(f"Error in safe_rerun: {e}")
+
+def safe_get_query_params() -> Dict[str, Any]:
+    """Safe get query params function"""
+    try:
+        # Try new method first (Streamlit >= 1.27.0)
+        if hasattr(st, 'query_params'):
+            return dict(st.query_params)
+        # Fallback to experimental method (Streamlit < 1.27.0)
+        elif hasattr(st, 'experimental_get_query_params'):
+            return st.experimental_get_query_params()
+        else:
+            return {}
+    except Exception as e:
+        logger.error(f"Error in safe_get_query_params: {e}")
+        return {}
+
+def safe_clear_query_params():
+    """Safe clear query params function"""
+    try:
+        # Try new method first (Streamlit >= 1.27.0)
+        if hasattr(st, 'query_params'):
+            st.query_params.clear()
+        # Fallback to experimental method (Streamlit < 1.27.0)
+        elif hasattr(st, 'experimental_set_query_params'):
+            st.experimental_set_query_params()
+    except Exception as e:
+        logger.error(f"Error in safe_clear_query_params: {e}")
+
+def check_user_in_database(email: str, user_type: str) -> Tuple[bool, Optional[Dict]]:
+    """Check if user exists in the appropriate database table"""
+    try:
+        table_name = "individuals" if user_type == "individual" else "organizations"
+        
+        response = requests.get(
+            f"{BACKEND_URL}/api/v1/users/check-existence",
+            params={
+                "email": email,
+                "table": table_name
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            return data.get('exists', False), data.get('user_data')
+        else:
+            logger.error(f"Error checking user existence: {response.status_code}")
+            return False, None
+            
+    except Exception as e:
+        logger.error(f"Exception checking user in database: {e}")
+        return False, None
+
+def handle_oauth_callback() -> Optional[Dict[str, Any]]:
+    """Handle OAuth callback and ensure user is in database"""
+    try:
+        # Check for OAuth callback parameters
+        query_params = safe_get_query_params()
+        
+        if 'code' in query_params and 'state' in query_params:
+            auth_code = query_params['code'][0] if isinstance(query_params['code'], list) else query_params['code']
+            state = query_params['state'][0] if isinstance(query_params['state'], list) else query_params['state']
+            
+            # Parse state to get provider and user_type
+            try:
+                state_data = json.loads(state)
+                provider = state_data.get('provider')
+                user_type = state_data.get('user_type')
+            except:
+                logger.error("Invalid state parameter in OAuth callback")
+                return None
+            
+            # Exchange code for user data
+            user_data = exchange_oauth_code(auth_code, provider, user_type)
+            
+            if user_data:
+                # Check if user exists in database
+                exists, existing_data = check_user_in_database(
+                    user_data['email'], 
+                    user_type
+                )
+                
+                if not exists:
+                    st.error("❌ User not found in database. Please register first before logging in.")
+                    safe_clear_query_params()
+                    return None
+                
+                # Store user data in session
+                st.session_state.user_data = user_data
+                st.session_state.authenticated = True
+                st.session_state.user_type = user_type
+                st.session_state.current_page = 'dashboard'
+                
+                # Clear OAuth parameters
+                safe_clear_query_params()
+                
+                return user_data
+                
+    except Exception as e:
+        logger.error(f"OAuth callback error: {e}")
+        st.error(f"❌ OAuth authentication failed: {str(e)}")
+    
+    return None
+
+def exchange_oauth_code(code: str, provider: str, user_type: str) -> Optional[Dict[str, Any]]:
+    """Exchange OAuth authorization code for user data"""
+    try:
+        response = requests.post(
+            f"{BACKEND_URL}/api/v1/auth/{provider}/callback",
+            json={
+                'code': code,
+                'user_type': user_type,
+                'redirect_uri': FRONTEND_URL
+            },
+            timeout=15
+        )
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(f"OAuth exchange failed: {response.status_code}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"OAuth code exchange error: {e}")
+        return None
+
+def generate_oauth_url(provider: str, user_type: str) -> Optional[str]:
+    """Generate OAuth URL for the specified provider"""
+    try:
+        # Create state parameter with provider and user_type
+        state = json.dumps({
+            'provider': provider,
+            'user_type': user_type,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+        oauth_url = f"{BACKEND_URL}/api/v1/auth/{provider}/login"
+        oauth_url += f"?user_type={user_type}&state={state}&redirect_uri={FRONTEND_URL}"
+        
+        return oauth_url
+        
+    except Exception as e:
+        logger.error(f"Error generating OAuth URL: {e}")
+        st.error(f"❌ Error generating OAuth URL: {str(e)}")
+        return None
+
 def show_login_page():
-    """Display login page with OAuth options and registration"""
+    """Display login page with proper authentication flow"""
     
     # Main header
     st.markdown("""
@@ -267,7 +438,12 @@ def show_login_page():
     oauth_enabled = st.session_state.features.get('oauth_enabled', True)
     
     if not oauth_enabled:
-        st.warning("🔒 OAuth authentication is currently disabled. Please contact the administrator.")
+        st.markdown("""
+        <div class='warning-message'>
+            <h3>🔒 OAuth Disabled</h3>
+            <p>OAuth authentication is currently disabled. Please contact the administrator.</p>
+        </div>
+        """, unsafe_allow_html=True)
         return
     
     # Create tabs for Login and Register
@@ -282,7 +458,15 @@ def show_login_page():
 def show_login_tab():
     """Show login tab with role selection and OAuth"""
     
-    st.markdown("### 🎯 Choose Your Role")
+    st.markdown("### 🎯 Choose Your Role to Login")
+    
+    st.markdown("""
+    <div class='info-message'>
+        <h4>💡 Important</h4>
+        <p>You must be registered in our database before you can log in. If you're new, please use the Register tab first.</p>
+        <p><strong>Process:</strong> Registration → Database Storage → Login → Access</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     col1, col2 = st.columns(2)
     
@@ -301,7 +485,7 @@ def show_login_tab():
         
         if st.button("Login as Individual", key="login_individual", use_container_width=True, type="primary"):
             st.session_state.selected_role = "individual"
-            st.experimental_rerun()
+            safe_rerun()
     
     with col2:
         st.markdown("""
@@ -318,16 +502,23 @@ def show_login_tab():
         
         if st.button("Login as Organization", key="login_organization", use_container_width=True, type="primary"):
             st.session_state.selected_role = "organization"
-            st.experimental_rerun()
+            safe_rerun()
     
     # Show OAuth buttons if role is selected
     if st.session_state.get("selected_role"):
         st.markdown("---")
         st.markdown(f"### 🔐 Login as {st.session_state.selected_role.title()}")
         
+        st.markdown("""
+        <div class='warning-message'>
+            <h4>⚠️ Database Check</h4>
+            <p>We will verify that you exist in our database before allowing login.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
         # OAuth section with pulse effect
         st.markdown("""
-        <div class='oauth-section pulse-button'>
+        <div class='oauth-section'>
             <h4 style='text-align: center; color: #4CAF50;'>🔐 Secure Login Options</h4>
         </div>
         """, unsafe_allow_html=True)
@@ -339,43 +530,205 @@ def show_login_tab():
         if st.button("⬅️ Back to Role Selection", key="back_to_role"):
             if "selected_role" in st.session_state:
                 del st.session_state.selected_role
-            st.experimental_rerun()
+            safe_rerun()
+
+def render_oauth_buttons(user_type: str):
+    """Render OAuth buttons with proper popup functionality"""
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🔍 Continue with Google", key="google_login", use_container_width=True, type="primary"):
+            # Generate OAuth URL
+            google_url = generate_oauth_url("google", user_type)
+            if google_url:
+                st.markdown(f"""
+                <script>
+                window.open('{google_url}', 'oauth_popup', 'width=500,height=600,scrollbars=yes,resizable=yes');
+                </script>
+                """, unsafe_allow_html=True)
+                st.markdown("""
+                <div class='info-message'>
+                    <p>🔄 OAuth window opened. Please complete authentication and return to this page.</p>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    with col2:
+        if st.button("📘 Continue with Facebook", key="facebook_login", use_container_width=True, type="primary"):
+            # Generate OAuth URL
+            facebook_url = generate_oauth_url("facebook", user_type)
+            if facebook_url:
+                st.markdown(f"""
+                <script>
+                window.open('{facebook_url}', 'oauth_popup', 'width=500,height=600,scrollbars=yes,resizable=yes');
+                </script>
+                """, unsafe_allow_html=True)
+                st.markdown("""
+                <div class='info-message'>
+                    <p>🔄 OAuth window opened. Please complete authentication and return to this page.</p>
+                </div>
+                """, unsafe_allow_html=True)
 
 def show_registration_tab():
-    """Show registration tab"""
+    """Show registration tab with proper database integration"""
     
     if not st.session_state.features.get('registration_enabled', True):
-        st.warning("📝 Registration is currently disabled. Please contact the administrator.")
+        st.markdown("""
+        <div class='warning-message'>
+            <h3>📝 Registration Disabled</h3>
+            <p>Registration is currently disabled. Please contact the administrator.</p>
+        </div>
+        """, unsafe_allow_html=True)
         return
     
     st.markdown("### 📝 New to Haven? Register Now!")
     
-    # Use updated registration workflow
-    show_registration_page()
+    st.markdown("""
+    <div class='info-message'>
+        <h4>💡 Registration Process</h4>
+        <p>Your details will be stored in our database first, then you can log in using OAuth.</p>
+        <p><strong>Steps:</strong> Fill Form → Database Storage → OAuth Login → Access</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Simple registration form
+    with st.form("registration_form"):
+        st.markdown("#### 📋 Registration Details")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            user_type = st.selectbox(
+                "👤 Account Type",
+                ["individual", "organization"],
+                help="Choose your account type"
+            )
+            
+            first_name = st.text_input("First Name *", placeholder="Enter your first name")
+            email = st.text_input("Email Address *", placeholder="Enter your email")
+            phone = st.text_input("Phone Number", placeholder="Enter your phone number")
+        
+        with col2:
+            last_name = st.text_input("Last Name *", placeholder="Enter your last name")
+            city = st.text_input("City *", placeholder="Enter your city")
+            country = st.text_input("Country *", placeholder="Enter your country")
+            address = st.text_area("Address", placeholder="Enter your full address")
+        
+        # Organization-specific fields
+        if user_type == "organization":
+            st.markdown("#### 🏢 Organization Details")
+            
+            col3, col4 = st.columns(2)
+            
+            with col3:
+                org_name = st.text_input("Organization Name *", placeholder="Enter organization name")
+                org_type = st.selectbox(
+                    "Organization Type *",
+                    ["NGO", "Charity", "Foundation", "Social Enterprise", "Other"]
+                )
+            
+            with col4:
+                tax_id = st.text_input("Tax ID", placeholder="Enter tax identification number")
+                website = st.text_input("Website", placeholder="Enter organization website")
+            
+            description = st.text_area("Organization Description", placeholder="Describe your organization's mission and activities")
+        
+        # Terms and conditions
+        terms_accepted = st.checkbox("I agree to the Terms of Service and Privacy Policy *")
+        
+        # Submit button
+        submitted = st.form_submit_button("📝 Complete Registration", use_container_width=True, type="primary")
+        
+        if submitted:
+            # Validate required fields
+            if not all([first_name, last_name, email, city, country, terms_accepted]):
+                st.error("❌ Please fill in all required fields and accept the terms.")
+                return
+            
+            if user_type == "organization" and not org_name:
+                st.error("❌ Organization name is required for organization accounts.")
+                return
+            
+            # Prepare registration data
+            registration_data = {
+                'email': email,
+                'first_name': first_name,
+                'last_name': last_name,
+                'user_type': user_type,
+                'phone': phone,
+                'address': address,
+                'city': city,
+                'country': country,
+                'verification_status': 'pending',
+                'created_at': datetime.now().isoformat()
+            }
+            
+            # Add organization-specific fields
+            if user_type == 'organization':
+                registration_data.update({
+                    'organization_name': org_name,
+                    'organization_type': org_type,
+                    'tax_id': tax_id,
+                    'website': website,
+                    'description': description
+                })
+            
+            # Submit registration
+            if register_user(registration_data):
+                st.markdown("""
+                <div class='success-message'>
+                    <h4>✅ Registration Successful!</h4>
+                    <p>Your account has been created and stored in our database.</p>
+                    <p><strong>Next Step:</strong> Go to the Login tab and use OAuth to sign in.</p>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <div class='error-message'>
+                    <h4>❌ Registration Failed</h4>
+                    <p>There was an error creating your account. Please try again or contact support.</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+def register_user(user_data: Dict[str, Any]) -> bool:
+    """Register user in the database"""
+    try:
+        response = requests.post(
+            f"{BACKEND_URL}/api/v1/users/register",
+            json=user_data,
+            timeout=15
+        )
+        
+        if response.status_code == 201:
+            logger.info(f"User {user_data['email']} registered successfully")
+            return True
+        else:
+            logger.error(f"Registration failed: {response.status_code} - {response.text}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Exception during user registration: {e}")
+        return False
 
 def show_authenticated_app():
     """Show main application for authenticated users"""
     
     # Get user information
-    user_info = get_user_info()
-    user_role = get_current_user_role()
+    user_data = st.session_state.get('user_data')
+    user_type = st.session_state.get('user_type')
     
-    if not user_info or not user_role:
-        st.error("❌ Authentication error. Please login again.")
-        logout()
-        st.experimental_rerun()
+    if not user_data or not user_type:
+        st.error("❌ User data not found. Please log in again.")
+        logout_user()
+        safe_rerun()
         return
     
-    # Sidebar navigation
+    # Show sidebar navigation
     with st.sidebar:
-        show_sidebar_navigation(user_info, user_role)
+        show_sidebar_navigation(user_data, user_type)
     
     # Main content area
-    show_main_content(user_role)
-    
-    # Floating action button for organizations
-    if user_role == 'organization' and st.session_state.features.get('campaign_creation_enabled', True):
-        show_floating_action_button()
+    show_main_content(user_type)
 
 def show_sidebar_navigation(user_info: Dict[str, Any], user_role: str):
     """Show sidebar navigation with user info and menu"""
@@ -386,6 +739,7 @@ def show_sidebar_navigation(user_info: Dict[str, Any], user_role: str):
         <h4>👋 Welcome!</h4>
         <p><strong>Role:</strong> {user_role.title()}</p>
         <p><strong>Email:</strong> {user_info.get('email', 'N/A')}</p>
+        <p><strong>Status:</strong> ✅ Authenticated</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -395,100 +749,50 @@ def show_sidebar_navigation(user_info: Dict[str, Any], user_role: str):
     st.markdown("### 🧭 Navigation")
     
     if user_role == 'organization':
-        show_organization_navigation()
+        nav_items = [
+            ("🏠 Dashboard", "dashboard"),
+            ("🚀 Create Campaign", "create_campaign"),
+            ("📊 My Campaigns", "my_campaigns"),
+            ("💰 Donations Received", "donations_received"),
+            ("🔍 Browse All Campaigns", "browse_campaigns")
+        ]
     else:  # individual
-        show_individual_navigation()
+        nav_items = [
+            ("🏠 Dashboard", "dashboard"),
+            ("🔍 Browse Campaigns", "browse_campaigns"),
+            ("💝 My Donations", "my_donations"),
+            ("❤️ Favorite Campaigns", "favorites")
+        ]
     
-    st.markdown("---")
-    
-    # Settings and logout
-    st.markdown("### ⚙️ Settings")
-    
-    if st.button("👤 Profile Settings", use_container_width=True):
-        st.session_state.current_page = 'profile'
-        st.experimental_rerun()
-    
-    if st.button("🔔 Notifications", use_container_width=True):
-        st.session_state.current_page = 'notifications'
-        st.experimental_rerun()
-    
-    if st.button("❓ Help & Support", use_container_width=True):
-        st.session_state.current_page = 'help'
-        st.experimental_rerun()
+    for label, page_key in nav_items:
+        if st.button(label, key=f"nav_{page_key}", use_container_width=True):
+            st.session_state.current_page = page_key
+            safe_rerun()
     
     st.markdown("---")
     
     # Logout button
     if st.button("🚪 Logout", use_container_width=True, type="secondary"):
-        logout()
-        st.experimental_rerun()
-
-def show_organization_navigation():
-    """Show navigation menu for organizations"""
-    
-    nav_items = [
-        ("🏠 Dashboard", "dashboard"),
-        ("🚀 Create Campaign", "create_campaign"),
-        ("📊 My Campaigns", "my_campaigns"),
-        ("💰 Donations Received", "donations_received"),
-        ("📈 Analytics", "analytics"),
-        ("🔍 Browse All Campaigns", "browse_campaigns")
-    ]
-    
-    for label, page_key in nav_items:
-        if st.button(label, key=f"nav_{page_key}", use_container_width=True):
-            st.session_state.current_page = page_key
-            st.experimental_rerun()
-
-def show_individual_navigation():
-    """Show navigation menu for individuals"""
-    
-    nav_items = [
-        ("🏠 Dashboard", "dashboard"),
-        ("🔍 Browse Campaigns", "browse_campaigns"),
-        ("💝 My Donations", "my_donations"),
-        ("❤️ Favorite Campaigns", "favorites"),
-        ("📊 Impact Report", "impact_report")
-    ]
-    
-    for label, page_key in nav_items:
-        if st.button(label, key=f"nav_{page_key}", use_container_width=True):
-            st.session_state.current_page = page_key
-            st.experimental_rerun()
+        logout_user()
+        safe_rerun()
 
 def show_main_content(user_role: str):
     """Show main content based on current page and user role"""
     
     current_page = st.session_state.get('current_page', 'dashboard')
     
-    try:
-        if current_page == 'dashboard':
-            show_dashboard(user_role)
-        elif current_page == 'create_campaign' and user_role == 'organization':
-            render_create_campaign_page(None)
-        elif current_page == 'browse_campaigns':
-            render_campaign_browse_page(None)
-        elif current_page == 'campaign_details':
-            render_campaign_details_page(None)
-        elif current_page == 'donation':
-            render_donation_page(None)
-        elif current_page == 'my_campaigns' and user_role == 'organization':
-            show_my_campaigns()
-        elif current_page == 'my_donations' and user_role == 'individual':
-            show_my_donations()
-        elif current_page == 'profile':
-            show_profile_settings()
-        elif current_page == 'analytics' and user_role == 'organization':
-            show_analytics()
-        elif current_page == 'help':
-            show_help_support()
-        else:
-            show_dashboard(user_role)
-            
-    except Exception as e:
-        logger.error(f"Error showing page {current_page}: {e}")
-        st.error(f"❌ Error loading page: {str(e)}")
-        st.info("🔄 Please try navigating to a different page or refresh the application.")
+    if current_page == 'dashboard':
+        show_dashboard(user_role)
+    elif current_page == 'create_campaign' and user_role == 'organization':
+        show_create_campaign()
+    elif current_page == 'browse_campaigns':
+        show_browse_campaigns()
+    elif current_page == 'my_campaigns' and user_role == 'organization':
+        show_my_campaigns()
+    elif current_page == 'my_donations' and user_role == 'individual':
+        show_my_donations()
+    else:
+        show_dashboard(user_role)
 
 def show_dashboard(user_role: str):
     """Show role-specific dashboard"""
@@ -538,20 +842,14 @@ def show_organization_dashboard():
         """)
     
     with col2:
-        st.markdown("""
-        **Quick Actions:**
-        """)
+        st.markdown("**Quick Actions:**")
         
         if st.button("🚀 Create New Campaign", use_container_width=True, type="primary"):
             st.session_state.current_page = 'create_campaign'
-            st.experimental_rerun()
+            safe_rerun()
         
         if st.button("📊 View Analytics", use_container_width=True):
-            st.session_state.current_page = 'analytics'
-            st.experimental_rerun()
-        
-        if st.button("💌 Send Update", use_container_width=True):
-            st.info("📧 Campaign update feature coming soon!")
+            st.info("📊 Analytics feature coming soon!")
 
 def show_individual_dashboard():
     """Show dashboard for individuals"""
@@ -587,7 +885,7 @@ def show_individual_dashboard():
         
         if st.button("💝 Donate Now", key="donate_medical", use_container_width=True, type="primary"):
             st.session_state.current_page = 'browse_campaigns'
-            st.experimental_rerun()
+            safe_rerun()
     
     with col2:
         st.markdown("""
@@ -600,666 +898,64 @@ def show_individual_dashboard():
         
         if st.button("💝 Support Cause", key="donate_water", use_container_width=True, type="primary"):
             st.session_state.current_page = 'browse_campaigns'
-            st.experimental_rerun()
-    
-    # Recent activity
-    st.markdown("### 📈 Your Recent Activity")
-    
-    st.markdown("""
-    **Recent Donations:**
-    - $75 to Emergency Medical Fund - 3 days ago
-    - $50 to School Supplies Drive - 1 week ago
-    - $25 to Animal Shelter Renovation - 2 weeks ago
-    
-    **Campaigns You're Following:**
-    - Emergency Medical Fund (75% funded)
-    - Clean Water Initiative (60% funded)
-    - Community Garden Project (40% funded)
-    """)
+            safe_rerun()
 
-def show_floating_action_button():
-    """Show floating action button for creating campaigns"""
-    
-    st.markdown("""
-    <div style='position: fixed; bottom: 2rem; right: 2rem; z-index: 1000;'>
-        <div class='fab-button' onclick='window.location.reload()' title='Create Campaign'>
-            ➕
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+def show_create_campaign():
+    """Show create campaign page for organizations"""
+    st.markdown("### 🚀 Create New Campaign")
+    st.info("🚀 Campaign creation features coming soon!")
+
+def show_browse_campaigns():
+    """Show browse campaigns page"""
+    st.markdown("### 🔍 Browse Campaigns")
+    st.info("🔍 Campaign browsing features coming soon!")
 
 def show_my_campaigns():
     """Show organization's campaigns"""
-    
     st.markdown("### 📊 My Campaigns")
-    
-    # Mock campaign data
-    campaigns = [
-        {
-            'title': 'Emergency Medical Fund',
-            'status': 'Active',
-            'raised': 37500,
-            'target': 50000,
-            'donors': 89,
-            'days_left': 15
-        },
-        {
-            'title': 'School Supplies Drive',
-            'status': 'Under Review',
-            'raised': 0,
-            'target': 25000,
-            'donors': 0,
-            'days_left': 30
-        }
-    ]
-    
-    for campaign in campaigns:
-        with st.expander(f"{campaign['title']} - {campaign['status']}"):
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                st.metric("💰 Raised", f"${campaign['raised']:,}")
-            
-            with col2:
-                st.metric("🎯 Target", f"${campaign['target']:,}")
-            
-            with col3:
-                st.metric("👥 Donors", campaign['donors'])
-            
-            with col4:
-                st.metric("📅 Days Left", campaign['days_left'])
-            
-            # Progress bar
-            if campaign['target'] > 0:
-                progress = campaign['raised'] / campaign['target']
-                st.progress(progress)
-            
-            # Action buttons
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                if st.button(f"📝 Edit", key=f"edit_{campaign['title']}"):
-                    st.info("📝 Edit functionality coming soon!")
-            
-            with col2:
-                if st.button(f"📊 Analytics", key=f"analytics_{campaign['title']}"):
-                    st.info("📊 Analytics functionality coming soon!")
-            
-            with col3:
-                if st.button(f"📢 Update", key=f"update_{campaign['title']}"):
-                    st.info("📢 Update functionality coming soon!")
+    st.info("📊 Campaign management features coming soon!")
 
 def show_my_donations():
     """Show individual's donation history"""
-    
     st.markdown("### 💝 My Donation History")
-    
-    # Mock donation data
-    donations = [
-        {
-            'campaign': 'Emergency Medical Fund',
-            'amount': 75,
-            'date': '2025-08-04',
-            'status': 'Completed',
-            'receipt': 'REC-001'
-        },
-        {
-            'campaign': 'School Supplies Drive',
-            'amount': 50,
-            'date': '2025-07-28',
-            'status': 'Completed',
-            'receipt': 'REC-002'
-        }
+    st.info("💝 Donation history features coming soon!")
+
+def logout_user():
+    """Clear authentication session"""
+    keys_to_clear = [
+        'authenticated', 'user_data', 'user_type', 
+        'current_page', 'selected_role'
     ]
     
-    for donation in donations:
-        with st.expander(f"${donation['amount']} to {donation['campaign']} - {donation['date']}"):
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.write(f"**Amount:** ${donation['amount']}")
-                st.write(f"**Status:** {donation['status']}")
-            
-            with col2:
-                st.write(f"**Date:** {donation['date']}")
-                st.write(f"**Receipt:** {donation['receipt']}")
-            
-            with col3:
-                if st.button(f"📧 Email Receipt", key=f"receipt_{donation['receipt']}"):
-                    st.success("📧 Receipt sent to your email!")
-                
-                if st.button(f"🔗 View Campaign", key=f"view_{donation['receipt']}"):
-                    st.session_state.current_page = 'browse_campaigns'
-                    st.experimental_rerun()
+    for key in keys_to_clear:
+        if key in st.session_state:
+            del st.session_state[key]
+    
+    st.session_state.current_page = 'login'
+    logger.info("User logged out successfully")
 
-def show_profile_settings():
-    """Show profile settings page"""
-    
-    st.markdown("### 👤 Profile Settings")
-    
-    user_info = get_user_info()
-    user_role = get_current_user_role()
-    
-    with st.form("profile_form"):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.text_input("Email", value=user_info.get('email', ''), disabled=True)
-            st.text_input("First Name", value=user_info.get('first_name', ''))
-            st.text_input("Last Name", value=user_info.get('last_name', ''))
-        
-        with col2:
-            st.selectbox("Role", options=[user_role], index=0, disabled=True)
-            st.text_input("Phone", value=user_info.get('phone', ''))
-            st.selectbox("Preferred Language", options=["English", "Spanish", "French"], index=0)
-        
-        # Notification preferences
-        st.markdown("#### 🔔 Notification Preferences")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.checkbox("Email notifications", value=True)
-            st.checkbox("Campaign updates", value=True)
-        
-        with col2:
-            st.checkbox("Donation receipts", value=True)
-            st.checkbox("Newsletter", value=False)
-        
-        if st.form_submit_button("💾 Save Changes", use_container_width=True, type="primary"):
-            st.success("✅ Profile updated successfully!")
-
-def show_analytics():
-    """Show analytics page for organizations"""
-    
-    st.markdown("### 📊 Campaign Analytics")
-    
-    # Mock analytics data
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.metric("📈 Total Views", "1,234", delta="156")
-    
-    with col2:
-        st.metric("💰 Conversion Rate", "12.5%", delta="2.1%")
-    
-    with col3:
-        st.metric("📱 Mobile Traffic", "68%", delta="5%")
-    
-    # Charts would go here
-    st.info("📊 Detailed analytics charts coming soon!")
-
-def show_help_support():
-    """Show help and support page"""
-    
-    st.markdown("### ❓ Help & Support")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        #### 📚 Frequently Asked Questions
-        
-        **Q: How do I create a campaign?**
-        A: Click on "Create Campaign" in the navigation menu and follow the step-by-step process.
-        
-        **Q: How long does campaign approval take?**
-        A: Campaign approval typically takes 24-48 hours after submission.
-        
-        **Q: How do I receive donations?**
-        A: Donations are transferred to your verified bank account weekly.
-        """)
-    
-    with col2:
-        st.markdown("""
-        #### 📞 Contact Support
-        
-        **Email:** support@haven-platform.org
-        **Phone:** +1 (555) 123-4567
-        **Hours:** Monday-Friday, 9 AM - 6 PM EST
-        
-        #### 🔗 Useful Links
-        - [Campaign Guidelines](https://haven-platform.org/guidelines)
-        - [Terms of Service](https://haven-platform.org/terms)
-        - [Privacy Policy](https://haven-platform.org/privacy)
-        """)
-
-if __name__ == "__main__":
-    main()
-
-
-
-# Additional workflow integration functions
-
-def handle_page_navigation():
-    """Handle advanced page navigation with workflow integration"""
-    
-    # Check for URL parameters or query strings for direct navigation
-    query_params = st.experimental_get_query_params()
-    
-    if 'page' in query_params:
-        requested_page = query_params['page'][0]
-        if is_valid_page(requested_page):
-            st.session_state.current_page = requested_page
-    
-    if 'campaign_id' in query_params:
-        campaign_id = query_params['campaign_id'][0]
-        # Load specific campaign
-        load_campaign_by_id(campaign_id)
-
-def is_valid_page(page: str) -> bool:
-    """Check if requested page is valid for current user role"""
-    
-    user_role = get_current_user_role()
-    
-    valid_pages = {
-        'individual': [
-            'dashboard', 'browse_campaigns', 'campaign_details', 'donation',
-            'my_donations', 'favorites', 'impact_report', 'profile', 'help'
-        ],
-        'organization': [
-            'dashboard', 'create_campaign', 'my_campaigns', 'donations_received',
-            'analytics', 'browse_campaigns', 'profile', 'help'
-        ]
-    }
-    
-    return page in valid_pages.get(user_role, [])
-
-def load_campaign_by_id(campaign_id: str):
-    """Load specific campaign for viewing or editing"""
+def main():
+    """Main application function with corrected authentication flow"""
     
     try:
-        # In real implementation, this would fetch from backend
-        # For now, we'll simulate loading
-        st.session_state.selected_campaign = {
-            'id': campaign_id,
-            'title': f'Campaign {campaign_id}',
-            'status': 'active'
-        }
-        st.session_state.current_page = 'campaign_details'
+        # Add custom CSS
+        add_custom_css()
         
-    except Exception as e:
-        logger.error(f"Error loading campaign {campaign_id}: {e}")
-        st.error(f"❌ Could not load campaign: {str(e)}")
-
-def show_workflow_status():
-    """Show current workflow status for organizations"""
-    
-    user_role = get_current_user_role()
-    
-    if user_role != 'organization':
-        return
-    
-    # Check for campaigns in different workflow stages
-    workflow_status = {
-        'draft': 1,
-        'pending_review': 2,
-        'active': 3,
-        'completed': 1
-    }
-    
-    st.markdown("### 🔄 Workflow Status")
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("📝 Drafts", workflow_status['draft'])
-    
-    with col2:
-        st.metric("⏳ Pending Review", workflow_status['pending_review'])
-    
-    with col3:
-        st.metric("🚀 Active", workflow_status['active'])
-    
-    with col4:
-        st.metric("✅ Completed", workflow_status['completed'])
-
-def show_notification_center():
-    """Show notification center with workflow updates"""
-    
-    if 'show_notifications' not in st.session_state:
-        st.session_state.show_notifications = False
-    
-    # Notification toggle in sidebar
-    with st.sidebar:
-        if st.button("🔔 Notifications", use_container_width=True):
-            st.session_state.show_notifications = not st.session_state.show_notifications
-    
-    if st.session_state.show_notifications:
-        with st.sidebar:
-            st.markdown("#### 🔔 Recent Notifications")
-            
-            notifications = [
-                {
-                    'type': 'success',
-                    'message': 'Campaign "Medical Fund" approved!',
-                    'time': '2 hours ago'
-                },
-                {
-                    'type': 'info',
-                    'message': 'New donation of $50 received',
-                    'time': '5 hours ago'
-                },
-                {
-                    'type': 'warning',
-                    'message': 'Campaign deadline approaching',
-                    'time': '1 day ago'
-                }
-            ]
-            
-            for notification in notifications:
-                icon = "✅" if notification['type'] == 'success' else "ℹ️" if notification['type'] == 'info' else "⚠️"
-                st.markdown(f"{icon} {notification['message']}")
-                st.caption(notification['time'])
-                st.markdown("---")
-
-def show_quick_actions():
-    """Show quick action buttons based on user role and context"""
-    
-    user_role = get_current_user_role()
-    current_page = st.session_state.get('current_page', 'dashboard')
-    
-    # Quick actions in sidebar
-    with st.sidebar:
-        st.markdown("### ⚡ Quick Actions")
-        
-        if user_role == 'organization':
-            if current_page != 'create_campaign':
-                if st.button("🚀 Quick Campaign", use_container_width=True, type="primary"):
-                    st.session_state.current_page = 'create_campaign'
-                    st.experimental_rerun()
-            
-            if st.button("📊 Quick Stats", use_container_width=True):
-                show_quick_stats_modal()
-            
-            if st.button("💌 Send Update", use_container_width=True):
-                show_campaign_update_modal()
-        
-        else:  # individual
-            if st.button("💝 Quick Donate", use_container_width=True, type="primary"):
-                st.session_state.current_page = 'browse_campaigns'
-                st.experimental_rerun()
-            
-            if st.button("📊 My Impact", use_container_width=True):
-                show_impact_modal()
-            
-            if st.button("⭐ Favorites", use_container_width=True):
-                st.session_state.current_page = 'favorites'
-                st.experimental_rerun()
-
-def show_quick_stats_modal():
-    """Show quick stats in a modal-like container"""
-    
-    with st.container():
-        st.markdown("""
-        <div class='info-card'>
-            <h4>📊 Quick Stats</h4>
-            <p><strong>Active Campaigns:</strong> 3</p>
-            <p><strong>Total Raised:</strong> $12,450</p>
-            <p><strong>This Month:</strong> $2,100</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-def show_campaign_update_modal():
-    """Show campaign update form in a modal-like container"""
-    
-    with st.container():
-        st.markdown("#### 💌 Send Campaign Update")
-        
-        with st.form("quick_update_form"):
-            campaign = st.selectbox("Select Campaign", ["Emergency Medical Fund", "School Supplies Drive"])
-            update_title = st.text_input("Update Title")
-            update_message = st.text_area("Update Message", height=100)
-            
-            if st.form_submit_button("📤 Send Update"):
-                st.success("✅ Update sent to all supporters!")
-
-def show_impact_modal():
-    """Show impact summary for individuals"""
-    
-    with st.container():
-        st.markdown("""
-        <div class='info-card'>
-            <h4>🌟 Your Impact</h4>
-            <p><strong>Total Donated:</strong> $450</p>
-            <p><strong>Campaigns Supported:</strong> 7</p>
-            <p><strong>Lives Impacted:</strong> ~150 people</p>
-            <p><strong>Impact Score:</strong> 92/100</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-def handle_workflow_transitions():
-    """Handle workflow state transitions and notifications"""
-    
-    # Check for workflow state changes
-    if 'last_workflow_check' not in st.session_state:
-        st.session_state.last_workflow_check = datetime.now()
-    
-    # Simulate workflow state changes (in real app, this would come from backend)
-    current_time = datetime.now()
-    time_diff = (current_time - st.session_state.last_workflow_check).seconds
-    
-    if time_diff > 30:  # Check every 30 seconds
-        check_workflow_updates()
-        st.session_state.last_workflow_check = current_time
-
-def check_workflow_updates():
-    """Check for workflow updates from backend"""
-    
-    try:
-        # In real implementation, this would call backend API
-        # For now, we'll simulate random updates
-        import random
-        
-        if random.random() < 0.1:  # 10% chance of update
-            show_workflow_notification()
-    
-    except Exception as e:
-        logger.error(f"Error checking workflow updates: {e}")
-
-def show_workflow_notification():
-    """Show workflow notification to user"""
-    
-    notifications = [
-        "✅ Your campaign has been approved!",
-        "💰 New donation received!",
-        "📊 Weekly report is ready",
-        "⚠️ Campaign deadline approaching"
-    ]
-    
-    import random
-    notification = random.choice(notifications)
-    
-    st.toast(notification, icon="🔔")
-
-def show_advanced_search():
-    """Show advanced search functionality for campaigns"""
-    
-    if st.session_state.get('current_page') == 'browse_campaigns':
-        with st.expander("🔍 Advanced Search", expanded=False):
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.multiselect("Categories", 
-                    ["Medical", "Education", "Environment", "Community", "Emergency"])
-                st.slider("Funding Range", 0, 100000, (0, 50000), format="$%d")
-            
-            with col2:
-                st.selectbox("Sort by", ["Most Recent", "Ending Soon", "Most Funded", "Alphabetical"])
-                st.selectbox("Location", ["All Locations", "Local", "National", "International"])
-            
-            with col3:
-                st.selectbox("Urgency", ["All Levels", "Critical", "High", "Medium", "Low"])
-                st.checkbox("Verified Organizations Only")
-            
-            if st.button("🔍 Apply Filters", use_container_width=True):
-                st.info("🔍 Filters applied! Results updated.")
-
-def show_campaign_sharing():
-    """Show campaign sharing functionality"""
-    
-    if st.session_state.get('selected_campaign'):
-        campaign = st.session_state.selected_campaign
-        
-        st.markdown("### 📤 Share This Campaign")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("📱 Share on Social", use_container_width=True):
-                st.info("📱 Social sharing link copied to clipboard!")
-        
-        with col2:
-            if st.button("📧 Email to Friend", use_container_width=True):
-                st.info("📧 Email sharing form opened!")
-        
-        with col3:
-            if st.button("🔗 Copy Link", use_container_width=True):
-                st.info("🔗 Campaign link copied to clipboard!")
-
-def show_donation_tracking():
-    """Show donation tracking for individuals"""
-    
-    user_role = get_current_user_role()
-    
-    if user_role == 'individual' and st.session_state.get('current_page') == 'my_donations':
-        st.markdown("### 📊 Donation Impact Tracking")
-        
-        # Impact visualization
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("""
-            **Your Donation Journey:**
-            - 🎯 Total Campaigns: 7
-            - 💰 Average Donation: $64
-            - 📈 Growth Rate: +15% this month
-            - 🏆 Donor Level: Gold Supporter
-            """)
-        
-        with col2:
-            st.markdown("""
-            **Impact Achieved:**
-            - 👥 People Helped: ~150
-            - 🏥 Medical Treatments: 12
-            - 📚 Students Supported: 25
-            - 🌱 Trees Planted: 50
-            """)
-
-def show_organization_verification():
-    """Show organization verification status and requirements"""
-    
-    user_role = get_current_user_role()
-    
-    if user_role == 'organization':
-        # Check verification status
-        verification_status = {
-            'documents': True,
-            'bank_account': True,
-            'identity': False,
-            'tax_status': True
-        }
-        
-        incomplete_items = [k for k, v in verification_status.items() if not v]
-        
-        if incomplete_items:
-            st.warning(f"⚠️ Verification incomplete: {', '.join(incomplete_items)}")
-            
-            if st.button("📋 Complete Verification", use_container_width=True):
-                st.session_state.current_page = 'verification'
-                st.experimental_rerun()
-
-def show_mobile_responsive_elements():
-    """Show mobile-responsive elements and touch-friendly interfaces"""
-    
-    # Add mobile-specific CSS
-    st.markdown("""
-    <style>
-    @media (max-width: 768px) {
-        .stButton > button {
-            padding: 1rem;
-            font-size: 16px;
-            min-height: 44px; /* Touch-friendly size */
-        }
-        
-        .role-card {
-            margin: 0.5rem 0;
-            padding: 1rem;
-        }
-        
-        .main-header {
-            padding: 1rem;
-            font-size: 1.2rem;
-        }
-        
-        .fab-button {
-            width: 64px;
-            height: 64px;
-            font-size: 28px;
-        }
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-def initialize_workflow_integration():
-    """Initialize all workflow integration components"""
-    
-    # Initialize workflow state tracking
-    if 'workflow_state' not in st.session_state:
-        st.session_state.workflow_state = {
-            'current_step': 1,
-            'completed_steps': [],
-            'pending_actions': []
-        }
-    
-    # Initialize notification system
-    if 'notifications' not in st.session_state:
-        st.session_state.notifications = []
-    
-    # Initialize search state
-    if 'search_filters' not in st.session_state:
-        st.session_state.search_filters = {}
-    
-    # Handle page navigation
-    handle_page_navigation()
-    
-    # Show workflow status for organizations
-    if get_current_user_role() == 'organization':
-        show_workflow_status()
-    
-    # Show notification center
-    show_notification_center()
-    
-    # Show quick actions
-    show_quick_actions()
-    
-    # Handle workflow transitions
-    handle_workflow_transitions()
-    
-    # Show mobile responsive elements
-    show_mobile_responsive_elements()
-    
-    # Show organization verification status
-    show_organization_verification()
-
-# Enhanced main function with full workflow integration
-def enhanced_main():
-    """Enhanced main function with complete workflow integration"""
-    
-    try:
         # Initialize session state
         initialize_session_state()
         
-        # Initialize workflow integration
-        initialize_workflow_integration()
-        
-        # Handle OAuth callback first
-        handle_oauth_callback()
+        # Handle OAuth callback first (this checks database)
+        oauth_result = handle_oauth_callback()
+        if oauth_result:
+            st.success("✅ OAuth authentication successful!")
+            safe_rerun()
         
         # Check authentication status
-        if check_authentication_status():
+        if st.session_state.get('authenticated', False):
+            # User is authenticated - show full app with navbar
             show_authenticated_app()
         else:
+            # User is not authenticated - show login/registration only (no navbar)
             show_login_page()
             
     except Exception as e:
@@ -1267,7 +963,6 @@ def enhanced_main():
         st.error(f"❌ Application error: {str(e)}")
         st.info("🔄 Please refresh the page or contact support if the issue persists.")
 
-# Update the main execution to use enhanced version
 if __name__ == "__main__":
-    enhanced_main()
+    main()
 
