@@ -1,6 +1,6 @@
 """
-Enhanced HAVEN Crowdfunding Platform Frontend
-Streamlit application with role-based access control and separate registration flows
+HAVEN Crowdfunding Platform - Clean Authentication-First Frontend
+Streamlit application with hidden navigation until after login
 """
 
 import streamlit as st
@@ -10,148 +10,191 @@ import os
 from datetime import datetime
 
 # Import enhanced authentication and registration modules
-from workflow_auth_utils import (
+from modules.workflow_auth_utils import (
     initialize_auth, is_authenticated, login_user, logout_user,
     is_individual, is_organization, can_donate, can_create_campaigns,
     needs_registration, get_user_role_display, get_allowed_features
 )
-from workflow_registration_pages import show_registration_workflow
-
-# Import Tabler Icons
-try:
-    from pytablericons import TablerIcon
-    TABLER_AVAILABLE = True
-except ImportError:
-    TABLER_AVAILABLE = False
-    st.warning("⚠️ pytablericons not installed. Install with: pip install pytablericons")
+from modules.workflow_registration_pages import show_registration_workflow
 
 # ===== CONFIGURATION =====
 st.set_page_config(
-    page_title="HAVEN - Enhanced Crowdfunding Platform",
+    page_title="HAVEN - Crowdfunding Platform",
     page_icon="🎯",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"  # Start with sidebar collapsed
 )
-
-# ===== DYNAMIC THEMING SYSTEM =====
-class ThemeManager:
-    """Manage dynamic theming for icons based on background"""
-    
-    @staticmethod
-    def get_icon_color(context="light"):
-        """Get appropriate icon color based on background context"""
-        if context == "dark":
-            return "#FFFFFF"  # White icons on dark background
-        else:
-            return "#000000"  # Black icons on light background
-    
-    @staticmethod
-    def get_primary_color():
-        """Get primary theme color"""
-        return "#4CAF50"
-    
-    @staticmethod
-    def get_secondary_color():
-        """Get secondary theme color"""
-        return "#2196F3"
-
-# ===== ICON CONSTANTS =====
-class HavenIcons:
-    """Tabler icon constants for HAVEN platform"""
-    HOME = "home"
-    TRENDING = "trending-up"
-    EXPLORE = "compass"
-    SEARCH = "search"
-    CAMPAIGN = "circle-plus"
-    DONATE = "heart"
-    PROFILE = "user"
-    LOGOUT = "logout"
-    RUPEE = "currency-rupee"
-    GOOGLE = "brand-google"
-    FACEBOOK = "brand-facebook"
-    INDIVIDUAL = "user"
-    ORGANIZATION = "building"
-    ADMIN = "shield-check"
-
-# ===== TABLER ICONS MANAGER =====
-class TablerIconManager:
-    """Manage Tabler Icons with dynamic theming and caching"""
-    
-    def __init__(self):
-        self.icon_cache = {}
-    
-    def get_icon(self, icon_name, size=24, color=None, context="light", stroke_width=2):
-        """Get Tabler icon with dynamic theming"""
-        if not TABLER_AVAILABLE:
-            return self._get_fallback_icon(icon_name)
-        
-        if color is None:
-            color = ThemeManager.get_icon_color(context)
-        
-        # Create cache key
-        cache_key = f"{icon_name}_{size}_{color}_{stroke_width}"
-        
-        if cache_key in self.icon_cache:
-            return self.icon_cache[cache_key]
-        
-        try:
-            # Get Tabler icon
-            icon = TablerIcon(
-                name=icon_name,
-                size=size,
-                color=color,
-                stroke_width=stroke_width
-            )
-            
-            # Cache the result
-            self.icon_cache[cache_key] = icon.svg
-            return icon.svg
-            
-        except Exception as e:
-            st.error(f"Error loading icon {icon_name}: {e}")
-            return self._get_fallback_icon(icon_name)
-    
-    def _get_fallback_icon(self, icon_name):
-        """Fallback emoji icons if Tabler Icons not available"""
-        fallbacks = {
-            "home": "🏠",
-            "trending-up": "📈",
-            "compass": "🧭",
-            "search": "🔍",
-            "circle-plus": "➕",
-            "heart": "❤️",
-            "user": "👤",
-            "logout": "🚪",
-            "currency-rupee": "₹",
-            "brand-google": "🇬",
-            "brand-facebook": "🇫",
-            "building": "🏢",
-            "shield-check": "🛡️"
-        }
-        return fallbacks.get(icon_name, "❓")
-    
-    def render_icon(self, icon_name, size=24, color=None, context="light", stroke_width=2):
-        """Render Tabler icon in Streamlit"""
-        if TABLER_AVAILABLE:
-            svg_code = self.get_icon(icon_name, size, color, context, stroke_width)
-            st.markdown(svg_code, unsafe_allow_html=True)
-        else:
-            fallback = self._get_fallback_icon(icon_name)
-            st.markdown(f'<span style="font-size: {size}px;">{fallback}</span>', unsafe_allow_html=True)
 
 # ===== CUSTOM CSS =====
 def load_custom_css():
-    """Load custom CSS for enhanced UI"""
+    """Load custom CSS for clean authentication-first design"""
     st.markdown("""
     <style>
-    /* Main app styling */
-    .main-header {
-        background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    /* Hide sidebar completely for unauthenticated users */
+    .css-1d391kg {
+        display: none;
+    }
+    
+    /* Hide sidebar toggle button for unauthenticated users */
+    .css-1rs6os {
+        display: none;
+    }
+    
+    /* Main container styling */
+    .main-container {
+        max-width: 1200px;
+        margin: 0 auto;
         padding: 2rem;
-        border-radius: 10px;
-        margin-bottom: 2rem;
+    }
+    
+    /* Authentication landing page */
+    .auth-landing {
+        background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+        padding: 3rem 2rem;
+        border-radius: 15px;
         text-align: center;
         color: white;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    }
+    
+    .auth-landing h1 {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        font-weight: bold;
+    }
+    
+    .auth-landing p {
+        font-size: 1.2rem;
+        opacity: 0.9;
+        margin-bottom: 0;
+    }
+    
+    /* Authentication cards */
+    .auth-card {
+        background: white;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+        border: 1px solid #e0e0e0;
+    }
+    
+    .auth-card h3 {
+        color: #333;
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+    
+    /* Role selection cards */
+    .role-card {
+        background: white;
+        padding: 2rem;
+        border-radius: 15px;
+        border: 2px solid #e0e0e0;
+        margin: 1rem 0;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        text-align: center;
+    }
+    
+    .role-card:hover {
+        border-color: #4CAF50;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    
+    .role-card.individual {
+        border-color: #2196F3;
+    }
+    
+    .role-card.organization {
+        border-color: #4CAF50;
+    }
+    
+    .role-card h4 {
+        margin-bottom: 1rem;
+        font-size: 1.5rem;
+    }
+    
+    .role-card.individual h4 {
+        color: #2196F3;
+    }
+    
+    .role-card.organization h4 {
+        color: #4CAF50;
+    }
+    
+    /* Form styling */
+    .stTextInput > div > div > input {
+        border-radius: 10px;
+        border: 2px solid #e0e0e0;
+        padding: 0.75rem;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        border-color: #4CAF50;
+        box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+    }
+    
+    /* Button styling */
+    .stButton > button {
+        border-radius: 10px;
+        border: none;
+        padding: 0.75rem 2rem;
+        font-weight: bold;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    
+    /* Social login buttons */
+    .social-login {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        margin: 1rem 0;
+    }
+    
+    .social-btn {
+        padding: 0.75rem 1.5rem;
+        border-radius: 10px;
+        border: 2px solid #e0e0e0;
+        background: white;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: bold;
+    }
+    
+    .social-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .social-btn.google {
+        border-color: #db4437;
+        color: #db4437;
+    }
+    
+    .social-btn.facebook {
+        border-color: #3b5998;
+        color: #3b5998;
+    }
+    
+    /* Dashboard styling */
+    .dashboard-header {
+        background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        color: white;
+        margin-bottom: 2rem;
+        text-align: center;
     }
     
     .role-badge {
@@ -160,7 +203,7 @@ def load_custom_css():
         border-radius: 20px;
         font-size: 0.9rem;
         font-weight: bold;
-        margin-left: 1rem;
+        margin-top: 0.5rem;
     }
     
     .individual-badge {
@@ -178,349 +221,396 @@ def load_custom_css():
         color: white;
     }
     
-    .feature-card {
+    /* Navigation styling for authenticated users */
+    .nav-container {
         background: white;
-        padding: 1.5rem;
-        border-radius: 10px;
-        border: 2px solid #e0e0e0;
-        margin-bottom: 1rem;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 1rem;
+        border-radius: 15px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
     }
     
-    .feature-card.enabled {
-        border-color: #4CAF50;
-    }
-    
-    .feature-card.disabled {
-        border-color: #f44336;
-        opacity: 0.6;
-    }
-    
-    .login-container {
-        background: white;
-        padding: 2rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        margin: 2rem 0;
-    }
-    
-    .social-login-container {
+    .nav-buttons {
         display: flex;
-        justify-content: center;
         gap: 1rem;
-        margin: 1rem 0;
+        flex-wrap: wrap;
+        justify-content: center;
     }
     
-    .social-icon {
-        padding: 0.75rem;
+    .nav-btn {
+        padding: 0.75rem 1.5rem;
+        border-radius: 10px;
         border: 2px solid #e0e0e0;
-        border-radius: 50%;
+        background: white;
         cursor: pointer;
         transition: all 0.3s ease;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        font-weight: bold;
+        text-decoration: none;
+        color: #333;
     }
     
-    .social-icon:hover {
+    .nav-btn:hover {
         border-color: #4CAF50;
-        transform: scale(1.1);
+        background: #f8f9fa;
+        transform: translateY(-1px);
     }
     
-    .registration-prompt {
-        background: #fff3cd;
-        border: 1px solid #ffeaa7;
-        border-radius: 10px;
-        padding: 1.5rem;
-        margin: 1rem 0;
-        text-align: center;
+    .nav-btn.active {
+        background: #4CAF50;
+        color: white;
+        border-color: #4CAF50;
     }
     
-    .access-denied {
-        background: #f8d7da;
-        border: 1px solid #f5c6cb;
-        border-radius: 10px;
-        padding: 1.5rem;
-        margin: 1rem 0;
-        text-align: center;
-        color: #721c24;
+    /* Hide Streamlit default elements */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .auth-landing h1 {
+            font-size: 2rem;
+        }
+        
+        .nav-buttons {
+            flex-direction: column;
+        }
+        
+        .social-login {
+            flex-direction: column;
+        }
     }
     </style>
     """, unsafe_allow_html=True)
 
 # ===== AUTHENTICATION FUNCTIONS =====
-def render_login_page(icon_manager):
-    """Render login page with role-based messaging"""
+def render_authentication_landing():
+    """Render clean authentication landing page"""
     st.markdown("""
-    <div class="main-header">
-        <h1>🎯 Welcome to HAVEN Enhanced</h1>
-        <p>Empowering Communities Through Role-Based Crowdfunding</p>
+    <div class="auth-landing">
+        <h1>🎯 Welcome to HAVEN</h1>
+        <p>Empowering Communities Through Transparent Crowdfunding</p>
     </div>
     """, unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns([1, 2, 1])
+    # Create two columns for login and register
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        render_login_card()
     
     with col2:
-        st.markdown('<div class="login-container">', unsafe_allow_html=True)
-        
-        # Role-based information
-        st.markdown("""
-        ### 🎭 Choose Your Role
-        
-        **👤 Individual**: Register to donate to campaigns and support causes you care about.
-        
-        **🏢 Organization**: Register to create and manage fundraising campaigns.
-        """)
-        
-        st.markdown("---")
-        
-        # Login form
-        st.markdown("### 🔐 Login")
-        
-        with st.form("login_form"):
-            email = st.text_input("Email", placeholder="your.email@example.com")
-            password = st.text_input("Password", type="password", placeholder="Your password")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                login_submitted = st.form_submit_button("🚀 Login", use_container_width=True, type="primary")
-            with col2:
-                register_clicked = st.form_submit_button("📝 Register", use_container_width=True)
-            
-            if login_submitted:
-                if email and password:
-                    with st.spinner("Logging in..."):
-                        success, message = login_user("email", {"email": email, "password": password})
-                    
-                    if success:
-                        st.success("Login successful!")
-                        st.rerun()
-                    else:
-                        st.error(message)
-                else:
-                    st.error("Please enter both email and password")
-            
-            if register_clicked:
-                st.session_state.show_registration = True
-                st.rerun()
-        
-        # Social login buttons
-        st.markdown("---")
-        st.markdown("### Or sign in with")
+        render_register_card()
+
+def render_login_card():
+    """Render login card"""
+    st.markdown("""
+    <div class="auth-card">
+        <h3>🔐 Login to Your Account</h3>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.form("login_form", clear_on_submit=False):
+        email = st.text_input("Email Address", placeholder="your.email@example.com", key="login_email")
+        password = st.text_input("Password", type="password", placeholder="Your password", key="login_password")
         
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🇬 Google", use_container_width=True):
-                st.info("Google OAuth integration coming soon!")
-        with col2:
-            if st.button("🇫 Facebook", use_container_width=True):
-                st.info("Facebook OAuth integration coming soon!")
+            login_submitted = st.form_submit_button("🚀 Login", use_container_width=True, type="primary")
         
-        st.markdown('</div>', unsafe_allow_html=True)
+        if login_submitted:
+            if email and password:
+                with st.spinner("Logging in..."):
+                    success, message = login_user("email", {"email": email, "password": password})
+                
+                if success:
+                    st.success("✅ Login successful!")
+                    st.rerun()
+                else:
+                    st.error(f"❌ {message}")
+            else:
+                st.error("❌ Please enter both email and password")
+    
+    # Social login section
+    st.markdown("---")
+    
+    # Import OAuth integration
+    from modules.oauth_integration import render_oauth_buttons
+    render_oauth_buttons("individual")
 
-def render_registration_prompt():
-    """Render registration completion prompt"""
+def render_register_card():
+    """Render registration card"""
     st.markdown("""
-    <div class="registration-prompt">
-        <h3>📋 Complete Your Registration</h3>
-        <p>You're logged in but need to complete your registration to access all features.</p>
+    <div class="auth-card">
+        <h3>📝 Create New Account</h3>
     </div>
     """, unsafe_allow_html=True)
     
-    if st.button("Complete Registration", use_container_width=True, type="primary"):
-        st.session_state.show_registration = True
-        st.rerun()
-
-# ===== NAVIGATION FUNCTIONS =====
-def render_navigation(icon_manager):
-    """Render role-based navigation sidebar"""
-    if not is_authenticated():
-        return
+    st.markdown("### Choose Your Role")
     
-    # User info in sidebar
-    st.sidebar.markdown("### 👤 User Info")
+    # Role selection
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("👤 Register as Individual", use_container_width=True, type="secondary", key="register_individual"):
+            st.session_state.show_registration = True
+            st.session_state.registration_type = "individual"
+            st.rerun()
+        
+        st.markdown("""
+        <small>
+        <strong>Individual:</strong><br>
+        • Donate to campaigns<br>
+        • Support causes you care about<br>
+        • Track donation history<br>
+        • Get tax receipts
+        </small>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        if st.button("🏢 Register as Organization", use_container_width=True, type="secondary", key="register_organization"):
+            st.session_state.show_registration = True
+            st.session_state.registration_type = "organization"
+            st.rerun()
+        
+        st.markdown("""
+        <small>
+        <strong>Organization:</strong><br>
+        • Create fundraising campaigns<br>
+        • Manage campaign updates<br>
+        • Track donations received<br>
+        • Engage with donors
+        </small>
+        """, unsafe_allow_html=True)
+
+# ===== AUTHENTICATED USER INTERFACE =====
+def render_authenticated_interface():
+    """Render interface for authenticated users"""
+    # Show role-based navigation
+    render_role_based_navigation()
+    
+    # Show current page content
+    current_page = st.session_state.get('current_page', 'dashboard')
+    
+    if current_page == 'dashboard':
+        render_dashboard()
+    elif current_page == 'campaigns':
+        render_campaigns_page()
+    elif current_page == 'donations':
+        render_donations_page()
+    elif current_page == 'create_campaign':
+        render_create_campaign_page()
+    elif current_page == 'my_campaigns':
+        render_my_campaigns_page()
+    elif current_page == 'profile':
+        render_profile_page()
+    else:
+        render_dashboard()
+
+def render_role_based_navigation():
+    """Render navigation based on user role"""
+    # User info header
     role_display = get_user_role_display()
     
     if is_individual():
         badge_class = "individual-badge"
+        welcome_msg = f"Welcome back, {role_display}!"
     elif is_organization():
         badge_class = "organization-badge"
+        welcome_msg = f"Welcome back, {role_display}!"
     else:
         badge_class = "admin-badge"
+        welcome_msg = f"Welcome back, {role_display}!"
     
-    st.sidebar.markdown(f"""
-    <div style="text-align: center;">
+    st.markdown(f"""
+    <div class="dashboard-header">
+        <h2>{welcome_msg}</h2>
         <span class="role-badge {badge_class}">{role_display}</span>
     </div>
     """, unsafe_allow_html=True)
     
-    st.sidebar.markdown("---")
+    # Navigation buttons
+    st.markdown('<div class="nav-container">', unsafe_allow_html=True)
     
     # Get allowed features
     features = get_allowed_features()
+    current_page = st.session_state.get('current_page', 'dashboard')
     
-    # Navigation items based on role
-    st.sidebar.markdown("### 🧭 Navigation")
+    # Create navigation buttons
+    nav_cols = st.columns(6)
     
-    # Home (always available)
-    if st.sidebar.button("🏠 Home", use_container_width=True):
-        st.session_state.current_page = "home"
-        st.rerun()
-    
-    # View campaigns (always available)
-    if st.sidebar.button("👀 View Campaigns", use_container_width=True):
-        st.session_state.current_page = "campaigns"
-        st.rerun()
-    
-    # Role-specific features
-    if features.get('donate', False):
-        if st.sidebar.button("❤️ My Donations", use_container_width=True):
-            st.session_state.current_page = "donations"
+    with nav_cols[0]:
+        if st.button("🏠 Dashboard", use_container_width=True, 
+                    type="primary" if current_page == 'dashboard' else "secondary"):
+            st.session_state.current_page = 'dashboard'
             st.rerun()
+    
+    with nav_cols[1]:
+        if st.button("👀 Browse Campaigns", use_container_width=True,
+                    type="primary" if current_page == 'campaigns' else "secondary"):
+            st.session_state.current_page = 'campaigns'
+            st.rerun()
+    
+    # Role-specific navigation
+    if features.get('donate', False):
+        with nav_cols[2]:
+            if st.button("❤️ My Donations", use_container_width=True,
+                        type="primary" if current_page == 'donations' else "secondary"):
+                st.session_state.current_page = 'donations'
+                st.rerun()
     
     if features.get('create_campaigns', False):
-        if st.sidebar.button("➕ Create Campaign", use_container_width=True):
-            st.session_state.current_page = "create_campaign"
+        with nav_cols[2]:
+            if st.button("➕ Create Campaign", use_container_width=True,
+                        type="primary" if current_page == 'create_campaign' else "secondary"):
+                st.session_state.current_page = 'create_campaign'
+                st.rerun()
+        
+        with nav_cols[3]:
+            if st.button("📊 My Campaigns", use_container_width=True,
+                        type="primary" if current_page == 'my_campaigns' else "secondary"):
+                st.session_state.current_page = 'my_campaigns'
+                st.rerun()
+    
+    with nav_cols[4]:
+        if st.button("👤 Profile", use_container_width=True,
+                    type="primary" if current_page == 'profile' else "secondary"):
+            st.session_state.current_page = 'profile'
             st.rerun()
     
-    if features.get('manage_campaigns', False):
-        if st.sidebar.button("📊 My Campaigns", use_container_width=True):
-            st.session_state.current_page = "my_campaigns"
+    with nav_cols[5]:
+        if st.button("🚪 Logout", use_container_width=True, type="secondary"):
+            logout_user()
+            st.session_state.current_page = 'dashboard'
             st.rerun()
     
-    if features.get('admin_panel', False):
-        if st.sidebar.button("🛡️ Admin Panel", use_container_width=True):
-            st.session_state.current_page = "admin"
-            st.rerun()
-    
-    # Profile and logout
-    st.sidebar.markdown("---")
-    if st.sidebar.button("👤 Profile", use_container_width=True):
-        st.session_state.current_page = "profile"
-        st.rerun()
-    
-    if st.sidebar.button("🚪 Logout", use_container_width=True):
-        logout_user()
-        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# ===== PAGE FUNCTIONS =====
-def render_home_page(icon_manager):
-    """Render role-based home page"""
-    st.markdown("""
-    <div class="main-header">
-        <h1>🏠 HAVEN Dashboard</h1>
-        <p>Welcome to your personalized crowdfunding experience</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Role-specific welcome message
+def render_dashboard():
+    """Render role-based dashboard"""
     if is_individual():
-        st.markdown("""
-        ### 👤 Individual Dashboard
+        st.markdown("### 👤 Individual Dashboard")
         
-        As an individual donor, you can:
-        - 💝 Donate to campaigns that matter to you
-        - 📊 Track your donation history
-        - 🧾 Download tax receipts
-        - 🔍 Discover new causes to support
-        """)
-        
-        # Quick donate section
-        st.markdown("### 🚀 Quick Actions")
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("❤️ Browse Campaigns to Donate", use_container_width=True, type="primary"):
-                st.session_state.current_page = "campaigns"
+            st.markdown("""
+            #### 💝 Your Impact
+            - Browse active campaigns
+            - Make secure donations
+            - Track your contribution history
+            - Download tax receipts
+            """)
+            
+            if st.button("🔍 Browse Campaigns", use_container_width=True, type="primary"):
+                st.session_state.current_page = 'campaigns'
                 st.rerun()
+        
         with col2:
-            if st.button("📊 View My Donations", use_container_width=True):
-                st.session_state.current_page = "donations"
+            st.markdown("""
+            #### 📊 Quick Stats
+            - Total donations: Coming soon
+            - Campaigns supported: Coming soon
+            - Impact created: Coming soon
+            """)
+            
+            if st.button("📈 View My Donations", use_container_width=True):
+                st.session_state.current_page = 'donations'
                 st.rerun()
     
     elif is_organization():
-        st.markdown("""
-        ### 🏢 Organization Dashboard
+        st.markdown("### 🏢 Organization Dashboard")
         
-        As an organization, you can:
-        - 🎯 Create fundraising campaigns
-        - 📈 Manage your active campaigns
-        - 💰 Track donations received
-        - 📝 Post campaign updates
-        """)
-        
-        # Quick campaign actions
-        st.markdown("### 🚀 Quick Actions")
         col1, col2 = st.columns(2)
         with col1:
+            st.markdown("""
+            #### 🎯 Campaign Management
+            - Create new fundraising campaigns
+            - Manage active campaigns
+            - Post updates to donors
+            - Track donation progress
+            """)
+            
             if st.button("➕ Create New Campaign", use_container_width=True, type="primary"):
-                st.session_state.current_page = "create_campaign"
+                st.session_state.current_page = 'create_campaign'
                 st.rerun()
+        
         with col2:
-            if st.button("📊 Manage My Campaigns", use_container_width=True):
-                st.session_state.current_page = "my_campaigns"
+            st.markdown("""
+            #### 📊 Performance Overview
+            - Active campaigns: Coming soon
+            - Total raised: Coming soon
+            - Donor engagement: Coming soon
+            """)
+            
+            if st.button("📊 Manage Campaigns", use_container_width=True):
+                st.session_state.current_page = 'my_campaigns'
                 st.rerun()
     
     else:
-        st.markdown("""
-        ### 🛡️ Admin Dashboard
-        
-        As an administrator, you have full access to:
-        - 👥 User management
-        - 🎯 Campaign moderation
-        - 📊 Platform analytics
-        - ⚙️ System configuration
-        """)
+        st.markdown("### 🛡️ Admin Dashboard")
+        st.info("Admin features coming soon!")
 
 def render_campaigns_page():
     """Render campaigns listing page"""
-    st.markdown("""
-    <div class="main-header">
-        <h1>🎯 Browse Campaigns</h1>
-        <p>Discover amazing causes and make a difference</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("### 🎯 Browse Active Campaigns")
     
-    # Role-specific messaging
     if is_individual():
         st.info("💡 As an individual, you can donate to any active campaign!")
     elif is_organization():
-        st.info("💡 As an organization, you can view campaigns but cannot donate. You can create your own campaigns!")
+        st.info("💡 As an organization, you can view campaigns for inspiration!")
     
-    # Placeholder for campaigns list
-    st.markdown("### 📋 Active Campaigns")
-    st.info("Campaign listing functionality will be implemented here.")
+    st.markdown("#### Featured Campaigns")
+    st.info("📋 Campaign listing functionality will be implemented here.")
 
-def render_access_denied(feature_name):
-    """Render access denied message"""
-    st.markdown(f"""
-    <div class="access-denied">
-        <h3>🚫 Access Denied</h3>
-        <p>You don't have permission to access <strong>{feature_name}</strong>.</p>
-        <p>Your current role: <strong>{get_user_role_display()}</strong></p>
-    </div>
-    """, unsafe_allow_html=True)
+def render_donations_page():
+    """Render donations page for individuals"""
+    if not can_donate():
+        st.error("🚫 Access denied. Only individuals can view donation history.")
+        return
     
-    # Role-specific guidance
-    if is_individual():
-        st.info("💡 As an individual, you can donate to campaigns but cannot create them.")
-    elif is_organization():
-        st.info("💡 As an organization, you can create campaigns but cannot donate to them.")
+    st.markdown("### ❤️ My Donation History")
+    st.info("📊 Your donation history will be displayed here.")
+
+def render_create_campaign_page():
+    """Render campaign creation page for organizations"""
+    if not can_create_campaigns():
+        st.error("🚫 Access denied. Only organizations can create campaigns.")
+        return
+    
+    st.markdown("### ➕ Create New Campaign")
+    st.info("📝 Campaign creation form will be implemented here.")
+
+def render_my_campaigns_page():
+    """Render campaign management page for organizations"""
+    if not can_create_campaigns():
+        st.error("🚫 Access denied. Only organizations can manage campaigns.")
+        return
+    
+    st.markdown("### 📊 My Campaigns")
+    st.info("📈 Your campaign management interface will be implemented here.")
+
+def render_profile_page():
+    """Render profile page"""
+    st.markdown("### 👤 Profile Settings")
+    st.info("⚙️ Profile management will be implemented here.")
 
 # ===== MAIN APPLICATION =====
 def main():
-    """Main application function"""
+    """Main application function with clean authentication flow"""
     # Load custom CSS
     load_custom_css()
     
     # Initialize authentication
     initialize_auth()
     
-    # Create icon manager
-    icon_manager = TablerIconManager()
+    # Check for OAuth callback first
+    from modules.oauth_integration import check_oauth_callback
+    if check_oauth_callback():
+        st.rerun()
     
     # Initialize session state
     if 'current_page' not in st.session_state:
-        st.session_state.current_page = "home"
+        st.session_state.current_page = 'dashboard'
     
     if 'show_registration' not in st.session_state:
         st.session_state.show_registration = False
@@ -529,61 +619,29 @@ def main():
     if st.session_state.show_registration:
         show_registration_workflow()
         
-        # Back to login button
-        if st.button("← Back to Login"):
+        # Back to main button
+        if st.button("← Back to Login", key="back_to_login"):
             st.session_state.show_registration = False
+            st.session_state.registration_type = None
             st.rerun()
         return
     
-    # Check authentication
+    # Check authentication status
     if not is_authenticated():
-        render_login_page(icon_manager)
+        # Show clean authentication landing page (NO SIDEBAR)
+        render_authentication_landing()
         return
     
     # Check if user needs to complete registration
     if needs_registration():
-        render_registration_prompt()
+        st.warning("📋 Please complete your registration to access all features.")
+        if st.button("Complete Registration", type="primary"):
+            st.session_state.show_registration = True
+            st.rerun()
         return
     
-    # Render navigation
-    render_navigation(icon_manager)
-    
-    # Render current page
-    current_page = st.session_state.current_page
-    
-    if current_page == "home":
-        render_home_page(icon_manager)
-    elif current_page == "campaigns":
-        render_campaigns_page()
-    elif current_page == "donations":
-        if can_donate():
-            st.markdown("### 📊 My Donations")
-            st.info("Donation history will be implemented here.")
-        else:
-            render_access_denied("Donation History")
-    elif current_page == "create_campaign":
-        if can_create_campaigns():
-            st.markdown("### ➕ Create New Campaign")
-            st.info("Campaign creation form will be implemented here.")
-        else:
-            render_access_denied("Campaign Creation")
-    elif current_page == "my_campaigns":
-        if can_create_campaigns():
-            st.markdown("### 📊 My Campaigns")
-            st.info("Campaign management will be implemented here.")
-        else:
-            render_access_denied("Campaign Management")
-    elif current_page == "admin":
-        if st.session_state.user_role == "admin":
-            st.markdown("### 🛡️ Admin Panel")
-            st.info("Admin panel will be implemented here.")
-        else:
-            render_access_denied("Admin Panel")
-    elif current_page == "profile":
-        st.markdown("### 👤 Profile")
-        st.info("Profile management will be implemented here.")
-    else:
-        render_home_page(icon_manager)
+    # Show authenticated interface with navigation
+    render_authenticated_interface()
 
 if __name__ == "__main__":
     main()
