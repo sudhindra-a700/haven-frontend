@@ -14,10 +14,10 @@ from datetime import datetime, timedelta
 # Import updated authentication utilities
 from workflow_auth_utils import (
     get_auth_manager, 
-    require_auth, 
+    require_authentication, 
     require_role, 
-    get_current_user_role,
-    is_authenticated
+    get_user_role,
+    check_user_authentication
 )
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ def render_admin_review_page(workflow_manager):
     """UPDATED: Render admin review page - shows campaign under review with authentication"""
     
     # Require authentication
-    if not require_auth():
+    if not require_authentication():
         return
     
     # Get current campaign from session state
@@ -135,7 +135,7 @@ def render_campaign_browse_page(workflow_manager):
     """UPDATED: Render campaign browsing page with authentication"""
     
     # Require authentication for browsing
-    if not require_auth():
+    if not require_authentication():
         return
     
     st.markdown("### 🔍 Browse Campaigns")
@@ -273,7 +273,7 @@ def render_campaign_details_page(workflow_manager):
     """UPDATED: Render detailed campaign view with authentication"""
     
     # Require authentication
-    if not require_auth():
+    if not require_authentication():
         return
     
     campaign = st.session_state.get('selected_campaign')
@@ -391,7 +391,7 @@ def render_donation_page(workflow_manager):
     """UPDATED: Render donation page with authentication"""
     
     # Require authentication
-    if not require_auth():
+    if not require_authentication():
         return
     
     campaign = st.session_state.get('selected_campaign')
@@ -730,7 +730,7 @@ def get_mock_campaigns():
 def get_campaign_by_id(campaign_id: str) -> Optional[Dict[str, Any]]:
     """UPDATED: Get campaign by ID with authentication"""
     
-    if not is_authenticated():
+    if not check_user_authentication():
         return None
     
     # In real implementation, this would fetch from backend
@@ -740,7 +740,7 @@ def get_campaign_by_id(campaign_id: str) -> Optional[Dict[str, Any]]:
 def get_user_donations(user_id: str) -> List[Dict[str, Any]]:
     """UPDATED: Get user's donation history with authentication"""
     
-    if not is_authenticated():
+    if not check_user_authentication():
         return []
     
     # In real implementation, this would fetch from backend
@@ -749,9 +749,8 @@ def get_user_donations(user_id: str) -> List[Dict[str, Any]]:
 def get_donation_receipt(donation_id: str) -> Optional[Dict[str, Any]]:
     """UPDATED: Get donation receipt with authentication"""
     
-    if not is_authenticated():
+    if not check_user_authentication():
         return None
     
     # In real implementation, this would fetch from backend
     return None
-
