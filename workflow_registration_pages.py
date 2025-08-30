@@ -13,9 +13,8 @@ import logging
 # Import updated authentication utilities
 from workflow_auth_utils import (
     get_auth_manager, 
-    require_auth, 
-    get_current_user_role,
-    is_authenticated
+    get_user_role,
+    check_user_authentication
 )
 
 logger = logging.getLogger(__name__)
@@ -41,8 +40,8 @@ class RegistrationManager:
         """UPDATED: Show registration type selection page with OAuth integration"""
         
         # Check if user is already authenticated via OAuth
-        if is_authenticated():
-            user_role = get_current_user_role()
+        if check_user_authentication():
+            user_role = get_user_role()
             st.success(f"✅ You are already logged in as {user_role}")
             
             # Check if additional registration is needed
@@ -777,4 +776,3 @@ def show_registration_page():
     
     registration_manager = RegistrationManager()
     registration_manager.show_registration_selection()
-
