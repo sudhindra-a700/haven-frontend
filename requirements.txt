@@ -1,36 +1,41 @@
+# Haven Frontend Requirements
 # Core Streamlit and web framework
 streamlit>=1.28.0
 requests>=2.31.0
-pytablericons>=1.0.1
 
-# Data processing and analysis
-pandas>=2.0.0
-numpy>=1.24.0
+# Database connectivity
+psycopg2-binary>=2.9.7
+sqlalchemy>=2.0.0
 
-# Image processing
-Pillow>=10.0.0
+# Environment and configuration
+python-dotenv>=1.0.0
+pydantic>=2.0.0
 
 # Authentication and security
 PyJWT>=2.8.0
 cryptography>=41.0.0
 
-# HTTP client enhancements
-httpx>=0.24.0
+# HTTP client for API calls
+httpx>=0.25.0
 
-# Date and time handling
+# Data processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Image processing (for Bootstrap icons)
+Pillow>=10.0.0
+
+# Additional utilities
+python-multipart>=0.0.6
+email-validator>=2.0.0
+
 python-dateutil>=2.8.0
-
-# Environment and configuration
-python-dotenv>=1.0.0
 
 # UI enhancements
 streamlit-option-menu>=0.3.6
 
 # File handling
 openpyxl>=3.1.0
-
-# API and data validation
-pydantic>=2.0.0
 validators>=0.20.0
 nltk
 uuid
