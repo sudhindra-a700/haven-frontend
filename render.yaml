@@ -1,0 +1,74 @@
+# Haven Crowdfunding Platform - Secure Render Blueprint
+# Two Repository Setup: Frontend + Backend
+# Place this file as: haven-frontend/render.yaml
+
+# Enable preview environments for testing changes
+previews:
+  generation: automatic
+
+# NO environment groups defined here - using existing "crowdfunding" group
+# All secret values are already in your existing environment group
+
+# PostgreSQL database configuration
+databases:
+  - name: haven-database
+    plan: free
+    databaseName: haven_database
+    user: haven_database_user
+    region: oregon
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: Allow all connections for development
+
+# Service definitions for both repositories
+services:
+  # FastAPI Backend Service (from backend repository)
+  - type: web
+    name: haven-backend
+    runtime: python
+    repo: https://github.com/sudhindra-a700/haven-backend.git
+    branch: main
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    maxShutdownDelaySeconds: 120
+    envVars:
+      # Database URL automatically injected from database
+      - key: DATABASE_URL
+        fromDatabase:
+          name: haven-database
+          property: connectionString
+      # Port for the service
+      - key: PORT
+        value: 8000
+      # Reference your existing environment group with all secrets
+      - fromGroup: crowdfunding
+    
+  # Streamlit Frontend Service (from frontend repository)
+  - type: web
+    name: haven-frontend
+    runtime: python
+    repo: https://github.com/sudhindra-a700/haven-frontend.git
+    branch: main
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    healthCheckPath: /_stcore/health
+    autoDeploy: true
+    maxShutdownDelaySeconds: 120
+    envVars:
+      # Database URL automatically injected from database
+      - key: DATABASE_URL
+        fromDatabase:
+          name: haven-database
+          property: connectionString
+      # Port for the service
+      - key: PORT
+        value: 8501
+      # Reference your existing environment group with all secrets
+      - fromGroup: crowdfunding
+
