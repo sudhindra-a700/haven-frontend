@@ -6,7 +6,7 @@ import os
 from typing import Optional
 
 # BOOTSTRAP ICONS PATH - Based on repository verification
-BOOTSTRAP_ICONS_PATH = "bootstrap-icons/icons"
+BOOTSTRAP_ICONS_PATH = "assets"
 
 def display_icon(icon_name: str, width: int = 20, height: Optional[int] = None) -> None:
     """
