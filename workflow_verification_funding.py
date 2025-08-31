@@ -1,757 +1,371 @@
-"""
-UPDATED Verification and Funding Workflow Pages for HAVEN
-Integrates with fixed OAuth authentication system
-Implements: Admin Review → Verification → Browse → View → Fund → Payment → Success
-"""
+# Modified workflow_auth_utils.py - Authentication Workflow with Bootstrap Icons
+# This file replaces your existing workflow_auth_utils.py
 
 import streamlit as st
-from typing import Dict, Any, List, Optional
-import logging
-import time
-import random
-from datetime import datetime, timedelta
-
-# Import updated authentication utilities
-from workflow_auth_utils import (
-    get_auth_manager, 
-    require_authentication, 
-    require_role, 
-    get_user_role,
-    check_user_authentication
-)
 from utils.icon_utils import display_icon, get_icon_html
 from config.icon_mapping import get_icon, ICON_COLORS, ICON_SIZES
-logger = logging.getLogger(__name__)
 
-def render_admin_review_page(workflow_manager):
-    """UPDATED: Render admin review page - shows campaign under review with authentication"""
-    
-    # Require authentication
-    if not require_authentication():
-        return
-    
-    # Get current campaign from session state
-    campaign = st.session_state.get('current_campaign')
-    
-    if not campaign:
-        st.error("❌ No campaign selected for review")
-        return
-    
+def render_login_page():
+    """Render login page with Bootstrap icons."""
+    # Page header with icon
     st.markdown(f"""
-    <div style='background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%); 
-                padding: 2rem; border-radius: 10px; text-align: center; margin-bottom: 2rem;'>
-        <h2 style='color: #f57c00; margin: 0;'>🔍 Admin Review in Progress</h2>
-        <p style='color: #ef6c00; margin: 0;'>Campaign "{campaign.get('basic_info', {}).get('title', 'your campaign')}" is being reviewed by our team</p>
+    <div style="text-align: center; margin-bottom: 30px;">
+        {get_icon_html('shield-lock-fill', 48, ICON_COLORS['primary'])}
+        <h1 style="color: {ICON_COLORS['primary']}; margin-top: 15px;">
+            Welcome to Haven
+        </h1>
+        <p style="color: {ICON_COLORS['muted']};">Sign in to your account</p>
     </div>
     """, unsafe_allow_html=True)
     
-    # Review status
-    st.markdown("### 📊 Review Status")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.metric("📝 Review Stage", "Manual Review")
-    
-    with col2:
-        st.metric("⏰ Estimated Review Time", "24-48 hours")
-    
-    with col3:
-        auth_time = datetime.fromtimestamp(campaign.get('created_at', time.time()))
-        st.metric("📅 Submitted", auth_time.strftime("%Y-%m-%d %H:%M"))
-    
-    # Review progress
-    st.markdown("### 🔄 Review Progress")
-    
-    progress_steps = [
-        ("📥 Received", True, "Campaign received and queued for review"),
-        ("🤖 AI Check", True, "Automated compliance and completeness check"),
-        ("👥 Manual Review", True, "Human review of campaign details and documents"),
-        ("✅ Decision", False, "Final approval or feedback"),
-        ("🚀 Launch", False, "Campaign goes live on platform")
-    ]
-    
-    for step_name, completed, description in progress_steps:
-        if completed:
-            st.success(f"✅ **{step_name}**: {description}")
-        else:
-            st.info(f"⏳ **{step_name}**: {description}")
-    
-    # Campaign summary
-    st.markdown("### 📋 Campaign Summary")
-    
-    with st.expander("View Campaign Details", expanded=False):
-        basic_info = campaign.get('basic_info', {})
-        details = campaign.get('details', {})
-        funding = campaign.get('funding', {})
-        
-        col1, col2 = st.columns(2)
-        
+    # Login form with icons
+    with st.form("login_form"):
+        # Email field with icon
+        col1, col2 = st.columns([1, 10])
         with col1:
-            st.markdown("**Basic Information:**")
-            st.write(f"• **Title:** {basic_info.get('title', 'N/A')}")
-            st.write(f"• **Category:** {basic_info.get('category', 'N/A')}")
-            st.write(f"• **Location:** {basic_info.get('location', 'N/A')}")
-            st.write(f"• **Urgency:** {basic_info.get('urgency_level', 'N/A')}")
-        
+            st.markdown(f"""
+            <div style="padding-top: 8px;">
+                {get_icon_html('envelope-fill', ICON_SIZES['md'], ICON_COLORS['muted'])}
+            </div>
+            """, unsafe_allow_html=True)
         with col2:
-            st.markdown("**Funding Information:**")
-            st.write(f"• **Target:** ${funding.get('funding_target', 0):,}")
-            st.write(f"• **Minimum:** ${funding.get('minimum_funding', 0):,}")
-            st.write(f"• **Currency:** {funding.get('currency', 'USD')}")
-            st.write(f"• **Type:** {funding.get('funding_type', 'N/A')}")
-    
-    # What happens next
-    st.markdown("### 🔮 What Happens Next?")
-    
-    st.info("""
-    **Review Process:**
-    
-    1. **Document Verification**: Our team verifies all uploaded documents and organization credentials
-    2. **Content Review**: Campaign content is reviewed for compliance with our guidelines
-    3. **Risk Assessment**: We assess the campaign for potential risks and authenticity
-    4. **Final Decision**: Campaign is either approved, requires modifications, or is declined
-    
-    **You will be notified via email once the review is complete.**
-    """)
-    
-    # Contact support
-    st.markdown("### 📞 Need Help?")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("📧 Contact Support", use_container_width=True):
-            st.info("📧 Please email support@haven-platform.org for assistance")
-    
-    with col2:
-        if st.button("📚 Review Guidelines", use_container_width=True):
-            st.info("📚 Review our campaign guidelines for more information")
-    
-    # Refresh status
-    if st.button("🔄 Refresh Status", use_container_width=True, type="primary"):
-        st.experimental_rerun()
-
-def render_campaign_browse_page(workflow_manager):
-    """UPDATED: Render campaign browsing page with authentication"""
-    
-    # Require authentication for browsing
-    if not require_authentication():
-        return
-    
-    st.markdown("### 🔍 Browse Campaigns")
-    st.markdown("Discover and support amazing causes in your community and beyond")
-    
-    # Search and filter section
-    st.markdown("#### 🔎 Search & Filter")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        search_query = st.text_input(
-            "Search campaigns",
-            placeholder="Enter keywords...",
-            key="campaign_search"
-        )
-    
-    with col2:
-        category_filter = st.selectbox(
-            "Category",
-            options=["All Categories", "Medical", "Education", "Disaster Relief", 
-                    "Community Development", "Environment", "Animal Welfare"],
-            key="category_filter"
-        )
-    
-    with col3:
-        location_filter = st.text_input(
-            "Location",
-            placeholder="City, State, Country",
-            key="location_filter"
-        )
-    
-    # Additional filters
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        urgency_filter = st.selectbox(
-            "Urgency Level",
-            options=["All Levels", "Critical", "High", "Medium", "Low"],
-            key="urgency_filter"
-        )
-    
-    with col2:
-        funding_range = st.selectbox(
-            "Funding Range",
-            options=["All Amounts", "Under $1K", "$1K-$5K", "$5K-$25K", "$25K-$100K", "Over $100K"],
-            key="funding_filter"
-        )
-    
-    with col3:
-        sort_by = st.selectbox(
-            "Sort by",
-            options=["Most Recent", "Ending Soon", "Most Funded", "Least Funded", "Alphabetical"],
-            key="sort_filter"
-        )
-    
-    # Mock campaign data (in real implementation, this would come from backend)
-    campaigns = get_mock_campaigns()
-    
-    # Apply filters (simplified for demo)
-    filtered_campaigns = campaigns
-    
-    if search_query:
-        filtered_campaigns = [c for c in filtered_campaigns 
-                            if search_query.lower() in c['title'].lower() 
-                            or search_query.lower() in c['description'].lower()]
-    
-    if category_filter != "All Categories":
-        filtered_campaigns = [c for c in filtered_campaigns if c['category'] == category_filter]
-    
-    # Display campaigns
-    st.markdown(f"#### 📊 Found {len(filtered_campaigns)} campaigns")
-    
-    if not filtered_campaigns:
-        st.info("🔍 No campaigns found matching your criteria. Try adjusting your filters.")
-        return
-    
-    # Campaign cards
-    for i in range(0, len(filtered_campaigns), 2):
-        col1, col2 = st.columns(2)
+            email = st.text_input("Email Address", placeholder="Enter your email")
         
+        # Password field with icon
+        col1, col2 = st.columns([1, 10])
         with col1:
-            if i < len(filtered_campaigns):
-                render_campaign_card(filtered_campaigns[i])
-        
+            st.markdown(f"""
+            <div style="padding-top: 8px;">
+                {get_icon_html('key-fill', ICON_SIZES['md'], ICON_COLORS['muted'])}
+            </div>
+            """, unsafe_allow_html=True)
         with col2:
-            if i + 1 < len(filtered_campaigns):
-                render_campaign_card(filtered_campaigns[i + 1])
-
-def render_campaign_card(campaign):
-    """UPDATED: Render individual campaign card with authentication"""
+            password = st.text_input("Password", type="password", placeholder="Enter your password")
+        
+        # Remember me checkbox with icon
+        col1, col2 = st.columns([1, 10])
+        with col1:
+            st.markdown(f"""
+            <div style="padding-top: 8px;">
+                {get_icon_html('check-square', ICON_SIZES['sm'], ICON_COLORS['muted'])}
+            </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            remember_me = st.checkbox("Remember me")
+        
+        # Login button with icon
+        if st.form_submit_button(f"{get_icon_html('box-arrow-in-right', ICON_SIZES['sm'])} Sign In"):
+            if authenticate_user(email, password):
+                st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Login successful!")
+                return True
+            else:
+                st.error(f"{get_icon_html('x-circle-fill', ICON_SIZES['sm'], ICON_COLORS['danger'])} Invalid credentials")
+                return False
     
-    with st.container():
+    # Social login options
+    st.markdown("---")
+    st.markdown(f"""
+    <div style="text-align: center;">
+        <p style="color: {ICON_COLORS['muted']};">Or sign in with</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col1:
+        if st.button(f"{get_icon_html('google', ICON_SIZES['sm'])} Google", key="google_login"):
+            st.info("Google OAuth integration")
+    with col2:
+        if st.button(f"{get_icon_html('facebook', ICON_SIZES['sm'])} Facebook", key="facebook_login"):
+            st.info("Facebook OAuth integration")
+    with col3:
+        if st.button(f"{get_icon_html('github', ICON_SIZES['sm'])} GitHub", key="github_login"):
+            st.info("GitHub OAuth integration")
+    
+    # Registration link
+    st.markdown(f"""
+    <div style="text-align: center; margin-top: 30px;">
+        <p>Don't have an account? 
+        <a href="#" style="color: {ICON_COLORS['primary']};">
+            {get_icon_html('person-plus', ICON_SIZES['sm'])} Create one here
+        </a></p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    return False
+
+def render_registration_page():
+    """Render registration page with Bootstrap icons."""
+    st.markdown(f"""
+    <div style="text-align: center; margin-bottom: 30px;">
+        {get_icon_html('person-plus-fill', 48, ICON_COLORS['primary'])}
+        <h1 style="color: {ICON_COLORS['primary']}; margin-top: 15px;">
+            Join Haven
+        </h1>
+        <p style="color: {ICON_COLORS['muted']};">Create your crowdfunding account</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.form("registration_form"):
+        # Personal information section
         st.markdown(f"""
-        <div style='border: 1px solid #ddd; border-radius: 10px; padding: 1rem; margin: 1rem 0; background: white;'>
-            <h4 style='color: #4CAF50; margin-top: 0;'>{campaign['title']}</h4>
-            <p style='color: #666; margin: 0.5rem 0;'><strong>Category:</strong> {campaign['category']}</p>
-            <p style='color: #666; margin: 0.5rem 0;'><strong>Location:</strong> {campaign['location']}</p>
-            <p style='margin: 1rem 0;'>{campaign['description'][:150]}...</p>
-        </div>
+        <h3>{get_icon_html('person-vcard', ICON_SIZES['lg'])} Personal Information</h3>
         """, unsafe_allow_html=True)
         
-        # Progress bar
-        progress = campaign['raised'] / campaign['target']
-        st.progress(progress)
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric("💰 Raised", f"${campaign['raised']:,}")
-        
-        with col2:
-            st.metric("🎯 Target", f"${campaign['target']:,}")
-        
-        with col3:
-            days_left = (campaign['end_date'] - datetime.now()).days
-            st.metric("📅 Days Left", f"{max(0, days_left)}")
-        
-        # Action buttons
         col1, col2 = st.columns(2)
-        
         with col1:
-            if st.button(f"👁️ View Details", key=f"view_{campaign['id']}", use_container_width=True):
-                st.session_state.selected_campaign = campaign
-                st.session_state.page = "campaign_details"
-                st.experimental_rerun()
-        
+            first_name = st.text_input(f"{get_icon_html('person', ICON_SIZES['sm'])} First Name")
         with col2:
-            if st.button(f"💝 Donate Now", key=f"donate_{campaign['id']}", use_container_width=True, type="primary"):
-                st.session_state.selected_campaign = campaign
-                st.session_state.page = "donation"
-                st.experimental_rerun()
-
-def render_campaign_details_page(workflow_manager):
-    """UPDATED: Render detailed campaign view with authentication"""
-    
-    # Require authentication
-    if not require_authentication():
-        return
-    
-    campaign = st.session_state.get('selected_campaign')
-    
-    if not campaign:
-        st.error("❌ No campaign selected")
-        return
-    
-    # Campaign header
-    st.markdown(f"""
-    <div style='background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%); 
-                padding: 2rem; border-radius: 10px; margin-bottom: 2rem;'>
-        <h1 style='color: #2e7d32; margin: 0;'>{campaign['title']}</h1>
-        <p style='color: #388e3c; margin: 0.5rem 0;'>{campaign['category']} • {campaign['location']}</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Campaign stats
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("💰 Raised", f"${campaign['raised']:,}")
-    
-    with col2:
-        st.metric("🎯 Target", f"${campaign['target']:,}")
-    
-    with col3:
-        progress = (campaign['raised'] / campaign['target']) * 100
-        st.metric("📊 Progress", f"{progress:.1f}%")
-    
-    with col4:
-        days_left = (campaign['end_date'] - datetime.now()).days
-        st.metric("📅 Days Left", f"{max(0, days_left)}")
-    
-    # Progress bar
-    st.progress(campaign['raised'] / campaign['target'])
-    
-    # Campaign content
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        # Description
-        st.markdown("### 📖 Campaign Story")
-        st.markdown(campaign['description'])
+            last_name = st.text_input(f"{get_icon_html('person', ICON_SIZES['sm'])} Last Name")
         
-        # Updates (mock)
-        st.markdown("### 📢 Campaign Updates")
+        email = st.text_input(f"{get_icon_html('envelope', ICON_SIZES['sm'])} Email Address")
+        phone = st.text_input(f"{get_icon_html('telephone', ICON_SIZES['sm'])} Phone Number")
         
-        updates = [
-            {"date": "2025-08-06", "title": "Thank you for your support!", "content": "We've reached 75% of our goal..."},
-            {"date": "2025-08-04", "title": "Campaign milestone reached", "content": "Thanks to your generous donations..."},
-            {"date": "2025-08-01", "title": "Campaign launched", "content": "We're excited to launch this campaign..."}
-        ]
-        
-        for update in updates:
-            with st.expander(f"{update['date']} - {update['title']}"):
-                st.markdown(update['content'])
-    
-    with col2:
-        # Donation section
-        st.markdown("### 💝 Support This Campaign")
-        
-        # Quick donation amounts
-        st.markdown("**Quick Donate:**")
-        
-        amounts = [25, 50, 100, 250, 500]
-        
-        for amount in amounts:
-            if st.button(f"${amount}", key=f"quick_donate_{amount}", use_container_width=True):
-                st.session_state.donation_amount = amount
-                st.session_state.page = "donation"
-                st.experimental_rerun()
-        
-        # Custom amount
-        custom_amount = st.number_input(
-            "Custom Amount ($)",
-            min_value=1,
-            max_value=10000,
-            value=50,
-            step=5
-        )
-        
-        if st.button("💝 Donate Custom Amount", use_container_width=True, type="primary"):
-            st.session_state.donation_amount = custom_amount
-            st.session_state.selected_campaign = campaign
-            st.session_state.page = "donation"
-            st.experimental_rerun()
-        
-        # Share campaign
-        st.markdown("### 📤 Share Campaign")
-        
-        if st.button("📱 Share on Social Media", use_container_width=True):
-            st.info("📱 Share functionality would be implemented here")
-        
-        if st.button("📧 Share via Email", use_container_width=True):
-            st.info("📧 Email sharing functionality would be implemented here")
-        
-        # Campaign organizer
-        st.markdown("### 👥 Campaign Organizer")
-        
+        # Account security section
         st.markdown(f"""
-        **Organization:** {campaign.get('organizer', 'Haven Organization')}
+        <h3>{get_icon_html('shield-check', ICON_SIZES['lg'])} Account Security</h3>
+        """, unsafe_allow_html=True)
         
-        **Verified:** ✅ Verified Organization
+        password = st.text_input(f"{get_icon_html('key', ICON_SIZES['sm'])} Password", type="password")
+        confirm_password = st.text_input(f"{get_icon_html('key-fill', ICON_SIZES['sm'])} Confirm Password", type="password")
         
-        **Contact:** Available after donation
-        """)
-    
-    # Back button
-    if st.button("⬅️ Back to Browse", use_container_width=True):
-        st.session_state.page = "browse"
-        st.experimental_rerun()
-
-def render_donation_page(workflow_manager):
-    """UPDATED: Render donation page with authentication"""
-    
-    # Require authentication
-    if not require_authentication():
-        return
-    
-    campaign = st.session_state.get('selected_campaign')
-    donation_amount = st.session_state.get('donation_amount', 50)
-    
-    if not campaign:
-        st.error("❌ No campaign selected for donation")
-        return
-    
-    st.markdown(f"""
-    <div style='background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); 
-                padding: 2rem; border-radius: 10px; margin-bottom: 2rem;'>
-        <h2 style='color: #1976d2; margin: 0;'>💝 Make a Donation</h2>
-        <p style='color: #1565c0; margin: 0;'>Supporting: {campaign['title']}</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Donation form
-    with st.form("donation_form"):
-        # Donation amount
-        st.markdown("### 💰 Donation Amount")
+        # Terms and conditions
+        terms_accepted = st.checkbox(f"{get_icon_html('file-text', ICON_SIZES['sm'])} I agree to the Terms and Conditions")
+        newsletter = st.checkbox(f"{get_icon_html('envelope-heart', ICON_SIZES['sm'])} Subscribe to newsletter")
         
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            amount = st.number_input(
-                "Donation Amount ($)",
-                min_value=1,
-                max_value=10000,
-                value=donation_amount,
-                step=5
-            )
-        
-        with col2:
-            currency = st.selectbox(
-                "Currency",
-                options=["USD", "EUR", "GBP", "CAD"],
-                index=0
-            )
-        
-        # Donation frequency
-        frequency = st.radio(
-            "Donation Frequency",
-            options=["One-time", "Monthly", "Quarterly"],
-            index=0,
-            horizontal=True
-        )
-        
-        # Personal information
-        st.markdown("### 👤 Donor Information")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            donor_name = st.text_input(
-                "Full Name *",
-                placeholder="Enter your full name"
-            )
-            
-            donor_email = st.text_input(
-                "Email Address *",
-                placeholder="your.email@example.com"
-            )
-        
-        with col2:
-            donor_phone = st.text_input(
-                "Phone Number",
-                placeholder="+1234567890"
-            )
-            
-            anonymous = st.checkbox(
-                "Make this donation anonymous",
-                value=False
-            )
-        
-        # Payment information
-        st.markdown("### 💳 Payment Information")
-        
-        payment_method = st.selectbox(
-            "Payment Method",
-            options=["Credit Card", "Debit Card", "PayPal", "Bank Transfer"],
-            index=0
-        )
-        
-        if payment_method in ["Credit Card", "Debit Card"]:
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                card_number = st.text_input(
-                    "Card Number *",
-                    placeholder="1234 5678 9012 3456",
-                    type="password"
-                )
-                
-                cardholder_name = st.text_input(
-                    "Cardholder Name *",
-                    placeholder="Name on card"
-                )
-            
-            with col2:
-                col2_1, col2_2 = st.columns(2)
-                
-                with col2_1:
-                    expiry_date = st.text_input(
-                        "Expiry Date *",
-                        placeholder="MM/YY"
-                    )
-                
-                with col2_2:
-                    cvv = st.text_input(
-                        "CVV *",
-                        placeholder="123",
-                        type="password"
-                    )
-        
-        # Billing address
-        st.markdown("### 🏠 Billing Address")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            billing_address = st.text_input(
-                "Address *",
-                placeholder="Street address"
-            )
-            
-            billing_city = st.text_input(
-                "City *",
-                placeholder="City"
-            )
-        
-        with col2:
-            billing_state = st.text_input(
-                "State/Province *",
-                placeholder="State or province"
-            )
-            
-            billing_zip = st.text_input(
-                "ZIP/Postal Code *",
-                placeholder="ZIP code"
-            )
-        
-        # Additional options
-        st.markdown("### ⚙️ Additional Options")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            cover_fees = st.checkbox(
-                "Cover processing fees (3.5%)",
-                value=False,
-                help="Help the campaign receive the full donation amount"
-            )
-            
-            newsletter = st.checkbox(
-                "Subscribe to campaign updates",
-                value=True
-            )
-        
-        with col2:
-            tax_receipt = st.checkbox(
-                "Email me a tax receipt",
-                value=True
-            )
-            
-            share_info = st.checkbox(
-                "Share my contact info with organizer",
-                value=False
-            )
-        
-        # Donation summary
-        st.markdown("### 📊 Donation Summary")
-        
-        processing_fee = amount * 0.035 if cover_fees else 0
-        total_amount = amount + processing_fee
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric("💝 Donation", f"${amount:.2f}")
-        
-        with col2:
-            st.metric("💳 Processing Fee", f"${processing_fee:.2f}")
-        
-        with col3:
-            st.metric("💰 Total", f"${total_amount:.2f}")
-        
-        # Terms and submit
-        terms_accepted = st.checkbox(
-            "I agree to the Terms of Service and Privacy Policy *",
-            value=False
-        )
-        
-        # Submit button
-        submitted = st.form_submit_button(
-            f"💝 Donate ${total_amount:.2f}",
-            use_container_width=True,
-            type="primary"
-        )
-        
-        if submitted:
-            # Validation
-            errors = []
-            
-            if not donor_name.strip():
-                errors.append("Full name is required")
-            if not donor_email.strip():
-                errors.append("Email address is required")
-            if payment_method in ["Credit Card", "Debit Card"]:
-                if not card_number.strip():
-                    errors.append("Card number is required")
-                if not cardholder_name.strip():
-                    errors.append("Cardholder name is required")
-                if not expiry_date.strip():
-                    errors.append("Expiry date is required")
-                if not cvv.strip():
-                    errors.append("CVV is required")
-            if not billing_address.strip():
-                errors.append("Billing address is required")
-            if not billing_city.strip():
-                errors.append("Billing city is required")
-            if not billing_state.strip():
-                errors.append("Billing state is required")
-            if not billing_zip.strip():
-                errors.append("Billing ZIP code is required")
-            if not terms_accepted:
-                errors.append("You must accept the terms and conditions")
-            
-            if errors:
-                for error in errors:
-                    st.error(f"❌ {error}")
+        if st.form_submit_button(f"{get_icon_html('person-plus', ICON_SIZES['sm'])} Create Account"):
+            if validate_registration_data(first_name, last_name, email, password, confirm_password, terms_accepted):
+                st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Account created successfully!")
+                return True
             else:
-                # Process donation (mock)
-                process_donation(campaign, amount, donor_name, donor_email, anonymous)
-
-def process_donation(campaign, amount, donor_name, donor_email, anonymous):
-    """UPDATED: Process donation with authentication"""
+                st.error(f"{get_icon_html('exclamation-triangle', ICON_SIZES['sm'], ICON_COLORS['warning'])} Please check your information")
+                return False
     
-    try:
-        # Simulate payment processing
-        with st.spinner("Processing your donation..."):
-            time.sleep(2)  # Simulate processing time
-        
-        # Mock successful payment
-        donation_id = f"DON-{int(time.time())}"
-        
-        st.success("🎉 **Donation Successful!**")
-        
-        st.markdown(f"""
-        **Donation Details:**
-        - **Donation ID:** {donation_id}
-        - **Amount:** ${amount:.2f}
-        - **Campaign:** {campaign['title']}
-        - **Date:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-        
-        **What happens next:**
-        - You'll receive an email confirmation shortly
-        - Tax receipt will be sent within 24 hours
-        - Campaign organizer will be notified of your support
-        """)
-        
-        # Clear donation state
-        if "donation_amount" in st.session_state:
-            del st.session_state.donation_amount
-        if "selected_campaign" in st.session_state:
-            del st.session_state.selected_campaign
-        
-        col1, col2 = st.columns(2)
-        
+    return False
+
+def render_forgot_password_page():
+    """Render forgot password page with Bootstrap icons."""
+    st.markdown(f"""
+    <div style="text-align: center; margin-bottom: 30px;">
+        {get_icon_html('key-fill', 48, ICON_COLORS['warning'])}
+        <h1 style="color: {ICON_COLORS['warning']}; margin-top: 15px;">
+            Reset Password
+        </h1>
+        <p style="color: {ICON_COLORS['muted']};">Enter your email to receive reset instructions</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.form("forgot_password_form"):
+        col1, col2 = st.columns([1, 10])
         with col1:
-            if st.button("🏠 Return to Browse", use_container_width=True):
-                st.session_state.page = "browse"
-                st.experimental_rerun()
-        
+            st.markdown(f"""
+            <div style="padding-top: 8px;">
+                {get_icon_html('envelope', ICON_SIZES['md'], ICON_COLORS['muted'])}
+            </div>
+            """, unsafe_allow_html=True)
         with col2:
-            if st.button("📧 Share Your Support", use_container_width=True, type="primary"):
-                st.info("📧 Sharing functionality would be implemented here")
+            email = st.text_input("Email Address", placeholder="Enter your registered email")
         
-    except Exception as e:
-        logger.error(f"Donation processing error: {e}")
-        st.error(f"❌ Donation failed: {str(e)}")
-
-def get_mock_campaigns():
-    """Generate mock campaign data for demonstration"""
+        if st.form_submit_button(f"{get_icon_html('send', ICON_SIZES['sm'])} Send Reset Link"):
+            if email:
+                st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Reset link sent to {email}")
+                return True
+            else:
+                st.error(f"{get_icon_html('exclamation-triangle', ICON_SIZES['sm'], ICON_COLORS['warning'])} Please enter your email address")
     
-    campaigns = [
-        {
-            'id': 'camp_001',
-            'title': 'Emergency Medical Fund for Children',
-            'category': 'Medical',
-            'location': 'New York, NY',
-            'description': 'Help provide emergency medical care for children in need. Our hospital serves over 1000 children annually and needs support for critical equipment and treatments.',
-            'target': 50000,
-            'raised': 37500,
-            'end_date': datetime.now() + timedelta(days=15),
-            'organizer': 'Children\'s Medical Center'
-        },
-        {
-            'id': 'camp_002',
-            'title': 'School Supplies for Rural Education',
-            'category': 'Education',
-            'location': 'Rural Texas',
-            'description': 'Providing essential school supplies and learning materials to underserved rural schools. Help us bridge the education gap and give every child a chance to succeed.',
-            'target': 25000,
-            'raised': 18750,
-            'end_date': datetime.now() + timedelta(days=22),
-            'organizer': 'Rural Education Foundation'
-        },
-        {
-            'id': 'camp_003',
-            'title': 'Clean Water Initiative',
-            'category': 'Environment',
-            'location': 'Kenya, Africa',
-            'description': 'Building clean water wells in remote villages to provide safe drinking water. Each well serves approximately 500 people and dramatically improves health outcomes.',
-            'target': 75000,
-            'raised': 45000,
-            'end_date': datetime.now() + timedelta(days=30),
-            'organizer': 'Global Water Project'
-        },
-        {
-            'id': 'camp_004',
-            'title': 'Animal Shelter Renovation',
-            'category': 'Animal Welfare',
-            'location': 'Los Angeles, CA',
-            'description': 'Renovating our animal shelter to provide better care for rescued animals. The new facility will house 200+ animals and include modern medical facilities.',
-            'target': 100000,
-            'raised': 65000,
-            'end_date': datetime.now() + timedelta(days=45),
-            'organizer': 'City Animal Rescue'
-        }
+    return False
+
+def render_user_profile_settings():
+    """Render user profile settings with Bootstrap icons."""
+    st.markdown(f"""
+    <h1>{get_icon_html('person-gear', 32, ICON_COLORS['primary'])} Profile Settings</h1>
+    """, unsafe_allow_html=True)
+    
+    # Profile tabs
+    tab1, tab2, tab3, tab4 = st.tabs([
+        f"{get_icon_html('person', ICON_SIZES['sm'])} Personal Info",
+        f"{get_icon_html('shield-check', ICON_SIZES['sm'])} Security", 
+        f"{get_icon_html('bell', ICON_SIZES['sm'])} Notifications",
+        f"{get_icon_html('credit-card', ICON_SIZES['sm'])} Payment"
+    ])
+    
+    with tab1:
+        render_personal_info_tab()
+    
+    with tab2:
+        render_security_tab()
+    
+    with tab3:
+        render_notifications_tab()
+    
+    with tab4:
+        render_payment_tab()
+
+def render_personal_info_tab():
+    """Render personal information tab."""
+    st.markdown(f"""
+    <h3>{get_icon_html('person-vcard-fill', ICON_SIZES['lg'])} Personal Information</h3>
+    """, unsafe_allow_html=True)
+    
+    with st.form("personal_info_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            first_name = st.text_input("First Name", value="John")
+            email = st.text_input("Email", value="john@example.com")
+        with col2:
+            last_name = st.text_input("Last Name", value="Doe")
+            phone = st.text_input("Phone", value="+1234567890")
+        
+        bio = st.text_area("Bio", value="Passionate about innovative projects...")
+        location = st.text_input(f"{get_icon_html('geo-alt', ICON_SIZES['sm'])} Location", value="San Francisco, CA")
+        
+        if st.form_submit_button(f"{get_icon_html('floppy', ICON_SIZES['sm'])} Save Changes"):
+            st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Profile updated successfully!")
+
+def render_security_tab():
+    """Render security settings tab."""
+    st.markdown(f"""
+    <h3>{get_icon_html('shield-lock-fill', ICON_SIZES['lg'])} Security Settings</h3>
+    """, unsafe_allow_html=True)
+    
+    # Change password section
+    st.markdown(f"""
+    <h4>{get_icon_html('key', ICON_SIZES['md'])} Change Password</h4>
+    """, unsafe_allow_html=True)
+    
+    with st.form("change_password_form"):
+        current_password = st.text_input("Current Password", type="password")
+        new_password = st.text_input("New Password", type="password")
+        confirm_new_password = st.text_input("Confirm New Password", type="password")
+        
+        if st.form_submit_button(f"{get_icon_html('shield-check', ICON_SIZES['sm'])} Update Password"):
+            st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Password updated successfully!")
+    
+    # Two-factor authentication
+    st.markdown(f"""
+    <h4>{get_icon_html('phone', ICON_SIZES['md'])} Two-Factor Authentication</h4>
+    """, unsafe_allow_html=True)
+    
+    two_fa_enabled = st.checkbox(f"{get_icon_html('shield-fill-check', ICON_SIZES['sm'])} Enable 2FA", value=False)
+    
+    if two_fa_enabled:
+        st.info(f"{get_icon_html('info-circle', ICON_SIZES['sm'])} 2FA setup instructions will be sent to your phone")
+
+def render_notifications_tab():
+    """Render notifications settings tab."""
+    st.markdown(f"""
+    <h3>{get_icon_html('bell-fill', ICON_SIZES['lg'])} Notification Preferences</h3>
+    """, unsafe_allow_html=True)
+    
+    # Email notifications
+    st.markdown(f"""
+    <h4>{get_icon_html('envelope', ICON_SIZES['md'])} Email Notifications</h4>
+    """, unsafe_allow_html=True)
+    
+    email_campaign_updates = st.checkbox(f"{get_icon_html('megaphone', ICON_SIZES['sm'])} Campaign updates", value=True)
+    email_new_campaigns = st.checkbox(f"{get_icon_html('plus-circle', ICON_SIZES['sm'])} New campaigns in your interests", value=True)
+    email_funding_milestones = st.checkbox(f"{get_icon_html('trophy', ICON_SIZES['sm'])} Funding milestones", value=True)
+    email_newsletter = st.checkbox(f"{get_icon_html('newspaper', ICON_SIZES['sm'])} Weekly newsletter", value=False)
+    
+    # Push notifications
+    st.markdown(f"""
+    <h4>{get_icon_html('phone', ICON_SIZES['md'])} Push Notifications</h4>
+    """, unsafe_allow_html=True)
+    
+    push_messages = st.checkbox(f"{get_icon_html('chat-dots', ICON_SIZES['sm'])} Direct messages", value=True)
+    push_campaign_alerts = st.checkbox(f"{get_icon_html('exclamation-triangle', ICON_SIZES['sm'])} Campaign alerts", value=True)
+    
+    if st.button(f"{get_icon_html('floppy', ICON_SIZES['sm'])} Save Notification Settings"):
+        st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Notification preferences saved!")
+
+def render_payment_tab():
+    """Render payment settings tab."""
+    st.markdown(f"""
+    <h3>{get_icon_html('credit-card-fill', ICON_SIZES['lg'])} Payment Methods</h3>
+    """, unsafe_allow_html=True)
+    
+    # Existing payment methods
+    payment_methods = [
+        {"type": "credit_card", "name": "Visa ending in 4242", "icon": "credit-card", "primary": True},
+        {"type": "bank", "name": "Chase Bank Account", "icon": "bank", "primary": False},
+        {"type": "paypal", "name": "PayPal Account", "icon": "paypal", "primary": False}
     ]
     
-    return campaigns
+    for method in payment_methods:
+        primary_badge = f"""
+        <span style="background: {ICON_COLORS['success']}; color: white; padding: 2px 8px; 
+                     border-radius: 12px; font-size: 12px; margin-left: 10px;">
+            {get_icon_html('star-fill', 12)} Primary
+        </span>
+        """ if method['primary'] else ""
+        
+        st.markdown(f"""
+        <div style="display: flex; align-items: center; justify-content: space-between; 
+                    padding: 15px; margin: 10px 0; background: white; border-radius: 10px; 
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div style="display: flex; align-items: center;">
+                {get_icon_html(method['icon'], 24, ICON_COLORS['primary'])}
+                <span style="margin-left: 15px; font-weight: 500;">{method['name']}</span>
+                {primary_badge}
+            </div>
+            <div>
+                <button style="background: none; border: 1px solid {ICON_COLORS['muted']}; 
+                               color: {ICON_COLORS['muted']}; padding: 5px 10px; border-radius: 5px; 
+                               margin-right: 5px; cursor: pointer;">
+                    {get_icon_html('pencil', 14)} Edit
+                </button>
+                <button style="background: none; border: 1px solid {ICON_COLORS['danger']}; 
+                               color: {ICON_COLORS['danger']}; padding: 5px 10px; border-radius: 5px; 
+                               cursor: pointer;">
+                    {get_icon_html('trash', 14)} Remove
+                </button>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Add new payment method
+    if st.button(f"{get_icon_html('plus-circle', ICON_SIZES['sm'])} Add Payment Method", key="add_payment"):
+        st.info("Opening payment method setup...")
 
-# Utility functions for workflow management
-def get_campaign_by_id(campaign_id: str) -> Optional[Dict[str, Any]]:
-    """UPDATED: Get campaign by ID with authentication"""
-    
-    if not check_user_authentication():
-        return None
-    
-    # In real implementation, this would fetch from backend
-    campaigns = get_mock_campaigns()
-    return next((c for c in campaigns if c['id'] == campaign_id), None)
+# Helper functions (add your existing authentication logic here)
+def authenticate_user(email: str, password: str) -> bool:
+    """Authenticate user credentials."""
+    # Add your existing authentication logic here
+    # This is a placeholder
+    return email and password and len(password) >= 6
 
-def get_user_donations(user_id: str) -> List[Dict[str, Any]]:
-    """UPDATED: Get user's donation history with authentication"""
-    
-    if not check_user_authentication():
-        return []
-    
-    # In real implementation, this would fetch from backend
-    return []
+def validate_registration_data(first_name: str, last_name: str, email: str, 
+                             password: str, confirm_password: str, terms_accepted: bool) -> bool:
+    """Validate registration form data."""
+    # Add your existing validation logic here
+    # This is a placeholder
+    return (first_name and last_name and email and password and 
+            password == confirm_password and terms_accepted and len(password) >= 6)
 
-def get_donation_receipt(donation_id: str) -> Optional[Dict[str, Any]]:
-    """UPDATED: Get donation receipt with authentication"""
+# Main authentication workflow function
+def run_authentication_workflow():
+    """Main function to run authentication workflow."""
+    if 'auth_page' not in st.session_state:
+        st.session_state.auth_page = 'login'
     
-    if not check_user_authentication():
-        return None
+    # Navigation
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button(f"{get_icon_html('box-arrow-in-right', ICON_SIZES['sm'])} Login"):
+            st.session_state.auth_page = 'login'
+    with col2:
+        if st.button(f"{get_icon_html('person-plus', ICON_SIZES['sm'])} Register"):
+            st.session_state.auth_page = 'register'
+    with col3:
+        if st.button(f"{get_icon_html('key', ICON_SIZES['sm'])} Forgot Password"):
+            st.session_state.auth_page = 'forgot'
     
-    # In real implementation, this would fetch from backend
-    return None
+    # Render appropriate page
+    if st.session_state.auth_page == 'login':
+        return render_login_page()
+    elif st.session_state.auth_page == 'register':
+        return render_registration_page()
+    elif st.session_state.auth_page == 'forgot':
+        return render_forgot_password_page()
+    
+    return False
+
