@@ -1,302 +1,220 @@
-# Modified workflow_auth_utils.py - Authentication Workflow with Bootstrap Icons
-# This file replaces your existing workflow_auth_utils.py
+# Modified workflow_verification_funding.py - Verification and Funding with Bootstrap Icons
+# This file replaces your existing workflow_verification_funding.py
 
 import streamlit as st
-from utils.icon_utils import display_icon, get_icon_html
+from utils.icon_utils import display_icon, get_icon_html, icon_button
 from config.icon_mapping import get_icon, ICON_COLORS, ICON_SIZES
 
-def render_login_page():
-    """Render login page with Bootstrap icons."""
-    # Page header with icon
+def render_identity_verification():
+    """Render identity verification process with Bootstrap icons."""
     st.markdown(f"""
-    <div style="text-align: center; margin-bottom: 30px;">
-        {get_icon_html('shield-lock-fill', 48, ICON_COLORS['primary'])}
-        <h1 style="color: {ICON_COLORS['primary']}; margin-top: 15px;">
-            Welcome to Haven
-        </h1>
-        <p style="color: {ICON_COLORS['muted']};">Sign in to your account</p>
-    </div>
+    <h1>{get_icon_html('shield-check', 32, ICON_COLORS['primary'])} Identity Verification</h1>
+    <p style="color: {ICON_COLORS['muted']};">Verify your identity to ensure platform security</p>
     """, unsafe_allow_html=True)
     
-    # Login form with icons
-    with st.form("login_form"):
-        # Email field with icon
-        col1, col2 = st.columns([1, 10])
-        with col1:
-            st.markdown(f"""
-            <div style="padding-top: 8px;">
-                {get_icon_html('envelope-fill', ICON_SIZES['md'], ICON_COLORS['muted'])}
-            </div>
-            """, unsafe_allow_html=True)
-        with col2:
-            email = st.text_input("Email Address", placeholder="Enter your email")
-        
-        # Password field with icon
-        col1, col2 = st.columns([1, 10])
-        with col1:
-            st.markdown(f"""
-            <div style="padding-top: 8px;">
-                {get_icon_html('key-fill', ICON_SIZES['md'], ICON_COLORS['muted'])}
-            </div>
-            """, unsafe_allow_html=True)
-        with col2:
-            password = st.text_input("Password", type="password", placeholder="Enter your password")
-        
-        # Remember me checkbox with icon
-        col1, col2 = st.columns([1, 10])
-        with col1:
-            st.markdown(f"""
-            <div style="padding-top: 8px;">
-                {get_icon_html('check-square', ICON_SIZES['sm'], ICON_COLORS['muted'])}
-            </div>
-            """, unsafe_allow_html=True)
-        with col2:
-            remember_me = st.checkbox("Remember me")
-        
-        # Login button with icon
-        if st.form_submit_button(f"{get_icon_html('box-arrow-in-right', ICON_SIZES['sm'])} Sign In"):
-            if authenticate_user(email, password):
-                st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Login successful!")
-                return True
-            else:
-                st.error(f"{get_icon_html('x-circle-fill', ICON_SIZES['sm'], ICON_COLORS['danger'])} Invalid credentials")
-                return False
+    # Verification steps
+    steps = [
+        {"icon": "person-vcard", "title": "Personal Information", "status": "completed", "description": "Basic details verified"},
+        {"icon": "camera", "title": "Photo ID Upload", "status": "current", "description": "Upload government-issued ID"},
+        {"icon": "bank", "title": "Bank Account Verification", "status": "pending", "description": "Link your bank account"},
+        {"icon": "check-circle", "title": "Review & Approval", "status": "pending", "description": "Final verification review"}
+    ]
     
-    # Social login options
-    st.markdown("---")
+    for i, step in enumerate(steps):
+        status_color = {
+            "completed": ICON_COLORS['success'],
+            "current": ICON_COLORS['primary'],
+            "pending": ICON_COLORS['muted']
+        }[step['status']]
+        
+        status_icon = {
+            "completed": "check-circle-fill",
+            "current": "arrow-right-circle-fill",
+            "pending": "circle"
+        }[step['status']]
+        
+        st.markdown(f"""
+        <div style="display: flex; align-items: center; padding: 15px; margin: 10px 0; 
+                    background: white; border-radius: 10px; border-left: 4px solid {status_color};">
+            <div style="margin-right: 15px;">
+                {get_icon_html(step['icon'], 24, status_color)}
+            </div>
+            <div style="flex-grow: 1;">
+                <h4 style="margin: 0; color: {status_color};">{step['title']}</h4>
+                <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">{step['description']}</p>
+            </div>
+            <div>
+                {get_icon_html(status_icon, 20, status_color)}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Current step: Photo ID Upload
+    if st.session_state.get('verification_step', 'id_upload') == 'id_upload':
+        render_id_upload_step()
+
+def render_id_upload_step():
+    """Render ID upload step."""
     st.markdown(f"""
-    <div style="text-align: center;">
-        <p style="color: {ICON_COLORS['muted']};">Or sign in with</p>
-    </div>
+    <h3>{get_icon_html('camera-fill', ICON_SIZES['lg'])} Upload Photo ID</h3>
+    <p style="color: {ICON_COLORS['muted']};">Please upload a clear photo of your government-issued ID</p>
     """, unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns([1, 1, 1])
+    # ID type selection
+    id_type = st.selectbox(
+        f"{get_icon_html('card-checklist', ICON_SIZES['sm'])} ID Type",
+        ["Driver's License", "Passport", "National ID Card", "State ID"]
+    )
+    
+    # File upload
+    uploaded_file = st.file_uploader(
+        f"{get_icon_html('cloud-upload', ICON_SIZES['sm'])} Choose ID document", 
+        type=['png', 'jpg', 'jpeg', 'pdf'],
+        help="Accepted formats: PNG, JPG, JPEG, PDF (max 10MB)"
+    )
+    
+    if uploaded_file:
+        st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} ID uploaded successfully!")
+        
+        # Preview uploaded file
+        if uploaded_file.type.startswith('image'):
+            st.image(uploaded_file, caption="Uploaded ID Document", width=300)
+        
+        # Verification checklist
+        st.markdown(f"""
+        <h4>{get_icon_html('list-check', ICON_SIZES['md'])} Verification Checklist</h4>
+        """, unsafe_allow_html=True)
+        
+        checklist_items = [
+            "Document is clearly visible and not blurred",
+            "All text is readable",
+            "Document is not expired",
+            "Photo matches your appearance",
+            "No information is covered or obscured"
+        ]
+        
+        for item in checklist_items:
+            st.markdown(f"""
+            <div style="display: flex; align-items: center; gap: 10px; margin: 5px 0;">
+                {get_icon_html('check-square', ICON_SIZES['sm'], ICON_COLORS['success'])}
+                <span>{item}</span>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        if st.button(f"{get_icon_html('send', ICON_SIZES['sm'])} Submit for Verification"):
+            st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} ID submitted for verification! You'll receive an update within 24 hours.")
+            st.session_state.verification_step = 'bank_verification'
+
+def render_bank_verification():
+    """Render bank account verification."""
+    st.markdown(f"""
+    <h1>{get_icon_html('bank', 32, ICON_COLORS['primary'])} Bank Account Verification</h1>
+    <p style="color: {ICON_COLORS['muted']};">Link your bank account for secure transactions</p>
+    """, unsafe_allow_html=True)
+    
+    # Bank connection methods
+    st.markdown(f"""
+    <h3>{get_icon_html('link-45deg', ICON_SIZES['lg'])} Connection Methods</h3>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    
     with col1:
-        if st.button(f"{get_icon_html('google', ICON_SIZES['sm'])} Google", key="google_login"):
-            st.info("Google OAuth integration")
+        st.markdown(f"""
+        <div style="border: 1px solid #e0e0e0; border-radius: 10px; padding: 20px; text-align: center; margin: 10px 0;">
+            {get_icon_html('lightning-charge-fill', 48, ICON_COLORS['primary'])}
+            <h4>Instant Verification</h4>
+            <p style="color: #666;">Connect securely through your online banking</p>
+            <button style="background: #4CAF50; border: none; color: white; padding: 10px 20px; 
+                           border-radius: 5px; cursor: pointer; width: 100%;">
+                {get_icon_html('shield-check', 16)} Connect Bank
+            </button>
+        </div>
+        """, unsafe_allow_html=True)
+    
     with col2:
-        if st.button(f"{get_icon_html('facebook', ICON_SIZES['sm'])} Facebook", key="facebook_login"):
-            st.info("Facebook OAuth integration")
-    with col3:
-        if st.button(f"{get_icon_html('github', ICON_SIZES['sm'])} GitHub", key="github_login"):
-            st.info("GitHub OAuth integration")
-    
-    # Registration link
-    st.markdown(f"""
-    <div style="text-align: center; margin-top: 30px;">
-        <p>Don't have an account? 
-        <a href="#" style="color: {ICON_COLORS['primary']};">
-            {get_icon_html('person-plus', ICON_SIZES['sm'])} Create one here
-        </a></p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    return False
-
-def render_registration_page():
-    """Render registration page with Bootstrap icons."""
-    st.markdown(f"""
-    <div style="text-align: center; margin-bottom: 30px;">
-        {get_icon_html('person-plus-fill', 48, ICON_COLORS['primary'])}
-        <h1 style="color: {ICON_COLORS['primary']}; margin-top: 15px;">
-            Join Haven
-        </h1>
-        <p style="color: {ICON_COLORS['muted']};">Create your crowdfunding account</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    with st.form("registration_form"):
-        # Personal information section
         st.markdown(f"""
-        <h3>{get_icon_html('person-vcard', ICON_SIZES['lg'])} Personal Information</h3>
+        <div style="border: 1px solid #e0e0e0; border-radius: 10px; padding: 20px; text-align: center; margin: 10px 0;">
+            {get_icon_html('clock', 48, ICON_COLORS['warning'])}
+            <h4>Manual Verification</h4>
+            <p style="color: #666;">Verify with micro-deposits (1-2 business days)</p>
+            <button style="background: #FF9800; border: none; color: white; padding: 10px 20px; 
+                           border-radius: 5px; cursor: pointer; width: 100%;">
+                {get_icon_html('pencil', 16)} Enter Details
+            </button>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Manual bank details form
+    if st.checkbox(f"{get_icon_html('pencil-square', ICON_SIZES['sm'])} Enter bank details manually"):
+        render_manual_bank_form()
+
+def render_manual_bank_form():
+    """Render manual bank details form."""
+    with st.form("bank_details_form"):
+        st.markdown(f"""
+        <h4>{get_icon_html('bank2', ICON_SIZES['md'])} Bank Account Details</h4>
         """, unsafe_allow_html=True)
         
         col1, col2 = st.columns(2)
         with col1:
-            first_name = st.text_input(f"{get_icon_html('person', ICON_SIZES['sm'])} First Name")
+            bank_name = st.text_input(f"{get_icon_html('building', ICON_SIZES['sm'])} Bank Name")
+            account_number = st.text_input(f"{get_icon_html('hash', ICON_SIZES['sm'])} Account Number")
         with col2:
-            last_name = st.text_input(f"{get_icon_html('person', ICON_SIZES['sm'])} Last Name")
+            routing_number = st.text_input(f"{get_icon_html('signpost', ICON_SIZES['sm'])} Routing Number")
+            account_type = st.selectbox(f"{get_icon_html('list', ICON_SIZES['sm'])} Account Type", ["Checking", "Savings"])
         
-        email = st.text_input(f"{get_icon_html('envelope', ICON_SIZES['sm'])} Email Address")
-        phone = st.text_input(f"{get_icon_html('telephone', ICON_SIZES['sm'])} Phone Number")
+        account_holder_name = st.text_input(f"{get_icon_html('person', ICON_SIZES['sm'])} Account Holder Name")
         
-        # Account security section
+        # Security notice
         st.markdown(f"""
-        <h3>{get_icon_html('shield-check', ICON_SIZES['lg'])} Account Security</h3>
+        <div style="background: #e3f2fd; border-left: 4px solid #2196F3; padding: 15px; margin: 15px 0;">
+            {get_icon_html('shield-lock-fill', 20, '#2196F3')}
+            <strong>Security Notice:</strong> Your banking information is encrypted and secure. 
+            We use bank-level security to protect your data.
+        </div>
         """, unsafe_allow_html=True)
         
-        password = st.text_input(f"{get_icon_html('key', ICON_SIZES['sm'])} Password", type="password")
-        confirm_password = st.text_input(f"{get_icon_html('key-fill', ICON_SIZES['sm'])} Confirm Password", type="password")
-        
-        # Terms and conditions
-        terms_accepted = st.checkbox(f"{get_icon_html('file-text', ICON_SIZES['sm'])} I agree to the Terms and Conditions")
-        newsletter = st.checkbox(f"{get_icon_html('envelope-heart', ICON_SIZES['sm'])} Subscribe to newsletter")
-        
-        if st.form_submit_button(f"{get_icon_html('person-plus', ICON_SIZES['sm'])} Create Account"):
-            if validate_registration_data(first_name, last_name, email, password, confirm_password, terms_accepted):
-                st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Account created successfully!")
-                return True
-            else:
-                st.error(f"{get_icon_html('exclamation-triangle', ICON_SIZES['sm'], ICON_COLORS['warning'])} Please check your information")
-                return False
-    
-    return False
+        if st.form_submit_button(f"{get_icon_html('shield-check', ICON_SIZES['sm'])} Verify Account"):
+            st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Bank account submitted for verification!")
 
-def render_forgot_password_page():
-    """Render forgot password page with Bootstrap icons."""
+def render_payment_methods():
+    """Render payment methods management with Bootstrap icons."""
     st.markdown(f"""
-    <div style="text-align: center; margin-bottom: 30px;">
-        {get_icon_html('key-fill', 48, ICON_COLORS['warning'])}
-        <h1 style="color: {ICON_COLORS['warning']}; margin-top: 15px;">
-            Reset Password
-        </h1>
-        <p style="color: {ICON_COLORS['muted']};">Enter your email to receive reset instructions</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    with st.form("forgot_password_form"):
-        col1, col2 = st.columns([1, 10])
-        with col1:
-            st.markdown(f"""
-            <div style="padding-top: 8px;">
-                {get_icon_html('envelope', ICON_SIZES['md'], ICON_COLORS['muted'])}
-            </div>
-            """, unsafe_allow_html=True)
-        with col2:
-            email = st.text_input("Email Address", placeholder="Enter your registered email")
-        
-        if st.form_submit_button(f"{get_icon_html('send', ICON_SIZES['sm'])} Send Reset Link"):
-            if email:
-                st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Reset link sent to {email}")
-                return True
-            else:
-                st.error(f"{get_icon_html('exclamation-triangle', ICON_SIZES['sm'], ICON_COLORS['warning'])} Please enter your email address")
-    
-    return False
-
-def render_user_profile_settings():
-    """Render user profile settings with Bootstrap icons."""
-    st.markdown(f"""
-    <h1>{get_icon_html('person-gear', 32, ICON_COLORS['primary'])} Profile Settings</h1>
-    """, unsafe_allow_html=True)
-    
-    # Profile tabs
-    tab1, tab2, tab3, tab4 = st.tabs([
-        f"{get_icon_html('person', ICON_SIZES['sm'])} Personal Info",
-        f"{get_icon_html('shield-check', ICON_SIZES['sm'])} Security", 
-        f"{get_icon_html('bell', ICON_SIZES['sm'])} Notifications",
-        f"{get_icon_html('credit-card', ICON_SIZES['sm'])} Payment"
-    ])
-    
-    with tab1:
-        render_personal_info_tab()
-    
-    with tab2:
-        render_security_tab()
-    
-    with tab3:
-        render_notifications_tab()
-    
-    with tab4:
-        render_payment_tab()
-
-def render_personal_info_tab():
-    """Render personal information tab."""
-    st.markdown(f"""
-    <h3>{get_icon_html('person-vcard-fill', ICON_SIZES['lg'])} Personal Information</h3>
-    """, unsafe_allow_html=True)
-    
-    with st.form("personal_info_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            first_name = st.text_input("First Name", value="John")
-            email = st.text_input("Email", value="john@example.com")
-        with col2:
-            last_name = st.text_input("Last Name", value="Doe")
-            phone = st.text_input("Phone", value="+1234567890")
-        
-        bio = st.text_area("Bio", value="Passionate about innovative projects...")
-        location = st.text_input(f"{get_icon_html('geo-alt', ICON_SIZES['sm'])} Location", value="San Francisco, CA")
-        
-        if st.form_submit_button(f"{get_icon_html('floppy', ICON_SIZES['sm'])} Save Changes"):
-            st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Profile updated successfully!")
-
-def render_security_tab():
-    """Render security settings tab."""
-    st.markdown(f"""
-    <h3>{get_icon_html('shield-lock-fill', ICON_SIZES['lg'])} Security Settings</h3>
-    """, unsafe_allow_html=True)
-    
-    # Change password section
-    st.markdown(f"""
-    <h4>{get_icon_html('key', ICON_SIZES['md'])} Change Password</h4>
-    """, unsafe_allow_html=True)
-    
-    with st.form("change_password_form"):
-        current_password = st.text_input("Current Password", type="password")
-        new_password = st.text_input("New Password", type="password")
-        confirm_new_password = st.text_input("Confirm New Password", type="password")
-        
-        if st.form_submit_button(f"{get_icon_html('shield-check', ICON_SIZES['sm'])} Update Password"):
-            st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Password updated successfully!")
-    
-    # Two-factor authentication
-    st.markdown(f"""
-    <h4>{get_icon_html('phone', ICON_SIZES['md'])} Two-Factor Authentication</h4>
-    """, unsafe_allow_html=True)
-    
-    two_fa_enabled = st.checkbox(f"{get_icon_html('shield-fill-check', ICON_SIZES['sm'])} Enable 2FA", value=False)
-    
-    if two_fa_enabled:
-        st.info(f"{get_icon_html('info-circle', ICON_SIZES['sm'])} 2FA setup instructions will be sent to your phone")
-
-def render_notifications_tab():
-    """Render notifications settings tab."""
-    st.markdown(f"""
-    <h3>{get_icon_html('bell-fill', ICON_SIZES['lg'])} Notification Preferences</h3>
-    """, unsafe_allow_html=True)
-    
-    # Email notifications
-    st.markdown(f"""
-    <h4>{get_icon_html('envelope', ICON_SIZES['md'])} Email Notifications</h4>
-    """, unsafe_allow_html=True)
-    
-    email_campaign_updates = st.checkbox(f"{get_icon_html('megaphone', ICON_SIZES['sm'])} Campaign updates", value=True)
-    email_new_campaigns = st.checkbox(f"{get_icon_html('plus-circle', ICON_SIZES['sm'])} New campaigns in your interests", value=True)
-    email_funding_milestones = st.checkbox(f"{get_icon_html('trophy', ICON_SIZES['sm'])} Funding milestones", value=True)
-    email_newsletter = st.checkbox(f"{get_icon_html('newspaper', ICON_SIZES['sm'])} Weekly newsletter", value=False)
-    
-    # Push notifications
-    st.markdown(f"""
-    <h4>{get_icon_html('phone', ICON_SIZES['md'])} Push Notifications</h4>
-    """, unsafe_allow_html=True)
-    
-    push_messages = st.checkbox(f"{get_icon_html('chat-dots', ICON_SIZES['sm'])} Direct messages", value=True)
-    push_campaign_alerts = st.checkbox(f"{get_icon_html('exclamation-triangle', ICON_SIZES['sm'])} Campaign alerts", value=True)
-    
-    if st.button(f"{get_icon_html('floppy', ICON_SIZES['sm'])} Save Notification Settings"):
-        st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Notification preferences saved!")
-
-def render_payment_tab():
-    """Render payment settings tab."""
-    st.markdown(f"""
-    <h3>{get_icon_html('credit-card-fill', ICON_SIZES['lg'])} Payment Methods</h3>
+    <h1>{get_icon_html('credit-card', 32, ICON_COLORS['primary'])} Payment Methods</h1>
+    <p style="color: {ICON_COLORS['muted']};">Manage your payment and withdrawal methods</p>
     """, unsafe_allow_html=True)
     
     # Existing payment methods
     payment_methods = [
-        {"type": "credit_card", "name": "Visa ending in 4242", "icon": "credit-card", "primary": True},
-        {"type": "bank", "name": "Chase Bank Account", "icon": "bank", "primary": False},
-        {"type": "paypal", "name": "PayPal Account", "icon": "paypal", "primary": False}
+        {"type": "credit_card", "name": "Visa ending in 4242", "icon": "credit-card", "primary": True, "verified": True},
+        {"type": "bank", "name": "Chase Bank Account", "icon": "bank", "primary": False, "verified": True},
+        {"type": "paypal", "name": "PayPal Account", "icon": "paypal", "primary": False, "verified": False}
     ]
     
-    for method in payment_methods:
+    st.markdown(f"""
+    <h3>{get_icon_html('wallet2', ICON_SIZES['lg'])} Your Payment Methods</h3>
+    """, unsafe_allow_html=True)
+    
+    for i, method in enumerate(payment_methods):
         primary_badge = f"""
         <span style="background: {ICON_COLORS['success']}; color: white; padding: 2px 8px; 
                      border-radius: 12px; font-size: 12px; margin-left: 10px;">
             {get_icon_html('star-fill', 12)} Primary
         </span>
         """ if method['primary'] else ""
+        
+        verified_badge = f"""
+        <span style="background: {ICON_COLORS['info']}; color: white; padding: 2px 8px; 
+                     border-radius: 12px; font-size: 12px; margin-left: 5px;">
+            {get_icon_html('patch-check-fill', 12)} Verified
+        </span>
+        """ if method['verified'] else f"""
+        <span style="background: {ICON_COLORS['warning']}; color: white; padding: 2px 8px; 
+                     border-radius: 12px; font-size: 12px; margin-left: 5px;">
+            {get_icon_html('clock', 12)} Pending
+        </span>
+        """
         
         st.markdown(f"""
         <div style="display: flex; align-items: center; justify-content: space-between; 
@@ -306,6 +224,7 @@ def render_payment_tab():
                 {get_icon_html(method['icon'], 24, ICON_COLORS['primary'])}
                 <span style="margin-left: 15px; font-weight: 500;">{method['name']}</span>
                 {primary_badge}
+                {verified_badge}
             </div>
             <div>
                 <button style="background: none; border: 1px solid {ICON_COLORS['muted']}; 
@@ -324,48 +243,229 @@ def render_payment_tab():
     
     # Add new payment method
     if st.button(f"{get_icon_html('plus-circle', ICON_SIZES['sm'])} Add Payment Method", key="add_payment"):
-        st.info("Opening payment method setup...")
+        render_add_payment_method_form()
 
-# Helper functions (add your existing authentication logic here)
-def authenticate_user(email: str, password: str) -> bool:
-    """Authenticate user credentials."""
-    # Add your existing authentication logic here
-    # This is a placeholder
-    return email and password and len(password) >= 6
+def render_add_payment_method_form():
+    """Render form to add new payment method."""
+    st.markdown(f"""
+    <h3>{get_icon_html('plus-circle-fill', ICON_SIZES['lg'])} Add New Payment Method</h3>
+    """, unsafe_allow_html=True)
+    
+    # Payment method type selection
+    payment_type = st.selectbox(
+        f"{get_icon_html('list', ICON_SIZES['sm'])} Payment Method Type",
+        ["Credit/Debit Card", "Bank Account", "PayPal", "Digital Wallet"]
+    )
+    
+    if payment_type == "Credit/Debit Card":
+        render_credit_card_form()
+    elif payment_type == "Bank Account":
+        render_bank_account_form()
+    elif payment_type == "PayPal":
+        render_paypal_form()
+    elif payment_type == "Digital Wallet":
+        render_digital_wallet_form()
 
-def validate_registration_data(first_name: str, last_name: str, email: str, 
-                             password: str, confirm_password: str, terms_accepted: bool) -> bool:
-    """Validate registration form data."""
-    # Add your existing validation logic here
-    # This is a placeholder
-    return (first_name and last_name and email and password and 
-            password == confirm_password and terms_accepted and len(password) >= 6)
+def render_credit_card_form():
+    """Render credit card form."""
+    with st.form("credit_card_form"):
+        st.markdown(f"""
+        <h4>{get_icon_html('credit-card-fill', ICON_SIZES['md'])} Credit Card Information</h4>
+        """, unsafe_allow_html=True)
+        
+        card_number = st.text_input(f"{get_icon_html('credit-card', ICON_SIZES['sm'])} Card Number", placeholder="1234 5678 9012 3456")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            expiry_month = st.selectbox("Month", [f"{i:02d}" for i in range(1, 13)])
+        with col2:
+            expiry_year = st.selectbox("Year", [str(2024 + i) for i in range(10)])
+        with col3:
+            cvv = st.text_input("CVV", placeholder="123", max_chars=4)
+        
+        cardholder_name = st.text_input(f"{get_icon_html('person', ICON_SIZES['sm'])} Cardholder Name")
+        
+        billing_address = st.text_area(f"{get_icon_html('house', ICON_SIZES['sm'])} Billing Address")
+        
+        if st.form_submit_button(f"{get_icon_html('plus-circle', ICON_SIZES['sm'])} Add Card"):
+            st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Credit card added successfully!")
 
-# Main authentication workflow function
-def run_authentication_workflow():
-    """Main function to run authentication workflow."""
-    if 'auth_page' not in st.session_state:
-        st.session_state.auth_page = 'login'
+def render_bank_account_form():
+    """Render bank account form."""
+    with st.form("bank_account_form"):
+        st.markdown(f"""
+        <h4>{get_icon_html('bank2', ICON_SIZES['md'])} Bank Account Information</h4>
+        """, unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            bank_name = st.text_input(f"{get_icon_html('building', ICON_SIZES['sm'])} Bank Name")
+            account_number = st.text_input(f"{get_icon_html('hash', ICON_SIZES['sm'])} Account Number")
+        with col2:
+            routing_number = st.text_input(f"{get_icon_html('signpost', ICON_SIZES['sm'])} Routing Number")
+            account_type = st.selectbox(f"{get_icon_html('list', ICON_SIZES['sm'])} Account Type", ["Checking", "Savings"])
+        
+        if st.form_submit_button(f"{get_icon_html('plus-circle', ICON_SIZES['sm'])} Add Bank Account"):
+            st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Bank account added successfully!")
+
+def render_paypal_form():
+    """Render PayPal form."""
+    with st.form("paypal_form"):
+        st.markdown(f"""
+        <h4>{get_icon_html('paypal', ICON_SIZES['md'])} PayPal Account</h4>
+        """, unsafe_allow_html=True)
+        
+        paypal_email = st.text_input(f"{get_icon_html('envelope', ICON_SIZES['sm'])} PayPal Email Address")
+        
+        st.markdown(f"""
+        <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 15px 0;">
+            {get_icon_html('info-circle', 20, '#856404')}
+            <strong>Note:</strong> You'll be redirected to PayPal to authorize the connection.
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.form_submit_button(f"{get_icon_html('paypal', ICON_SIZES['sm'])} Connect PayPal"):
+            st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} PayPal connection initiated!")
+
+def render_digital_wallet_form():
+    """Render digital wallet form."""
+    with st.form("digital_wallet_form"):
+        st.markdown(f"""
+        <h4>{get_icon_html('phone', ICON_SIZES['md'])} Digital Wallet</h4>
+        """, unsafe_allow_html=True)
+        
+        wallet_type = st.selectbox(
+            f"{get_icon_html('wallet2', ICON_SIZES['sm'])} Wallet Type",
+            ["Apple Pay", "Google Pay", "Samsung Pay", "Other"]
+        )
+        
+        phone_number = st.text_input(f"{get_icon_html('telephone', ICON_SIZES['sm'])} Phone Number")
+        
+        if st.form_submit_button(f"{get_icon_html('plus-circle', ICON_SIZES['sm'])} Add Digital Wallet"):
+            st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Digital wallet added successfully!")
+
+def render_funding_dashboard():
+    """Render funding dashboard with transaction history."""
+    st.markdown(f"""
+    <h1>{get_icon_html('graph-up-arrow', 32, ICON_COLORS['primary'])} Funding Dashboard</h1>
+    """, unsafe_allow_html=True)
+    
+    # Funding overview
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown(f"""
+        <div style="background: white; padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            {get_icon_html('currency-dollar', 32, ICON_COLORS['success'])}
+            <h2 style="margin: 10px 0; color: {ICON_COLORS['success']};">$2,450</h2>
+            <p style="margin: 0; color: {ICON_COLORS['muted']};">Total Contributed</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div style="background: white; padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            {get_icon_html('bookmark-star-fill', 32, ICON_COLORS['info'])}
+            <h2 style="margin: 10px 0; color: {ICON_COLORS['info']};">12</h2>
+            <p style="margin: 0; color: {ICON_COLORS['muted']};">Projects Backed</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"""
+        <div style="background: white; padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            {get_icon_html('trophy-fill', 32, ICON_COLORS['warning'])}
+            <h2 style="margin: 10px 0; color: {ICON_COLORS['warning']};">8</h2>
+            <p style="margin: 0; color: {ICON_COLORS['muted']};">Successful Projects</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        st.markdown(f"""
+        <div style="background: white; padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            {get_icon_html('clock-history', 32, ICON_COLORS['primary'])}
+            <h2 style="margin: 10px 0; color: {ICON_COLORS['primary']};">4</h2>
+            <p style="margin: 0; color: {ICON_COLORS['muted']};">Active Campaigns</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Transaction history
+    st.markdown(f"""
+    <h3>{get_icon_html('list-ul', ICON_SIZES['lg'])} Recent Transactions</h3>
+    """, unsafe_allow_html=True)
+    
+    transactions = [
+        {"date": "2024-08-30", "type": "contribution", "project": "Smart Garden System", "amount": 150, "status": "completed"},
+        {"date": "2024-08-28", "type": "contribution", "project": "Eco Water Bottles", "amount": 75, "status": "completed"},
+        {"date": "2024-08-25", "type": "refund", "project": "Failed Project", "amount": 50, "status": "processed"},
+        {"date": "2024-08-20", "type": "contribution", "project": "Educational Game", "amount": 25, "status": "completed"}
+    ]
+    
+    for transaction in transactions:
+        transaction_icon = {
+            "contribution": "arrow-up-circle-fill",
+            "refund": "arrow-down-circle-fill",
+            "withdrawal": "cash-coin"
+        }.get(transaction['type'], "circle")
+        
+        transaction_color = {
+            "contribution": ICON_COLORS['success'],
+            "refund": ICON_COLORS['warning'],
+            "withdrawal": ICON_COLORS['info']
+        }.get(transaction['type'], ICON_COLORS['muted'])
+        
+        status_color = ICON_COLORS['success'] if transaction['status'] == 'completed' else ICON_COLORS['warning']
+        
+        st.markdown(f"""
+        <div style="display: flex; justify-content: space-between; align-items: center; 
+                    padding: 15px; margin: 10px 0; background: white; border-radius: 8px; 
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                {get_icon_html(transaction_icon, 24, transaction_color)}
+                <div>
+                    <h4 style="margin: 0;">{transaction['project']}</h4>
+                    <p style="margin: 0; color: #666; font-size: 14px;">{transaction['date']}</p>
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-weight: 500; color: {transaction_color};">
+                    {'$' + str(transaction['amount'])}
+                </div>
+                <div style="font-size: 12px; color: {status_color};">
+                    {get_icon_html('check-circle', 12, status_color)} {transaction['status']}
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# Main verification and funding workflow function
+def run_verification_funding_workflow():
+    """Main function to run verification and funding workflow."""
+    if 'verification_page' not in st.session_state:
+        st.session_state.verification_page = 'identity'
     
     # Navigation
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
-        if st.button(f"{get_icon_html('box-arrow-in-right', ICON_SIZES['sm'])} Login"):
-            st.session_state.auth_page = 'login'
+        if icon_button('shield-check', 'Identity', 'nav_identity', ICON_SIZES['sm']):
+            st.session_state.verification_page = 'identity'
     with col2:
-        if st.button(f"{get_icon_html('person-plus', ICON_SIZES['sm'])} Register"):
-            st.session_state.auth_page = 'register'
+        if icon_button('bank', 'Bank Verification', 'nav_bank', ICON_SIZES['sm']):
+            st.session_state.verification_page = 'bank'
     with col3:
-        if st.button(f"{get_icon_html('key', ICON_SIZES['sm'])} Forgot Password"):
-            st.session_state.auth_page = 'forgot'
+        if icon_button('credit-card', 'Payment Methods', 'nav_payment', ICON_SIZES['sm']):
+            st.session_state.verification_page = 'payment'
+    with col4:
+        if icon_button('graph-up-arrow', 'Funding Dashboard', 'nav_funding', ICON_SIZES['sm']):
+            st.session_state.verification_page = 'funding'
     
     # Render appropriate page
-    if st.session_state.auth_page == 'login':
-        return render_login_page()
-    elif st.session_state.auth_page == 'register':
-        return render_registration_page()
-    elif st.session_state.auth_page == 'forgot':
-        return render_forgot_password_page()
-    
-    return False
+    if st.session_state.verification_page == 'identity':
+        render_identity_verification()
+    elif st.session_state.verification_page == 'bank':
+        render_bank_verification()
+    elif st.session_state.verification_page == 'payment':
+        render_payment_methods()
+    elif st.session_state.verification_page == 'funding':
+        render_funding_dashboard()
 
