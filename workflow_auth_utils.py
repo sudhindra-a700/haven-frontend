@@ -1,441 +1,371 @@
-"""
-COMPATIBILITY UPDATED Workflow Authentication Utilities for HAVEN Platform
-Ensures compatibility with the fully integrated Streamlit app
-
-This module provides authentication utilities that work seamlessly with:
-1. fully_integrated_app.py
-2. corrected_authentication_flow.py
-3. Streamlit compatibility fixes
-4. Term simplification features
-"""
+# Modified workflow_auth_utils.py - Authentication Workflow with Bootstrap Icons
+# This file replaces your existing workflow_auth_utils.py
 
 import streamlit as st
-import logging
-import requests
-import json
-from datetime import datetime
-from typing import Dict, Any, Optional, Tuple
 from utils.icon_utils import display_icon, get_icon_html
 from config.icon_mapping import get_icon, ICON_COLORS, ICON_SIZES
 
-logger = logging.getLogger(__name__)
-
-# Backend configuration
-BACKEND_URL = st.secrets.get('BACKEND_URL', 'https://haven-backend-9lw3.onrender.com')
-
-def safe_rerun():
-    """Safe rerun function that works with both old and new Streamlit versions"""
-    try:
-        if hasattr(st, 'rerun'):
-            st.rerun()
-        elif hasattr(st, 'experimental_rerun'):
-            st.experimental_rerun()
-        else:
-            st.markdown('<meta http-equiv="refresh" content="0">', unsafe_allow_html=True)
-    except Exception as e:
-        logger.error(f"Error in safe_rerun: {e}")
-
-def get_auth_manager():
-    """Get authentication manager instance"""
-    try:
-        from corrected_authentication_flow import auth_manager
-        return auth_manager
-    except ImportError:
-        logger.warning("Authentication flow module not available")
-        return None
-
-def check_user_authentication() -> bool:
-    """Check if user is authenticated with database verification"""
+def render_login_page():
+    """Render login page with Bootstrap icons."""
+    # Page header with icon
+    st.markdown(f"""
+    <div style="text-align: center; margin-bottom: 30px;">
+        {get_icon_html('shield-lock-fill', 48, ICON_COLORS['primary'])}
+        <h1 style="color: {ICON_COLORS['primary']}; margin-top: 15px;">
+            Welcome to Haven
+        </h1>
+        <p style="color: {ICON_COLORS['muted']};">Sign in to your account</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Check session state first
-    if not st.session_state.get('authenticated', False):
-        return False
-    
-    # Verify user data exists
-    user_data = st.session_state.get('user_data')
-    user_type = st.session_state.get('user_type')
-    
-    if not user_data or not user_type:
-        logger.warning("User data missing, clearing authentication")
-        clear_authentication()
-        return False
-    
-    # Verify user still exists in database
-    try:
-        exists, _ = check_user_in_database(user_data.get('email'), user_type)
-        if not exists:
-            logger.warning("User no longer exists in database")
-            clear_authentication()
-            return False
-    except Exception as e:
-        logger.error(f"Error verifying user in database: {e}")
-        return False
-    
-    return True
-
-def check_user_in_database(email: str, user_type: str) -> Tuple[bool, Optional[Dict]]:
-    """Check if user exists in the appropriate database table"""
-    try:
-        table_name = "individuals" if user_type == "individual" else "organizations"
+    # Login form with icons
+    with st.form("login_form"):
+        # Email field with icon
+        col1, col2 = st.columns([1, 10])
+        with col1:
+            st.markdown(f"""
+            <div style="padding-top: 8px;">
+                {get_icon_html('envelope-fill', ICON_SIZES['md'], ICON_COLORS['muted'])}
+            </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            email = st.text_input("Email Address", placeholder="Enter your email")
         
-        response = requests.get(
-            f"{BACKEND_URL}/api/v1/users/check-existence",
-            params={
-                "email": email,
-                "table": table_name
-            },
-            timeout=10
-        )
+        # Password field with icon
+        col1, col2 = st.columns([1, 10])
+        with col1:
+            st.markdown(f"""
+            <div style="padding-top: 8px;">
+                {get_icon_html('key-fill', ICON_SIZES['md'], ICON_COLORS['muted'])}
+            </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            password = st.text_input("Password", type="password", placeholder="Enter your password")
         
-        if response.status_code == 200:
-            data = response.json()
-            return data.get('exists', False), data.get('user_data')
-        else:
-            logger.error(f"Error checking user existence: {response.status_code}")
-            return False, None
-            
-    except Exception as e:
-        logger.error(f"Exception checking user in database: {e}")
-        return False, None
+        # Remember me checkbox with icon
+        col1, col2 = st.columns([1, 10])
+        with col1:
+            st.markdown(f"""
+            <div style="padding-top: 8px;">
+                {get_icon_html('check-square', ICON_SIZES['sm'], ICON_COLORS['muted'])}
+            </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            remember_me = st.checkbox("Remember me")
+        
+        # Login button with icon
+        if st.form_submit_button(f"{get_icon_html('box-arrow-in-right', ICON_SIZES['sm'])} Sign In"):
+            if authenticate_user(email, password):
+                st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Login successful!")
+                return True
+            else:
+                st.error(f"{get_icon_html('x-circle-fill', ICON_SIZES['sm'], ICON_COLORS['danger'])} Invalid credentials")
+                return False
+    
+    # Social login options
+    st.markdown("---")
+    st.markdown(f"""
+    <div style="text-align: center;">
+        <p style="color: {ICON_COLORS['muted']};">Or sign in with</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col1:
+        if st.button(f"{get_icon_html('google', ICON_SIZES['sm'])} Google", key="google_login"):
+            st.info("Google OAuth integration")
+    with col2:
+        if st.button(f"{get_icon_html('facebook', ICON_SIZES['sm'])} Facebook", key="facebook_login"):
+            st.info("Facebook OAuth integration")
+    with col3:
+        if st.button(f"{get_icon_html('github', ICON_SIZES['sm'])} GitHub", key="github_login"):
+            st.info("GitHub OAuth integration")
+    
+    # Registration link
+    st.markdown(f"""
+    <div style="text-align: center; margin-top: 30px;">
+        <p>Don't have an account? 
+        <a href="#" style="color: {ICON_COLORS['primary']};">
+            {get_icon_html('person-plus', ICON_SIZES['sm'])} Create one here
+        </a></p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    return False
 
-def handle_user_login(provider: str, user_type: str) -> bool:
-    """Handle user login process"""
-    try:
-        # Generate OAuth URL
-        oauth_url = generate_oauth_url(provider, user_type)
-        if not oauth_url:
-            return False
-        
-        # Store login attempt in session
-        st.session_state.login_attempt = {
-            'provider': provider,
-            'user_type': user_type,
-            'timestamp': datetime.now().isoformat()
-        }
-        
-        # Open OAuth popup
+def render_registration_page():
+    """Render registration page with Bootstrap icons."""
+    st.markdown(f"""
+    <div style="text-align: center; margin-bottom: 30px;">
+        {get_icon_html('person-plus-fill', 48, ICON_COLORS['primary'])}
+        <h1 style="color: {ICON_COLORS['primary']}; margin-top: 15px;">
+            Join Haven
+        </h1>
+        <p style="color: {ICON_COLORS['muted']};">Create your crowdfunding account</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.form("registration_form"):
+        # Personal information section
         st.markdown(f"""
-        <script>
-        window.open('{oauth_url}', 'oauth_popup', 'width=500,height=600,scrollbars=yes,resizable=yes');
-        </script>
+        <h3>{get_icon_html('person-vcard', ICON_SIZES['lg'])} Personal Information</h3>
         """, unsafe_allow_html=True)
         
-        st.success(f"🔄 {provider.title()} login window opened. Please complete authentication.")
-        return True
+        col1, col2 = st.columns(2)
+        with col1:
+            first_name = st.text_input(f"{get_icon_html('person', ICON_SIZES['sm'])} First Name")
+        with col2:
+            last_name = st.text_input(f"{get_icon_html('person', ICON_SIZES['sm'])} Last Name")
         
-    except Exception as e:
-        logger.error(f"Error in handle_user_login: {e}")
-        st.error(f"❌ Login error: {str(e)}")
-        return False
+        email = st.text_input(f"{get_icon_html('envelope', ICON_SIZES['sm'])} Email Address")
+        phone = st.text_input(f"{get_icon_html('telephone', ICON_SIZES['sm'])} Phone Number")
+        
+        # Account security section
+        st.markdown(f"""
+        <h3>{get_icon_html('shield-check', ICON_SIZES['lg'])} Account Security</h3>
+        """, unsafe_allow_html=True)
+        
+        password = st.text_input(f"{get_icon_html('key', ICON_SIZES['sm'])} Password", type="password")
+        confirm_password = st.text_input(f"{get_icon_html('key-fill', ICON_SIZES['sm'])} Confirm Password", type="password")
+        
+        # Terms and conditions
+        terms_accepted = st.checkbox(f"{get_icon_html('file-text', ICON_SIZES['sm'])} I agree to the Terms and Conditions")
+        newsletter = st.checkbox(f"{get_icon_html('envelope-heart', ICON_SIZES['sm'])} Subscribe to newsletter")
+        
+        if st.form_submit_button(f"{get_icon_html('person-plus', ICON_SIZES['sm'])} Create Account"):
+            if validate_registration_data(first_name, last_name, email, password, confirm_password, terms_accepted):
+                st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Account created successfully!")
+                return True
+            else:
+                st.error(f"{get_icon_html('exclamation-triangle', ICON_SIZES['sm'], ICON_COLORS['warning'])} Please check your information")
+                return False
+    
+    return False
 
-def generate_oauth_url(provider: str, user_type: str) -> Optional[str]:
-    """Generate OAuth URL for the specified provider"""
-    try:
-        # Create state parameter with provider and user_type
-        state = json.dumps({
-            'provider': provider,
-            'user_type': user_type,
-            'timestamp': datetime.now().isoformat()
-        })
+def render_forgot_password_page():
+    """Render forgot password page with Bootstrap icons."""
+    st.markdown(f"""
+    <div style="text-align: center; margin-bottom: 30px;">
+        {get_icon_html('key-fill', 48, ICON_COLORS['warning'])}
+        <h1 style="color: {ICON_COLORS['warning']}; margin-top: 15px;">
+            Reset Password
+        </h1>
+        <p style="color: {ICON_COLORS['muted']};">Enter your email to receive reset instructions</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.form("forgot_password_form"):
+        col1, col2 = st.columns([1, 10])
+        with col1:
+            st.markdown(f"""
+            <div style="padding-top: 8px;">
+                {get_icon_html('envelope', ICON_SIZES['md'], ICON_COLORS['muted'])}
+            </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            email = st.text_input("Email Address", placeholder="Enter your registered email")
         
-        frontend_url = st.secrets.get('FRONTEND_URL', 'https://haven-frontend-65jr.onrender.com')
-        oauth_url = f"{BACKEND_URL}/api/v1/auth/{provider}/login"
-        oauth_url += f"?user_type={user_type}&state={state}&redirect_uri={frontend_url}"
-        
-        return oauth_url
-        
-    except Exception as e:
-        logger.error(f"Error generating OAuth URL: {e}")
-        return None
+        if st.form_submit_button(f"{get_icon_html('send', ICON_SIZES['sm'])} Send Reset Link"):
+            if email:
+                st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Reset link sent to {email}")
+                return True
+            else:
+                st.error(f"{get_icon_html('exclamation-triangle', ICON_SIZES['sm'], ICON_COLORS['warning'])} Please enter your email address")
+    
+    return False
 
-def handle_user_logout():
-    """Handle user logout process"""
-    try:
-        # Clear authentication state
-        clear_authentication()
-        
-        # Clear any cached data
-        if 'login_attempt' in st.session_state:
-            del st.session_state.login_attempt
-        
-        # Reset to login page
-        st.session_state.current_page = 'login'
-        
-        logger.info("User logged out successfully")
-        st.success("✅ Logged out successfully!")
-        
-        # Rerun to refresh the app
-        safe_rerun()
-        
-    except Exception as e:
-        logger.error(f"Error in handle_user_logout: {e}")
-        st.error(f"❌ Logout error: {str(e)}")
+def render_user_profile_settings():
+    """Render user profile settings with Bootstrap icons."""
+    st.markdown(f"""
+    <h1>{get_icon_html('person-gear', 32, ICON_COLORS['primary'])} Profile Settings</h1>
+    """, unsafe_allow_html=True)
+    
+    # Profile tabs
+    tab1, tab2, tab3, tab4 = st.tabs([
+        f"{get_icon_html('person', ICON_SIZES['sm'])} Personal Info",
+        f"{get_icon_html('shield-check', ICON_SIZES['sm'])} Security", 
+        f"{get_icon_html('bell', ICON_SIZES['sm'])} Notifications",
+        f"{get_icon_html('credit-card', ICON_SIZES['sm'])} Payment"
+    ])
+    
+    with tab1:
+        render_personal_info_tab()
+    
+    with tab2:
+        render_security_tab()
+    
+    with tab3:
+        render_notifications_tab()
+    
+    with tab4:
+        render_payment_tab()
 
-def clear_authentication():
-    """Clear all authentication-related session state"""
-    keys_to_clear = [
-        'authenticated', 'user_data', 'user_type', 
-        'selected_role', 'oauth_callback_handled'
+def render_personal_info_tab():
+    """Render personal information tab."""
+    st.markdown(f"""
+    <h3>{get_icon_html('person-vcard-fill', ICON_SIZES['lg'])} Personal Information</h3>
+    """, unsafe_allow_html=True)
+    
+    with st.form("personal_info_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            first_name = st.text_input("First Name", value="John")
+            email = st.text_input("Email", value="john@example.com")
+        with col2:
+            last_name = st.text_input("Last Name", value="Doe")
+            phone = st.text_input("Phone", value="+1234567890")
+        
+        bio = st.text_area("Bio", value="Passionate about innovative projects...")
+        location = st.text_input(f"{get_icon_html('geo-alt', ICON_SIZES['sm'])} Location", value="San Francisco, CA")
+        
+        if st.form_submit_button(f"{get_icon_html('floppy', ICON_SIZES['sm'])} Save Changes"):
+            st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Profile updated successfully!")
+
+def render_security_tab():
+    """Render security settings tab."""
+    st.markdown(f"""
+    <h3>{get_icon_html('shield-lock-fill', ICON_SIZES['lg'])} Security Settings</h3>
+    """, unsafe_allow_html=True)
+    
+    # Change password section
+    st.markdown(f"""
+    <h4>{get_icon_html('key', ICON_SIZES['md'])} Change Password</h4>
+    """, unsafe_allow_html=True)
+    
+    with st.form("change_password_form"):
+        current_password = st.text_input("Current Password", type="password")
+        new_password = st.text_input("New Password", type="password")
+        confirm_new_password = st.text_input("Confirm New Password", type="password")
+        
+        if st.form_submit_button(f"{get_icon_html('shield-check', ICON_SIZES['sm'])} Update Password"):
+            st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Password updated successfully!")
+    
+    # Two-factor authentication
+    st.markdown(f"""
+    <h4>{get_icon_html('phone', ICON_SIZES['md'])} Two-Factor Authentication</h4>
+    """, unsafe_allow_html=True)
+    
+    two_fa_enabled = st.checkbox(f"{get_icon_html('shield-fill-check', ICON_SIZES['sm'])} Enable 2FA", value=False)
+    
+    if two_fa_enabled:
+        st.info(f"{get_icon_html('info-circle', ICON_SIZES['sm'])} 2FA setup instructions will be sent to your phone")
+
+def render_notifications_tab():
+    """Render notifications settings tab."""
+    st.markdown(f"""
+    <h3>{get_icon_html('bell-fill', ICON_SIZES['lg'])} Notification Preferences</h3>
+    """, unsafe_allow_html=True)
+    
+    # Email notifications
+    st.markdown(f"""
+    <h4>{get_icon_html('envelope', ICON_SIZES['md'])} Email Notifications</h4>
+    """, unsafe_allow_html=True)
+    
+    email_campaign_updates = st.checkbox(f"{get_icon_html('megaphone', ICON_SIZES['sm'])} Campaign updates", value=True)
+    email_new_campaigns = st.checkbox(f"{get_icon_html('plus-circle', ICON_SIZES['sm'])} New campaigns in your interests", value=True)
+    email_funding_milestones = st.checkbox(f"{get_icon_html('trophy', ICON_SIZES['sm'])} Funding milestones", value=True)
+    email_newsletter = st.checkbox(f"{get_icon_html('newspaper', ICON_SIZES['sm'])} Weekly newsletter", value=False)
+    
+    # Push notifications
+    st.markdown(f"""
+    <h4>{get_icon_html('phone', ICON_SIZES['md'])} Push Notifications</h4>
+    """, unsafe_allow_html=True)
+    
+    push_messages = st.checkbox(f"{get_icon_html('chat-dots', ICON_SIZES['sm'])} Direct messages", value=True)
+    push_campaign_alerts = st.checkbox(f"{get_icon_html('exclamation-triangle', ICON_SIZES['sm'])} Campaign alerts", value=True)
+    
+    if st.button(f"{get_icon_html('floppy', ICON_SIZES['sm'])} Save Notification Settings"):
+        st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Notification preferences saved!")
+
+def render_payment_tab():
+    """Render payment settings tab."""
+    st.markdown(f"""
+    <h3>{get_icon_html('credit-card-fill', ICON_SIZES['lg'])} Payment Methods</h3>
+    """, unsafe_allow_html=True)
+    
+    # Existing payment methods
+    payment_methods = [
+        {"type": "credit_card", "name": "Visa ending in 4242", "icon": "credit-card", "primary": True},
+        {"type": "bank", "name": "Chase Bank Account", "icon": "bank", "primary": False},
+        {"type": "paypal", "name": "PayPal Account", "icon": "paypal", "primary": False}
     ]
     
-    for key in keys_to_clear:
-        if key in st.session_state:
-            del st.session_state[key]
+    for method in payment_methods:
+        primary_badge = f"""
+        <span style="background: {ICON_COLORS['success']}; color: white; padding: 2px 8px; 
+                     border-radius: 12px; font-size: 12px; margin-left: 10px;">
+            {get_icon_html('star-fill', 12)} Primary
+        </span>
+        """ if method['primary'] else ""
+        
+        st.markdown(f"""
+        <div style="display: flex; align-items: center; justify-content: space-between; 
+                    padding: 15px; margin: 10px 0; background: white; border-radius: 10px; 
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div style="display: flex; align-items: center;">
+                {get_icon_html(method['icon'], 24, ICON_COLORS['primary'])}
+                <span style="margin-left: 15px; font-weight: 500;">{method['name']}</span>
+                {primary_badge}
+            </div>
+            <div>
+                <button style="background: none; border: 1px solid {ICON_COLORS['muted']}; 
+                               color: {ICON_COLORS['muted']}; padding: 5px 10px; border-radius: 5px; 
+                               margin-right: 5px; cursor: pointer;">
+                    {get_icon_html('pencil', 14)} Edit
+                </button>
+                <button style="background: none; border: 1px solid {ICON_COLORS['danger']}; 
+                               color: {ICON_COLORS['danger']}; padding: 5px 10px; border-radius: 5px; 
+                               cursor: pointer;">
+                    {get_icon_html('trash', 14)} Remove
+                </button>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Add new payment method
+    if st.button(f"{get_icon_html('plus-circle', ICON_SIZES['sm'])} Add Payment Method", key="add_payment"):
+        st.info("Opening payment method setup...")
 
-def get_user_role() -> Optional[str]:
-    """Get current user role"""
-    return st.session_state.get('user_type')
+# Helper functions (add your existing authentication logic here)
+def authenticate_user(email: str, password: str) -> bool:
+    """Authenticate user credentials."""
+    # Add your existing authentication logic here
+    # This is a placeholder
+    return email and password and len(password) >= 6
 
-def get_current_user_data() -> Optional[Dict[str, Any]]:
-    """Get current user data"""
-    return st.session_state.get('user_data')
+def validate_registration_data(first_name: str, last_name: str, email: str, 
+                             password: str, confirm_password: str, terms_accepted: bool) -> bool:
+    """Validate registration form data."""
+    # Add your existing validation logic here
+    # This is a placeholder
+    return (first_name and last_name and email and password and 
+            password == confirm_password and terms_accepted and len(password) >= 6)
 
-def require_authentication(redirect_to_login: bool = True) -> bool:
-    """Require user to be authenticated"""
-    if not check_user_authentication():
-        if redirect_to_login:
-            st.error("❌ Authentication required. Please log in.")
-            st.session_state.current_page = 'login'
-            safe_rerun()
-        return False
-    return True
-
-def require_role(required_role: str) -> bool:
-    """Require user to have specific role"""
-    if not require_authentication():
-        return False
+# Main authentication workflow function
+def run_authentication_workflow():
+    """Main function to run authentication workflow."""
+    if 'auth_page' not in st.session_state:
+        st.session_state.auth_page = 'login'
     
-    user_role = get_user_role()
-    if user_role != required_role:
-        st.error(f"❌ Access denied. {required_role.title()} role required.")
-        return False
-    
-    return True
-
-def show_login_form():
-    """Show login form with role selection"""
-    
-    st.markdown("### 🎯 Choose Your Role to Login")
-    
-    st.markdown("""
-    <div class='info-message'>
-        <h4>💡 Important</h4>
-        <p>You must be registered in our database before you can log in.</p>
-        <p><strong>Process:</strong> Registration → Database Storage → Login → Access</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Role selection
-    col1, col2 = st.columns(2)
-    
+    # Navigation
+    col1, col2, col3 = st.columns(3)
     with col1:
-        st.markdown("""
-        <div class='role-card'>
-            <h4>👤 Individual</h4>
-            <ul>
-                <li>🎯 Donate to campaigns</li>
-                <li>❤️ Support causes you care about</li>
-                <li>📊 Track donation history</li>
-                <li>🧾 Get tax receipts</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if st.button("Login as Individual", key="auth_login_individual", use_container_width=True, type="primary"):
-            st.session_state.selected_role = "individual"
-            safe_rerun()
-    
+        if st.button(f"{get_icon_html('box-arrow-in-right', ICON_SIZES['sm'])} Login"):
+            st.session_state.auth_page = 'login'
     with col2:
-        st.markdown("""
-        <div class='role-card'>
-            <h4>🏢 Organization</h4>
-            <ul>
-                <li>🚀 Create fundraising campaigns</li>
-                <li>📈 Manage campaign updates</li>
-                <li>💰 Track donations received</li>
-                <li>🤝 Engage with donors</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if st.button("Login as Organization", key="auth_login_organization", use_container_width=True, type="primary"):
-            st.session_state.selected_role = "organization"
-            safe_rerun()
+        if st.button(f"{get_icon_html('person-plus', ICON_SIZES['sm'])} Register"):
+            st.session_state.auth_page = 'register'
+    with col3:
+        if st.button(f"{get_icon_html('key', ICON_SIZES['sm'])} Forgot Password"):
+            st.session_state.auth_page = 'forgot'
     
-    # Show OAuth buttons if role is selected
-    if st.session_state.get("selected_role"):
-        st.markdown("---")
-        st.markdown(f"### 🔐 Login as {st.session_state.selected_role.title()}")
-        
-        st.markdown("""
-        <div class='warning-message'>
-            <h4>⚠️ Database Check</h4>
-            <p>We will verify that you exist in our database before allowing login.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        show_oauth_buttons(st.session_state.selected_role)
-        
-        # Back button
-        if st.button("⬅️ Back to Role Selection", key="auth_back_to_role"):
-            if "selected_role" in st.session_state:
-                del st.session_state.selected_role
-            safe_rerun()
-
-def show_oauth_buttons(user_type: str):
-    """Show OAuth authentication buttons"""
+    # Render appropriate page
+    if st.session_state.auth_page == 'login':
+        return render_login_page()
+    elif st.session_state.auth_page == 'register':
+        return render_registration_page()
+    elif st.session_state.auth_page == 'forgot':
+        return render_forgot_password_page()
     
-    # OAuth section with pulse effect
-    st.markdown("""
-    <div class='oauth-section'>
-        <h4 style='text-align: center; color: #4CAF50;'>🔐 Secure Login Options</h4>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("🔍 Continue with Google", key=f"auth_google_{user_type}", use_container_width=True, type="primary"):
-            if handle_user_login("google", user_type):
-                st.markdown("""
-                <div class='info-message'>
-                    <p>🔄 Google authentication window opened. Please complete authentication and return to this page.</p>
-                </div>
-                """, unsafe_allow_html=True)
-    
-    with col2:
-        if st.button("📘 Continue with Facebook", key=f"auth_facebook_{user_type}", use_container_width=True, type="primary"):
-            if handle_user_login("facebook", user_type):
-                st.markdown("""
-                <div class='info-message'>
-                    <p>🔄 Facebook authentication window opened. Please complete authentication and return to this page.</p>
-                </div>
-                """, unsafe_allow_html=True)
-
-def show_role_selection() -> Optional[str]:
-    """Show role selection and return selected role"""
-    
-    st.markdown("### 🎯 Choose Your Role")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        <div class='role-card'>
-            <h4>👤 Individual</h4>
-            <p>Donate to campaigns and support causes</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if st.button("Select Individual", key="role_select_individual", use_container_width=True):
-            return "individual"
-    
-    with col2:
-        st.markdown("""
-        <div class='role-card'>
-            <h4>🏢 Organization</h4>
-            <p>Create and manage fundraising campaigns</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if st.button("Select Organization", key="role_select_organization", use_container_width=True):
-            return "organization"
-    
-    return None
-
-def show_authentication_status():
-    """Show current authentication status (for debugging)"""
-    
-    if st.checkbox("Show Authentication Status", key="auth_debug"):
-        st.markdown("### 🔍 Authentication Status")
-        
-        status_data = {
-            "Authenticated": st.session_state.get('authenticated', False),
-            "User Type": st.session_state.get('user_type', 'None'),
-            "User Email": st.session_state.get('user_data', {}).get('email', 'None'),
-            "Selected Role": st.session_state.get('selected_role', 'None'),
-            "Current Page": st.session_state.get('current_page', 'None'),
-            "Backend URL": BACKEND_URL
-        }
-        
-        for key, value in status_data.items():
-            st.write(f"**{key}:** {value}")
-
-def validate_user_session() -> bool:
-    """Validate current user session"""
-    try:
-        if not check_user_authentication():
-            return False
-        
-        user_data = get_current_user_data()
-        if not user_data:
-            return False
-        
-        # Additional validation can be added here
-        # e.g., token expiry, session timeout, etc.
-        
-        return True
-        
-    except Exception as e:
-        logger.error(f"Error validating user session: {e}")
-        return False
-
-def refresh_user_data():
-    """Refresh user data from backend"""
-    try:
-        user_data = get_current_user_data()
-        user_type = get_user_role()
-        
-        if not user_data or not user_type:
-            return False
-        
-        # Fetch fresh user data from backend
-        exists, fresh_data = check_user_in_database(user_data.get('email'), user_type)
-        
-        if exists and fresh_data:
-            st.session_state.user_data = fresh_data
-            logger.info("User data refreshed successfully")
-            return True
-        else:
-            logger.warning("Failed to refresh user data")
-            return False
-            
-    except Exception as e:
-        logger.error(f"Error refreshing user data: {e}")
-        return False
-
-# Compatibility functions for integration with main app
-def get_auth_status() -> Dict[str, Any]:
-    """Get comprehensive authentication status"""
-    return {
-        'authenticated': check_user_authentication(),
-        'user_data': get_current_user_data(),
-        'user_type': get_user_role(),
-        'session_valid': validate_user_session()
-    }
-
-def initialize_auth_state():
-    """Initialize authentication state"""
-    if 'auth_initialized' not in st.session_state:
-        st.session_state.auth_initialized = True
-        logger.info("Authentication state initialized")
-
-# Export functions for main app integration
-__all__ = [
-    'get_auth_manager',
-    'check_user_authentication', 
-    'handle_user_login',
-    'handle_user_logout',
-    'get_user_role',
-    'require_authentication',
-    'require_role',
-    'show_login_form',
-    'show_oauth_buttons',
-    'show_role_selection',
-    'get_current_user_data',
-    'validate_user_session',
-    'refresh_user_data',
-    'get_auth_status',
-    'initialize_auth_state'
-]
+    return False
 
