@@ -1,849 +1,546 @@
-"""
-COMPATIBILITY UPDATED Workflow Campaign Pages for HAVEN Platform
-Ensures compatibility with the fully integrated Streamlit app
-
-This module provides campaign management functionality that works seamlessly with:
-1. fully_integrated_app.py
-2. corrected_authentication_flow.py
-3. Streamlit compatibility fixes
-4. Term simplification features
-"""
+# Modified workflow_campaign_pages.py - Campaign Management with Bootstrap Icons
+# This file replaces your existing workflow_campaign_pages.py
 
 import streamlit as st
-import logging
-import requests
-import json
-from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List
-import uuid
-from utils.icon_utils import display_icon, get_icon_html
+from utils.icon_utils import display_icon, get_icon_html, icon_button
 from config.icon_mapping import get_icon, ICON_COLORS, ICON_SIZES
 
-logger = logging.getLogger(__name__)
-
-# Backend configuration
-BACKEND_URL = st.secrets.get('BACKEND_URL', 'https://haven-backend-9lw3.onrender.com')
-
-def safe_rerun():
-    """Safe rerun function that works with both old and new Streamlit versions"""
-    try:
-        if hasattr(st, 'rerun'):
-            st.rerun()
-        elif hasattr(st, 'experimental_rerun'):
-            st.experimental_rerun()
-        else:
-            st.markdown('<meta http-equiv="refresh" content="0">', unsafe_allow_html=True)
-    except Exception as e:
-        logger.error(f"Error in safe_rerun: {e}")
-
-def apply_term_simplification(text: str) -> str:
-    """Apply term simplification with 'i' icons if enabled"""
-    
-    if not st.session_state.get('simplification_active', False):
-        return text
-    
-    # Campaign-specific simplifications
-    simplifications = {
-        'campaign': {
-            'simplified': 'fundraising project',
-            'explanation': 'A specific project or cause that is asking for money donations'
-        },
-        'fundraising': {
-            'simplified': 'collecting money',
-            'explanation': 'The process of collecting money from people to support a cause or project'
-        },
-        'donation': {
-            'simplified': 'money gift',
-            'explanation': 'Money given freely to support a cause without expecting anything back'
-        },
-        'goal': {
-            'simplified': 'target amount',
-            'explanation': 'The total amount of money the campaign hopes to raise'
-        },
-        'milestone': {
-            'simplified': 'progress point',
-            'explanation': 'Important points reached during the fundraising process'
-        }
-    }
-    
-    result_text = text
-    for original, data in simplifications.items():
-        if original.lower() in text.lower():
-            simplified = data['simplified']
-            explanation = data['explanation']
-            
-            # Create HTML with 'i' icon and hover explanation
-            replacement = f"""
-            <span class="simplified-term">
-                {simplified}
-                <i class="material-icons info-icon">info</i>
-                <div class="term-explanation">{explanation}</div>
-            </span>
-            """
-            
-            result_text = result_text.replace(original, replacement)
-    
-    return result_text
-
-def render_create_campaign_page(session_state):
-    """Render the create campaign page with multi-step form"""
-    
-    # Check authentication and role
-    if not session_state.get('authenticated', False):
-        st.error("❌ Authentication required")
-        return
-    
-    if session_state.get('user_type') != 'organization':
-        st.error("❌ Organization role required to create campaigns")
-        return
-    
-    # Page header with term simplification
-    title = "🚀 Create New Campaign"
-    subtitle = "Launch your fundraising campaign and make a difference"
-    
-    if session_state.get('simplification_active', False):
-        title = apply_term_simplification(title)
-        subtitle = apply_term_simplification(subtitle)
-    
+def render_campaign_creation_form():
+    """Render campaign creation form with Bootstrap icons."""
     st.markdown(f"""
-    <div class='main-header'>
-        <h1>{title}</h1>
-        <p>{subtitle}</p>
-    </div>
+    <h1>{get_icon_html('plus-circle-fill', 32, ICON_COLORS['primary'])} Create New Campaign</h1>
+    <p style="color: {ICON_COLORS['muted']};">Bring your project to life with crowdfunding</p>
     """, unsafe_allow_html=True)
     
-    # Initialize campaign creation state
-    if 'campaign_creation_step' not in session_state:
-        session_state.campaign_creation_step = 1
+    with st.form("campaign_creation"):
+        # Basic Information
+        st.markdown(f"""
+        <h3>{get_icon_html('info-circle-fill', ICON_SIZES['lg'])} Basic Information</h3>
+        """, unsafe_allow_html=True)
+        
+        title = st.text_input(f"{get_icon_html('type', ICON_SIZES['sm'])} Campaign Title")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            category = st.selectbox(
+                f"{get_icon_html('tags', ICON_SIZES['sm'])} Category",
+                ["Technology", "Arts", "Environment", "Education", "Health", "Games"]
+            )
+        with col2:
+            location = st.text_input(f"{get_icon_html('geo-alt', ICON_SIZES['sm'])} Location")
+        
+        description = st.text_area(f"{get_icon_html('file-text', ICON_SIZES['sm'])} Description", height=150)
+        
+        # Funding Goals
+        st.markdown(f"""
+        <h3>{get_icon_html('currency-dollar', ICON_SIZES['lg'])} Funding Goals</h3>
+        """, unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            funding_goal = st.number_input(f"{get_icon_html('bullseye', ICON_SIZES['sm'])} Funding Goal ($)", min_value=100)
+        with col2:
+            duration = st.number_input(f"{get_icon_html('calendar', ICON_SIZES['sm'])} Campaign Duration (days)", min_value=1, max_value=90)
+        
+        # Media Upload
+        st.markdown(f"""
+        <h3>{get_icon_html('images', ICON_SIZES['lg'])} Media</h3>
+        """, unsafe_allow_html=True)
+        
+        main_image = st.file_uploader(f"{get_icon_html('image', ICON_SIZES['sm'])} Main Campaign Image", type=['png', 'jpg', 'jpeg'])
+        video_url = st.text_input(f"{get_icon_html('play-circle', ICON_SIZES['sm'])} Video URL (optional)")
+        
+        # Rewards/Perks
+        st.markdown(f"""
+        <h3>{get_icon_html('gift', ICON_SIZES['lg'])} Rewards & Perks</h3>
+        """, unsafe_allow_html=True)
+        
+        if st.checkbox(f"{get_icon_html('plus', ICON_SIZES['sm'])} Add Reward Tiers"):
+            num_rewards = st.number_input("Number of reward tiers", min_value=1, max_value=10, value=3)
+            
+            for i in range(num_rewards):
+                st.markdown(f"**{get_icon_html('award', ICON_SIZES['sm'])} Reward Tier {i+1}**")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    reward_amount = st.number_input(f"Amount ($)", key=f"reward_amount_{i}", min_value=1)
+                with col2:
+                    reward_title = st.text_input(f"Title", key=f"reward_title_{i}")
+                with col3:
+                    reward_quantity = st.number_input(f"Quantity", key=f"reward_qty_{i}", min_value=1)
+                
+                reward_description = st.text_area(f"Description", key=f"reward_desc_{i}", height=80)
+        
+        # Submit button
+        if st.form_submit_button(f"{get_icon_html('rocket-takeoff', ICON_SIZES['sm'])} Launch Campaign"):
+            if validate_campaign_data(title, category, description, funding_goal):
+                st.success(f"{get_icon_html('check-circle-fill', ICON_SIZES['sm'], ICON_COLORS['success'])} Campaign created successfully!")
+                return True
+            else:
+                st.error(f"{get_icon_html('exclamation-triangle', ICON_SIZES['sm'], ICON_COLORS['warning'])} Please fill in all required fields")
     
-    if 'campaign_draft' not in session_state:
-        session_state.campaign_draft = {}
-    
-    # Progress indicator
-    show_campaign_progress(session_state.campaign_creation_step)
-    
-    # Show appropriate step
-    if session_state.campaign_creation_step == 1:
-        show_campaign_basic_info(session_state)
-    elif session_state.campaign_creation_step == 2:
-        show_campaign_details(session_state)
-    elif session_state.campaign_creation_step == 3:
-        show_campaign_media(session_state)
-    elif session_state.campaign_creation_step == 4:
-        show_campaign_funding(session_state)
-    elif session_state.campaign_creation_step == 5:
-        show_campaign_review(session_state)
+    return False
 
-def show_campaign_progress(current_step: int):
-    """Show campaign creation progress"""
+def render_campaign_management_dashboard():
+    """Render campaign management dashboard with Bootstrap icons."""
+    st.markdown(f"""
+    <h1>{get_icon_html('speedometer2', 32, ICON_COLORS['primary'])} Campaign Dashboard</h1>
+    """, unsafe_allow_html=True)
     
-    steps = [
-        "📝 Basic Info",
-        "📄 Details", 
-        "🖼️ Media",
-        "💰 Funding",
-        "✅ Review"
+    # Campaign stats overview
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown(f"""
+        <div style="background: white; padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            {get_icon_html('currency-dollar', 32, ICON_COLORS['success'])}
+            <h2 style="margin: 10px 0; color: {ICON_COLORS['success']};">$12,450</h2>
+            <p style="margin: 0; color: {ICON_COLORS['muted']};">Total Raised</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div style="background: white; padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            {get_icon_html('people-fill', 32, ICON_COLORS['info'])}
+            <h2 style="margin: 10px 0; color: {ICON_COLORS['info']};">156</h2>
+            <p style="margin: 0; color: {ICON_COLORS['muted']};">Backers</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"""
+        <div style="background: white; padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            {get_icon_html('calendar-event', 32, ICON_COLORS['warning'])}
+            <h2 style="margin: 10px 0; color: {ICON_COLORS['warning']};">23</h2>
+            <p style="margin: 0; color: {ICON_COLORS['muted']};">Days Left</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        st.markdown(f"""
+        <div style="background: white; padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            {get_icon_html('graph-up-arrow', 32, ICON_COLORS['primary'])}
+            <h2 style="margin: 10px 0; color: {ICON_COLORS['primary']};">62%</h2>
+            <p style="margin: 0; color: {ICON_COLORS['muted']};">Goal Reached</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Quick actions
+    st.markdown(f"""
+    <h3>{get_icon_html('lightning-fill', ICON_SIZES['lg'])} Quick Actions</h3>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        if icon_button('pencil-square', 'Edit Campaign', 'edit_campaign', ICON_SIZES['sm']):
+            st.info("Opening campaign editor...")
+    
+    with col2:
+        if icon_button('megaphone', 'Post Update', 'post_update', ICON_SIZES['sm']):
+            st.info("Opening update composer...")
+    
+    with col3:
+        if icon_button('envelope', 'Message Backers', 'message_backers', ICON_SIZES['sm']):
+            st.info("Opening messaging interface...")
+    
+    with col4:
+        if icon_button('bar-chart', 'View Analytics', 'view_analytics', ICON_SIZES['sm']):
+            st.info("Opening analytics dashboard...")
+
+def render_campaign_browse_page():
+    """Render campaign browsing page with Bootstrap icons."""
+    st.markdown(f"""
+    <h1>{get_icon_html('search', 32, ICON_COLORS['primary'])} Browse Campaigns</h1>
+    """, unsafe_allow_html=True)
+    
+    # Search and filters
+    col1, col2, col3 = st.columns([3, 1, 1])
+    with col1:
+        search_query = st.text_input(f"{get_icon_html('search', ICON_SIZES['sm'])} Search campaigns", placeholder="Enter keywords...")
+    with col2:
+        category_filter = st.selectbox(f"{get_icon_html('funnel', ICON_SIZES['sm'])} Category", ["All", "Technology", "Arts", "Environment", "Education"])
+    with col3:
+        sort_by = st.selectbox(f"{get_icon_html('sort-down', ICON_SIZES['sm'])} Sort by", ["Most Recent", "Most Funded", "Ending Soon", "Most Popular"])
+    
+    # Campaign grid
+    render_campaign_grid()
+
+def render_campaign_grid():
+    """Render a grid of campaign cards with Bootstrap icons."""
+    # Sample campaign data
+    campaigns = [
+        {
+            "id": 1,
+            "title": "Smart Home Garden System",
+            "description": "Automated gardening for urban homes",
+            "goal": 50000,
+            "raised": 32500,
+            "backers": 245,
+            "days_left": 15,
+            "category": "Technology",
+            "status": "active",
+            "image": None
+        },
+        {
+            "id": 2,
+            "title": "Eco-Friendly Water Bottles",
+            "description": "Sustainable bottles made from ocean plastic",
+            "goal": 25000,
+            "raised": 28750,
+            "backers": 412,
+            "days_left": 3,
+            "category": "Environment",
+            "status": "completed",
+            "image": None
+        },
+        {
+            "id": 3,
+            "title": "Educational Board Game",
+            "description": "Teaching kids about climate change",
+            "goal": 15000,
+            "raised": 8200,
+            "backers": 156,
+            "days_left": 22,
+            "category": "Education",
+            "status": "active",
+            "image": None
+        },
+        {
+            "id": 4,
+            "title": "Indie Music Album",
+            "description": "Supporting local artists and musicians",
+            "goal": 10000,
+            "raised": 7500,
+            "backers": 89,
+            "days_left": 12,
+            "category": "Arts",
+            "status": "active",
+            "image": None
+        }
     ]
     
-    # Progress bar
-    progress = (current_step - 1) / (len(steps) - 1)
-    st.progress(progress)
-    
-    # Step indicators
-    cols = st.columns(len(steps))
-    for i, (col, step) in enumerate(zip(cols, steps)):
-        with col:
-            if i + 1 == current_step:
-                st.markdown(f"**{step}** ✨")
-            elif i + 1 < current_step:
-                st.markdown(f"{step} ✅")
-            else:
-                st.markdown(f"{step}")
-
-def show_campaign_basic_info(session_state):
-    """Show basic campaign information form"""
-    
-    st.markdown("### 📝 Basic Campaign Information")
-    
-    with st.form("campaign_basic_info"):
+    for i in range(0, len(campaigns), 2):
         col1, col2 = st.columns(2)
         
         with col1:
-            title = st.text_input(
-                "Campaign Title *",
-                value=session_state.campaign_draft.get('title', ''),
-                placeholder="Enter a compelling campaign title",
-                help="Choose a clear, engaging title that describes your cause"
-            )
-            
-            category = st.selectbox(
-                "Campaign Category *",
-                ["Medical", "Education", "Environment", "Community", "Emergency", "Arts", "Sports", "Technology", "Other"],
-                index=0 if not session_state.campaign_draft.get('category') else 
-                      ["Medical", "Education", "Environment", "Community", "Emergency", "Arts", "Sports", "Technology", "Other"].index(session_state.campaign_draft.get('category', 'Medical'))
-            )
-            
-            location = st.text_input(
-                "Campaign Location *",
-                value=session_state.campaign_draft.get('location', ''),
-                placeholder="City, Country",
-                help="Where is this campaign taking place?"
-            )
+            if i < len(campaigns):
+                render_campaign_card(campaigns[i])
         
         with col2:
-            short_description = st.text_area(
-                "Short Description *",
-                value=session_state.campaign_draft.get('short_description', ''),
-                placeholder="Brief summary of your campaign (max 200 characters)",
-                max_chars=200,
-                help="This will appear in campaign previews"
-            )
-            
-            tags = st.text_input(
-                "Tags",
-                value=session_state.campaign_draft.get('tags', ''),
-                placeholder="health, children, emergency (comma-separated)",
-                help="Add relevant tags to help people find your campaign"
-            )
-        
-        # Form submission
-        col1, col2, col3 = st.columns([1, 1, 1])
-        
-        with col2:
-            submitted = st.form_submit_button("Next: Campaign Details →", use_container_width=True, type="primary")
-        
-        with col3:
-            if st.form_submit_button("Save Draft", use_container_width=True):
-                save_campaign_draft(session_state, {
-                    'title': title,
-                    'category': category,
-                    'location': location,
-                    'short_description': short_description,
-                    'tags': tags
-                })
-                st.success("✅ Draft saved!")
-        
-        if submitted:
-            # Validate required fields
-            if not all([title, category, location, short_description]):
-                st.error("❌ Please fill in all required fields")
-                return
-            
-            # Save to draft and proceed
-            session_state.campaign_draft.update({
-                'title': title,
-                'category': category,
-                'location': location,
-                'short_description': short_description,
-                'tags': tags
-            })
-            
-            session_state.campaign_creation_step = 2
-            safe_rerun()
+            if i + 1 < len(campaigns):
+                render_campaign_card(campaigns[i + 1])
 
-def show_campaign_details(session_state):
-    """Show detailed campaign information form"""
+def render_campaign_card(campaign):
+    """Render a single campaign card with Bootstrap icons."""
+    # Determine category icon
+    category_icons = {
+        "Technology": "cpu-fill",
+        "Environment": "tree-fill",
+        "Education": "book-fill",
+        "Health": "heart-pulse-fill",
+        "Arts": "palette-fill",
+        "Games": "controller"
+    }
     
-    st.markdown("### 📄 Campaign Details")
+    category_icon = category_icons.get(campaign["category"], "tag-fill")
     
-    with st.form("campaign_details"):
-        # Full description
-        full_description = st.text_area(
-            "Full Campaign Description *",
-            value=session_state.campaign_draft.get('full_description', ''),
-            placeholder="Provide a detailed description of your campaign, including the problem you're solving, your solution, and how donations will be used.",
-            height=200,
-            help="Be specific about your goals and how funds will be used"
-        )
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Problem statement
-            problem_statement = st.text_area(
-                "Problem Statement *",
-                value=session_state.campaign_draft.get('problem_statement', ''),
-                placeholder="What problem are you trying to solve?",
-                height=100
-            )
-            
-            # Target beneficiaries
-            target_beneficiaries = st.text_input(
-                "Target Beneficiaries *",
-                value=session_state.campaign_draft.get('target_beneficiaries', ''),
-                placeholder="Who will benefit from this campaign?",
-                help="e.g., 100 children, local community, patients"
-            )
-        
-        with col2:
-            # Solution approach
-            solution_approach = st.text_area(
-                "Solution Approach *",
-                value=session_state.campaign_draft.get('solution_approach', ''),
-                placeholder="How will you solve this problem?",
-                height=100
-            )
-            
-            # Expected impact
-            expected_impact = st.text_area(
-                "Expected Impact",
-                value=session_state.campaign_draft.get('expected_impact', ''),
-                placeholder="What impact do you expect to achieve?",
-                height=100
-            )
-        
-        # Navigation buttons
-        col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
-        
-        with col1:
-            if st.form_submit_button("← Previous", use_container_width=True):
-                session_state.campaign_creation_step = 1
-                safe_rerun()
-        
-        with col2:
-            if st.form_submit_button("Save Draft", use_container_width=True):
-                save_campaign_draft(session_state, {
-                    'full_description': full_description,
-                    'problem_statement': problem_statement,
-                    'solution_approach': solution_approach,
-                    'target_beneficiaries': target_beneficiaries,
-                    'expected_impact': expected_impact
-                })
-                st.success("✅ Draft saved!")
-        
-        with col3:
-            submitted = st.form_submit_button("Next: Media →", use_container_width=True, type="primary")
-        
-        if submitted:
-            # Validate required fields
-            if not all([full_description, problem_statement, solution_approach, target_beneficiaries]):
-                st.error("❌ Please fill in all required fields")
-                return
-            
-            # Save to draft and proceed
-            session_state.campaign_draft.update({
-                'full_description': full_description,
-                'problem_statement': problem_statement,
-                'solution_approach': solution_approach,
-                'target_beneficiaries': target_beneficiaries,
-                'expected_impact': expected_impact
-            })
-            
-            session_state.campaign_creation_step = 3
-            safe_rerun()
-
-def show_campaign_media(session_state):
-    """Show campaign media upload form"""
+    # Calculate progress percentage
+    progress = min((campaign["raised"] / campaign["goal"]) * 100, 100)
     
-    st.markdown("### 🖼️ Campaign Media")
+    # Status styling
+    status_class = f"status-{campaign['status']}"
+    status_icons = {
+        "active": "play-circle-fill",
+        "completed": "check-circle-fill",
+        "pending": "clock-fill"
+    }
+    status_icon = status_icons.get(campaign["status"], "circle")
     
-    st.markdown("""
-    <div class='info-message'>
-        <h4>📸 Media Guidelines</h4>
-        <p>High-quality images and videos help tell your story and build trust with donors.</p>
-        <ul>
-            <li>Use clear, high-resolution images</li>
-            <li>Show the people or cause you're helping</li>
-            <li>Include progress photos if applicable</li>
-            <li>Videos should be under 5 minutes</li>
-        </ul>
+    st.markdown(f"""
+    <div style="border: 1px solid #e0e0e0; border-radius: 12px; padding: 20px; margin: 10px 0; 
+                background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.3s ease;">
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                {get_icon_html(category_icon, 24, '#4CAF50')}
+                <h3 style="margin: 0;">{campaign['title']}</h3>
+            </div>
+            <span style="display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; 
+                         border-radius: 20px; font-size: 12px; font-weight: bold; 
+                         background: #d4edda; color: #155724;">
+                {get_icon_html(status_icon, 14)}
+                {campaign['status'].title()}
+            </span>
+        </div>
+        
+        <p style="color: #666; margin-bottom: 15px;">{campaign['description']}</p>
+        
+        <div style="margin-bottom: 15px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <span>{get_icon_html('currency-dollar', 16)} ${campaign['raised']:,} raised</span>
+                <span>{progress:.1f}% of ${campaign['goal']:,}</span>
+            </div>
+            <div style="background: #e0e0e0; border-radius: 10px; height: 8px;">
+                <div style="background: linear-gradient(90deg, #4CAF50, #66BB6A); 
+                            height: 100%; border-radius: 10px; width: {progress}%;"></div>
+            </div>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; gap: 20px;">
+                <span style="display: flex; align-items: center; gap: 5px;">
+                    {get_icon_html('people', 16, '#666')}
+                    {campaign['backers']} backers
+                </span>
+                <span style="display: flex; align-items: center; gap: 5px;">
+                    {get_icon_html('calendar', 16, '#666')}
+                    {campaign['days_left']} days left
+                </span>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button style="background: none; border: 1px solid #4CAF50; color: #4CAF50; 
+                               padding: 5px 10px; border-radius: 5px; cursor: pointer;">
+                    {get_icon_html('heart', 16)} Like
+                </button>
+                <button style="background: #4CAF50; border: none; color: white; 
+                               padding: 5px 15px; border-radius: 5px; cursor: pointer;">
+                    {get_icon_html('cash-coin', 16)} Back This
+                </button>
+            </div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
-    
-    with st.form("campaign_media"):
-        # Main campaign image
-        st.markdown("#### 🖼️ Main Campaign Image *")
-        main_image = st.file_uploader(
-            "Upload main campaign image",
-            type=['jpg', 'jpeg', 'png'],
-            help="This will be the primary image for your campaign"
-        )
-        
-        # Additional images
-        st.markdown("#### 📸 Additional Images")
-        additional_images = st.file_uploader(
-            "Upload additional images",
-            type=['jpg', 'jpeg', 'png'],
-            accept_multiple_files=True,
-            help="Upload up to 5 additional images"
-        )
-        
-        # Campaign video
-        st.markdown("#### 🎥 Campaign Video (Optional)")
-        video_url = st.text_input(
-            "Video URL",
-            value=session_state.campaign_draft.get('video_url', ''),
-            placeholder="https://youtube.com/watch?v=...",
-            help="YouTube, Vimeo, or other video platform URL"
-        )
-        
-        # Documents
-        st.markdown("#### 📄 Supporting Documents (Optional)")
-        documents = st.file_uploader(
-            "Upload supporting documents",
-            type=['pdf', 'doc', 'docx'],
-            accept_multiple_files=True,
-            help="Medical reports, certificates, project plans, etc."
-        )
-        
-        # Navigation buttons
-        col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
-        
-        with col1:
-            if st.form_submit_button("← Previous", use_container_width=True):
-                session_state.campaign_creation_step = 2
-                safe_rerun()
-        
-        with col2:
-            if st.form_submit_button("Save Draft", use_container_width=True):
-                save_campaign_draft(session_state, {
-                    'video_url': video_url,
-                    'main_image_uploaded': main_image is not None,
-                    'additional_images_count': len(additional_images) if additional_images else 0,
-                    'documents_count': len(documents) if documents else 0
-                })
-                st.success("✅ Draft saved!")
-        
-        with col3:
-            submitted = st.form_submit_button("Next: Funding →", use_container_width=True, type="primary")
-        
-        if submitted:
-            # Validate required fields
-            if not main_image:
-                st.error("❌ Please upload a main campaign image")
-                return
-            
-            # Save media information to draft
-            session_state.campaign_draft.update({
-                'video_url': video_url,
-                'main_image': main_image,
-                'additional_images': additional_images,
-                'documents': documents
-            })
-            
-            session_state.campaign_creation_step = 4
-            safe_rerun()
 
-def show_campaign_funding(session_state):
-    """Show campaign funding configuration form"""
+def render_campaign_details_page(campaign_id):
+    """Render detailed campaign page with Bootstrap icons."""
+    st.markdown(f"""
+    <h1>{get_icon_html('eye-fill', 32, ICON_COLORS['primary'])} Campaign Details</h1>
+    """, unsafe_allow_html=True)
     
-    st.markdown("### 💰 Funding Configuration")
-    
-    with st.form("campaign_funding"):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Funding goal
-            funding_goal = st.number_input(
-                "Funding Goal (USD) *",
-                min_value=100,
-                max_value=1000000,
-                value=session_state.campaign_draft.get('funding_goal', 5000),
-                step=100,
-                help="How much money do you need to raise?"
-            )
-            
-            # Campaign duration
-            duration_days = st.number_input(
-                "Campaign Duration (Days) *",
-                min_value=7,
-                max_value=365,
-                value=session_state.campaign_draft.get('duration_days', 30),
-                step=1,
-                help="How long will your campaign run?"
-            )
-            
-            # Minimum donation
-            min_donation = st.number_input(
-                "Minimum Donation (USD)",
-                min_value=1,
-                max_value=1000,
-                value=session_state.campaign_draft.get('min_donation', 10),
-                step=1,
-                help="Minimum amount donors can contribute"
-            )
-        
-        with col2:
-            # Funding type
-            funding_type = st.selectbox(
-                "Funding Type *",
-                ["All or Nothing", "Keep What You Raise"],
-                index=0 if session_state.campaign_draft.get('funding_type') == "All or Nothing" else 1,
-                help="All or Nothing: Only receive funds if goal is met. Keep What You Raise: Keep all donations regardless of goal."
-            )
-            
-            # End date calculation
-            start_date = datetime.now()
-            end_date = start_date + timedelta(days=duration_days)
-            
-            st.markdown(f"""
-            **Campaign Timeline:**
-            - **Start Date:** {start_date.strftime('%B %d, %Y')}
-            - **End Date:** {end_date.strftime('%B %d, %Y')}
-            - **Duration:** {duration_days} days
-            """)
-        
-        # Milestones
-        st.markdown("#### 🎯 Funding Milestones (Optional)")
-        
-        milestones = []
-        for i in range(3):
-            col1, col2 = st.columns(2)
-            with col1:
-                milestone_amount = st.number_input(
-                    f"Milestone {i+1} Amount",
-                    min_value=0,
-                    max_value=funding_goal,
-                    value=0,
-                    key=f"milestone_amount_{i}"
-                )
-            with col2:
-                milestone_description = st.text_input(
-                    f"Milestone {i+1} Description",
-                    placeholder="What will be achieved at this milestone?",
-                    key=f"milestone_desc_{i}"
-                )
-            
-            if milestone_amount > 0 and milestone_description:
-                milestones.append({
-                    'amount': milestone_amount,
-                    'description': milestone_description
-                })
-        
-        # Navigation buttons
-        col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
-        
-        with col1:
-            if st.form_submit_button("← Previous", use_container_width=True):
-                session_state.campaign_creation_step = 3
-                safe_rerun()
-        
-        with col2:
-            if st.form_submit_button("Save Draft", use_container_width=True):
-                save_campaign_draft(session_state, {
-                    'funding_goal': funding_goal,
-                    'duration_days': duration_days,
-                    'min_donation': min_donation,
-                    'funding_type': funding_type,
-                    'milestones': milestones
-                })
-                st.success("✅ Draft saved!")
-        
-        with col3:
-            submitted = st.form_submit_button("Next: Review →", use_container_width=True, type="primary")
-        
-        if submitted:
-            # Validate required fields
-            if funding_goal < 100:
-                st.error("❌ Funding goal must be at least $100")
-                return
-            
-            # Save to draft and proceed
-            session_state.campaign_draft.update({
-                'funding_goal': funding_goal,
-                'duration_days': duration_days,
-                'min_donation': min_donation,
-                'funding_type': funding_type,
-                'milestones': milestones,
-                'start_date': start_date.isoformat(),
-                'end_date': end_date.isoformat()
-            })
-            
-            session_state.campaign_creation_step = 5
-            safe_rerun()
-
-def show_campaign_review(session_state):
-    """Show campaign review and submission"""
-    
-    st.markdown("### ✅ Review Your Campaign")
-    
-    draft = session_state.campaign_draft
-    
-    # Campaign preview
-    st.markdown("#### 📋 Campaign Summary")
-    
+    # Campaign header
     col1, col2 = st.columns([2, 1])
     
     with col1:
         st.markdown(f"""
-        **Title:** {draft.get('title', 'N/A')}
+        <h2>{get_icon_html('cpu-fill', 28, '#4CAF50')} Smart Home Garden System</h2>
+        <p style="color: #666; font-size: 18px;">Automated gardening for urban homes</p>
+        """, unsafe_allow_html=True)
         
-        **Category:** {draft.get('category', 'N/A')}
+        # Campaign description
+        st.markdown(f"""
+        <h3>{get_icon_html('file-text', ICON_SIZES['lg'])} About This Project</h3>
+        """, unsafe_allow_html=True)
         
-        **Location:** {draft.get('location', 'N/A')}
-        
-        **Short Description:** {draft.get('short_description', 'N/A')}
-        
-        **Funding Goal:** ${draft.get('funding_goal', 0):,}
-        
-        **Duration:** {draft.get('duration_days', 0)} days
-        
-        **Funding Type:** {draft.get('funding_type', 'N/A')}
+        st.write("""
+        Our Smart Home Garden System revolutionizes urban gardening by providing 
+        automated care for your plants. Using IoT sensors and AI, it monitors 
+        soil moisture, light levels, and nutrient content to ensure optimal 
+        growing conditions.
         """)
     
     with col2:
-        st.markdown("**Media Uploaded:**")
-        st.write(f"✅ Main Image: {'Yes' if draft.get('main_image') else 'No'}")
-        st.write(f"📸 Additional Images: {len(draft.get('additional_images', []))}")
-        st.write(f"🎥 Video: {'Yes' if draft.get('video_url') else 'No'}")
-        st.write(f"📄 Documents: {len(draft.get('documents', []))}")
-    
-    # Terms and conditions
-    st.markdown("#### 📜 Terms and Conditions")
-    
-    terms_accepted = st.checkbox(
-        "I agree to the Terms of Service and Campaign Guidelines",
-        help="You must agree to the terms to submit your campaign"
-    )
-    
-    verification_consent = st.checkbox(
-        "I consent to campaign verification process",
-        help="Your campaign will be reviewed before going live"
-    )
-    
-    # Submission buttons
-    col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
-    
-    with col1:
-        if st.button("← Previous", use_container_width=True):
-            session_state.campaign_creation_step = 4
-            safe_rerun()
-    
-    with col2:
-        if st.button("Save Draft", use_container_width=True):
-            save_campaign_draft(session_state, draft)
-            st.success("✅ Draft saved!")
-    
-    with col3:
-        if st.button("Preview Campaign", use_container_width=True):
-            show_campaign_preview(draft)
-    
-    with col4:
-        if st.button("🚀 Submit Campaign", use_container_width=True, type="primary"):
-            if not terms_accepted or not verification_consent:
-                st.error("❌ Please accept the terms and consent to verification")
-                return
+        # Funding progress
+        st.markdown(f"""
+        <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h3 style="margin-top: 0;">{get_icon_html('bullseye', 24)} Funding Progress</h3>
+            <h2 style="color: #4CAF50;">$32,500</h2>
+            <p style="color: #666;">raised of $50,000 goal</p>
             
-            if handle_campaign_submission(session_state, draft):
-                st.success("🎉 Campaign submitted successfully!")
-                st.balloons()
-                
-                # Reset campaign creation state
-                session_state.campaign_creation_step = 1
-                session_state.campaign_draft = {}
-                
-                # Redirect to my campaigns
-                session_state.current_page = 'my_campaigns'
-                safe_rerun()
-
-def save_campaign_draft(session_state, data: Dict[str, Any]):
-    """Save campaign draft to session state"""
-    session_state.campaign_draft.update(data)
-    session_state.campaign_draft['last_saved'] = datetime.now().isoformat()
-
-def show_campaign_preview(draft: Dict[str, Any]):
-    """Show campaign preview"""
-    
-    with st.expander("📋 Campaign Preview", expanded=True):
-        st.markdown(f"# {draft.get('title', 'Campaign Title')}")
-        st.markdown(f"**Category:** {draft.get('category')} | **Location:** {draft.get('location')}")
-        
-        # Progress bar (mock)
-        st.progress(0.0)
-        st.markdown(f"**Goal:** ${draft.get('funding_goal', 0):,} | **Raised:** $0 | **Days Left:** {draft.get('duration_days', 0)}")
-        
-        st.markdown("### About This Campaign")
-        st.write(draft.get('full_description', 'No description provided'))
-        
-        if draft.get('milestones'):
-            st.markdown("### Milestones")
-            for i, milestone in enumerate(draft.get('milestones', [])):
-                st.write(f"🎯 ${milestone['amount']:,}: {milestone['description']}")
-
-def handle_campaign_submission(session_state, draft: Dict[str, Any]) -> bool:
-    """Handle campaign submission to backend"""
-    
-    try:
-        user_data = session_state.get('user_data')
-        if not user_data:
-            st.error("❌ User data not found")
-            return False
-        
-        # Prepare campaign data for submission
-        campaign_data = {
-            'title': draft.get('title'),
-            'category': draft.get('category'),
-            'location': draft.get('location'),
-            'short_description': draft.get('short_description'),
-            'full_description': draft.get('full_description'),
-            'problem_statement': draft.get('problem_statement'),
-            'solution_approach': draft.get('solution_approach'),
-            'target_beneficiaries': draft.get('target_beneficiaries'),
-            'expected_impact': draft.get('expected_impact'),
-            'funding_goal': draft.get('funding_goal'),
-            'duration_days': draft.get('duration_days'),
-            'min_donation': draft.get('min_donation'),
-            'funding_type': draft.get('funding_type'),
-            'video_url': draft.get('video_url'),
-            'tags': draft.get('tags'),
-            'milestones': draft.get('milestones', []),
-            'start_date': draft.get('start_date'),
-            'end_date': draft.get('end_date'),
-            'organization_id': user_data.get('id'),
-            'organization_email': user_data.get('email'),
-            'status': 'pending_review',
-            'created_at': datetime.now().isoformat()
-        }
-        
-        # Submit to backend
-        response = requests.post(
-            f"{BACKEND_URL}/api/v1/campaigns/create",
-            json=campaign_data,
-            timeout=15
-        )
-        
-        if response.status_code == 201:
-            logger.info(f"Campaign '{draft.get('title')}' submitted successfully")
-            return True
-        else:
-            logger.error(f"Campaign submission failed: {response.status_code}")
-            st.error(f"❌ Submission failed: {response.text}")
-            return False
+            <div style="background: #e0e0e0; border-radius: 10px; height: 10px; margin: 15px 0;">
+                <div style="background: linear-gradient(90deg, #4CAF50, #66BB6A); 
+                            height: 100%; border-radius: 10px; width: 65%;"></div>
+            </div>
             
-    except Exception as e:
-        logger.error(f"Exception during campaign submission: {e}")
-        st.error(f"❌ Submission error: {str(e)}")
-        return False
+            <div style="display: flex; justify-content: space-between; margin: 15px 0;">
+                <span>{get_icon_html('people', 16)} 245 backers</span>
+                <span>{get_icon_html('calendar', 16)} 15 days left</span>
+            </div>
+            
+            <button style="width: 100%; background: #4CAF50; border: none; color: white; 
+                           padding: 15px; border-radius: 8px; font-size: 16px; cursor: pointer;">
+                {get_icon_html('cash-coin', 20)} Back This Project
+            </button>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Tabs for additional content
+    tab1, tab2, tab3, tab4 = st.tabs([
+        f"{get_icon_html('info-circle', ICON_SIZES['sm'])} Story",
+        f"{get_icon_html('gift', ICON_SIZES['sm'])} Rewards",
+        f"{get_icon_html('chat-dots', ICON_SIZES['sm'])} Updates",
+        f"{get_icon_html('people', ICON_SIZES['sm'])} Backers"
+    ])
+    
+    with tab1:
+        render_campaign_story_tab()
+    
+    with tab2:
+        render_campaign_rewards_tab()
+    
+    with tab3:
+        render_campaign_updates_tab()
+    
+    with tab4:
+        render_campaign_backers_tab()
 
-def render_campaign_management_page(session_state):
-    """Render campaign management page for organizations"""
+def render_campaign_story_tab():
+    """Render campaign story tab."""
+    st.markdown(f"""
+    <h3>{get_icon_html('book', ICON_SIZES['lg'])} Project Story</h3>
+    """, unsafe_allow_html=True)
     
-    st.markdown("### 📊 My Campaigns")
+    st.write("""
+    ### The Problem
+    Urban dwellers struggle to maintain healthy gardens due to busy lifestyles 
+    and lack of gardening expertise. Many plants die from over or under-watering, 
+    poor lighting, or nutrient deficiencies.
     
-    # Check authentication and role
-    if not session_state.get('authenticated', False):
-        st.error("❌ Authentication required")
-        return
+    ### Our Solution
+    The Smart Home Garden System uses advanced sensors and machine learning to:
+    - Monitor soil moisture and automatically water plants
+    - Adjust LED grow lights based on plant needs
+    - Track nutrient levels and alert users when fertilization is needed
+    - Provide mobile app notifications and insights
     
-    if session_state.get('user_type') != 'organization':
-        st.error("❌ Organization role required")
-        return
-    
-    # Show campaigns list
-    show_my_campaigns_list(session_state)
+    ### Why It Matters
+    This system enables anyone to grow fresh herbs, vegetables, and flowers at home, 
+    promoting healthier eating and sustainable living in urban environments.
+    """)
 
-def show_my_campaigns_list(session_state):
-    """Show list of organization's campaigns"""
+def render_campaign_rewards_tab():
+    """Render campaign rewards tab."""
+    st.markdown(f"""
+    <h3>{get_icon_html('gift-fill', ICON_SIZES['lg'])} Reward Tiers</h3>
+    """, unsafe_allow_html=True)
     
-    # Mock campaign data (in real app, fetch from backend)
-    campaigns = [
-        {
-            'id': '1',
-            'title': 'Emergency Medical Fund',
-            'status': 'active',
-            'goal': 50000,
-            'raised': 37500,
-            'donors': 89,
-            'days_left': 15,
-            'created_at': '2024-01-15'
-        },
-        {
-            'id': '2', 
-            'title': 'School Renovation Project',
-            'status': 'pending_review',
-            'goal': 25000,
-            'raised': 0,
-            'donors': 0,
-            'days_left': 30,
-            'created_at': '2024-02-01'
-        }
+    rewards = [
+        {"amount": 25, "title": "Early Bird Special", "description": "Digital thank you + project updates", "claimed": 50, "total": 100},
+        {"amount": 75, "title": "Starter Kit", "description": "Basic sensor kit + mobile app access", "claimed": 30, "total": 50},
+        {"amount": 150, "title": "Complete System", "description": "Full garden system + installation guide", "claimed": 45, "total": 75},
+        {"amount": 300, "title": "Premium Package", "description": "Complete system + premium plants + 1-year support", "claimed": 15, "total": 25}
     ]
     
-    # Campaign stats
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Total Campaigns", len(campaigns))
-    
-    with col2:
-        active_campaigns = len([c for c in campaigns if c['status'] == 'active'])
-        st.metric("Active Campaigns", active_campaigns)
-    
-    with col3:
-        total_raised = sum(c['raised'] for c in campaigns)
-        st.metric("Total Raised", f"${total_raised:,}")
-    
-    with col4:
-        total_donors = sum(c['donors'] for c in campaigns)
-        st.metric("Total Donors", total_donors)
-    
-    # Campaigns list
-    st.markdown("#### 📋 Your Campaigns")
-    
-    for campaign in campaigns:
-        with st.container():
-            col1, col2, col3 = st.columns([3, 1, 1])
-            
-            with col1:
-                st.markdown(f"**{campaign['title']}**")
-                
-                # Progress bar
-                progress = campaign['raised'] / campaign['goal'] if campaign['goal'] > 0 else 0
-                st.progress(progress)
-                
-                st.markdown(f"${campaign['raised']:,} raised of ${campaign['goal']:,} goal")
-                st.markdown(f"👥 {campaign['donors']} donors • ⏰ {campaign['days_left']} days left")
-            
-            with col2:
-                # Status badge
-                status_color = {
-                    'active': '🟢',
-                    'pending_review': '🟡',
-                    'completed': '✅',
-                    'cancelled': '🔴'
-                }
-                st.markdown(f"{status_color.get(campaign['status'], '⚪')} {campaign['status'].replace('_', ' ').title()}")
-            
-            with col3:
-                if st.button("View Details", key=f"view_{campaign['id']}", use_container_width=True):
-                    session_state.selected_campaign = campaign['id']
-                    session_state.current_page = 'campaign_details'
-                    safe_rerun()
-                
-                if st.button("Edit", key=f"edit_{campaign['id']}", use_container_width=True):
-                    st.info("🔧 Campaign editing coming soon!")
-            
-            st.markdown("---")
-
-def handle_campaign_update(session_state, campaign_id: str, updates: Dict[str, Any]) -> bool:
-    """Handle campaign update"""
-    
-    try:
-        response = requests.put(
-            f"{BACKEND_URL}/api/v1/campaigns/{campaign_id}",
-            json=updates,
-            timeout=15
-        )
+    for reward in rewards:
+        availability = f"{reward['claimed']}/{reward['total']} claimed"
+        progress = (reward['claimed'] / reward['total']) * 100
         
-        if response.status_code == 200:
-            logger.info(f"Campaign {campaign_id} updated successfully")
-            return True
-        else:
-            logger.error(f"Campaign update failed: {response.status_code}")
-            return False
-            
-    except Exception as e:
-        logger.error(f"Exception during campaign update: {e}")
-        return False
+        st.markdown(f"""
+        <div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin: 15px 0; background: white;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                <h4 style="margin: 0; color: #4CAF50;">${reward['amount']} - {reward['title']}</h4>
+                <span style="color: #666; font-size: 14px;">{availability}</span>
+            </div>
+            <p style="color: #666; margin-bottom: 15px;">{reward['description']}</p>
+            <div style="background: #f0f0f0; border-radius: 5px; height: 6px; margin-bottom: 10px;">
+                <div style="background: #4CAF50; height: 100%; border-radius: 5px; width: {progress}%;"></div>
+            </div>
+            <button style="background: #4CAF50; border: none; color: white; padding: 10px 20px; 
+                           border-radius: 5px; cursor: pointer;">
+                {get_icon_html('cash-coin', 16)} Select Reward
+            </button>
+        </div>
+        """, unsafe_allow_html=True)
 
-# Export functions for main app integration
-__all__ = [
-    'render_create_campaign_page',
-    'show_campaign_creation_form',
-    'handle_campaign_submission',
-    'show_campaign_progress',
-    'render_campaign_management_page',
-    'show_my_campaigns_list',
-    'handle_campaign_update'
-]
+def render_campaign_updates_tab():
+    """Render campaign updates tab."""
+    st.markdown(f"""
+    <h3>{get_icon_html('megaphone-fill', ICON_SIZES['lg'])} Project Updates</h3>
+    """, unsafe_allow_html=True)
+    
+    updates = [
+        {"date": "2024-08-25", "title": "Prototype Testing Complete!", "content": "We've successfully tested our prototype with 10 beta users..."},
+        {"date": "2024-08-20", "title": "Manufacturing Partner Confirmed", "content": "Excited to announce our partnership with GreenTech Manufacturing..."},
+        {"date": "2024-08-15", "title": "50% Funding Milestone Reached", "content": "Thank you to all our amazing backers! We've reached 50% of our goal..."}
+    ]
+    
+    for update in updates:
+        st.markdown(f"""
+        <div style="border-left: 4px solid #4CAF50; padding-left: 20px; margin: 20px 0;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                {get_icon_html('calendar-event', 20, '#4CAF50')}
+                <span style="color: #666; font-size: 14px;">{update['date']}</span>
+            </div>
+            <h4 style="margin: 0 0 10px 0;">{update['title']}</h4>
+            <p style="color: #666;">{update['content']}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+def render_campaign_backers_tab():
+    """Render campaign backers tab."""
+    st.markdown(f"""
+    <h3>{get_icon_html('people-fill', ICON_SIZES['lg'])} Our Backers</h3>
+    """, unsafe_allow_html=True)
+    
+    st.markdown(f"""
+    <div style="text-align: center; margin: 30px 0;">
+        <h2>{get_icon_html('heart-fill', 32, '#FF6B6B')} 245 Amazing Backers</h2>
+        <p style="color: #666;">Thank you to everyone who believes in our vision!</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Recent backers
+    recent_backers = [
+        {"name": "John D.", "amount": 150, "time": "2 hours ago"},
+        {"name": "Sarah M.", "amount": 75, "time": "5 hours ago"},
+        {"name": "Mike R.", "amount": 300, "time": "1 day ago"},
+        {"name": "Lisa K.", "amount": 25, "time": "1 day ago"}
+    ]
+    
+    st.markdown(f"""
+    <h4>{get_icon_html('clock', ICON_SIZES['md'])} Recent Backers</h4>
+    """, unsafe_allow_html=True)
+    
+    for backer in recent_backers:
+        st.markdown(f"""
+        <div style="display: flex; justify-content: space-between; align-items: center; 
+                    padding: 10px; margin: 5px 0; background: #f8f9fa; border-radius: 5px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                {get_icon_html('person-circle', 20, '#4CAF50')}
+                <span style="font-weight: 500;">{backer['name']}</span>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-weight: 500; color: #4CAF50;">${backer['amount']}</div>
+                <div style="font-size: 12px; color: #666;">{backer['time']}</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# Helper functions
+def validate_campaign_data(title: str, category: str, description: str, funding_goal: float) -> bool:
+    """Validate campaign creation data."""
+    return (title and len(title) >= 5 and 
+            category and 
+            description and len(description) >= 50 and 
+            funding_goal >= 100)
+
+# Main campaign workflow function
+def run_campaign_workflow():
+    """Main function to run campaign workflow."""
+    if 'campaign_page' not in st.session_state:
+        st.session_state.campaign_page = 'browse'
+    
+    # Navigation
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        if icon_button('search', 'Browse', 'nav_browse', ICON_SIZES['sm']):
+            st.session_state.campaign_page = 'browse'
+    with col2:
+        if icon_button('plus-circle-fill', 'Create', 'nav_create', ICON_SIZES['sm']):
+            st.session_state.campaign_page = 'create'
+    with col3:
+        if icon_button('speedometer2', 'Dashboard', 'nav_dashboard', ICON_SIZES['sm']):
+            st.session_state.campaign_page = 'dashboard'
+    with col4:
+        if icon_button('eye', 'View Details', 'nav_details', ICON_SIZES['sm']):
+            st.session_state.campaign_page = 'details'
+    
+    # Render appropriate page
+    if st.session_state.campaign_page == 'browse':
+        render_campaign_browse_page()
+    elif st.session_state.campaign_page == 'create':
+        render_campaign_creation_form()
+    elif st.session_state.campaign_page == 'dashboard':
+        render_campaign_management_dashboard()
+    elif st.session_state.campaign_page == 'details':
+        render_campaign_details_page(1)  # Sample campaign ID
 
