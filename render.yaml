@@ -1,4 +1,4 @@
-# Haven Crowdfunding Platform - Secure Render Blueprint
+# Haven Crowdfunding Platform - Working Render Blueprint
 # Two Repository Setup: Frontend + Backend
 # Place this file as: haven-frontend/render.yaml
 
@@ -6,16 +6,8 @@
 previews:
   generation: automatic
 
-# PostgreSQL database configuration
-databases:
-  - name: haven-database
-    plan: free
-    databaseName: haven_database
-    user: haven_database_user
-    region: oregon
-    ipAllowList:
-      - source: 0.0.0.0/0
-        description: Allow all connections for development
+# NO database defined - use your existing database
+# Your existing DATABASE_URL will be available through the crowdfunding environment group
 
 # Service definitions for both repositories
 services:
@@ -32,15 +24,10 @@ services:
     healthCheckPath: /health
     autoDeploy: true
     envVars:
-      # Database URL automatically injected from database
-      - key: DATABASE_URL
-        fromDatabase:
-          name: haven-database
-          property: connectionString
       # Port for the service
       - key: PORT
         value: 8000
-      # Reference your existing environment group with all secrets
+      # Reference your existing environment group with all secrets including DATABASE_URL
       - fromGroup: crowdfunding
     
   # Streamlit Frontend Service (from frontend repository)
@@ -56,14 +43,9 @@ services:
     healthCheckPath: /_stcore/health
     autoDeploy: true
     envVars:
-      # Database URL automatically injected from database
-      - key: DATABASE_URL
-        fromDatabase:
-          name: haven-database
-          property: connectionString
       # Port for the service
       - key: PORT
         value: 8501
-      # Reference your existing environment group with all secrets
+      # Reference your existing environment group with all secrets including DATABASE_URL
       - fromGroup: crowdfunding
 
