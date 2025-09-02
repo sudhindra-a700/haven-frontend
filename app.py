@@ -7,6 +7,7 @@ import base64
 import os
 import json
 import psycopg2
+import psycopg2.pool
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 import logging
@@ -155,20 +156,37 @@ def create_icon_button(icon_name: str, label: str, key: str, size: int = 18,
     return st.button(f"→ {label}", key=key, help=help_text or f"Navigate to {label}")
 
 # ================================
-# DATABASE UTILITIES
+# DATABASE UTILITIES (WITH CONNECTION POOLING)
 # ================================
 
-def get_db_connection():
-    """Get database connection using environment variable."""
+@st.cache_resource
+def get_db_connection_pool():
+    """Create and cache a database connection pool."""
     try:
-        conn = psycopg2.connect(DATABASE_URL)
-        return conn
-    except Exception as e:
+        pool = psycopg2.pool.SimpleConnectionPool(1, 10, dsn=DATABASE_URL)
+        logger.info("Database connection pool created successfully.")
+        return pool
+    except psycopg2.OperationalError as e:
+        st.error(f"🚨 Database connection failed: {e}")
         logger.error(f"Database connection failed: {e}")
         return None
 
+def get_db_connection():
+    """Get a connection from the pool."""
+    pool = get_db_connection_pool()
+    if pool:
+        return pool.getconn()
+    return None
+
+def release_db_connection(conn):
+    """Return a connection to the pool."""
+    pool = get_db_connection_pool()
+    if pool and conn:
+        pool.putconn(conn)
+
 def test_database_connection() -> bool:
     """Test database connectivity."""
+    conn = None
     try:
         conn = get_db_connection()
         if conn:
@@ -176,15 +194,18 @@ def test_database_connection() -> bool:
             cursor.execute("SELECT 1")
             result = cursor.fetchone()
             cursor.close()
-            conn.close()
             return result is not None
     except Exception as e:
         logger.error(f"Database test failed: {e}")
         return False
+    finally:
+        if conn:
+            release_db_connection(conn)
     return False
 
 def fetch_user_campaigns(user_id: str) -> List[Dict]:
-    """Fetch user's campaigns from database."""
+    """Fetch user's campaigns from database using a pooled connection."""
+    conn = None
     try:
         conn = get_db_connection()
         if not conn:
@@ -214,14 +235,17 @@ def fetch_user_campaigns(user_id: str) -> List[Dict]:
             })
         
         cursor.close()
-        conn.close()
         return campaigns
     except Exception as e:
         logger.error(f"Failed to fetch user campaigns: {e}")
         return []
+    finally:
+        if conn:
+            release_db_connection(conn)
 
 def fetch_user_contributions(user_id: str) -> List[Dict]:
     """Fetch user's contributions from database."""
+    conn = None
     try:
         conn = get_db_connection()
         if not conn:
@@ -246,14 +270,17 @@ def fetch_user_contributions(user_id: str) -> List[Dict]:
             })
         
         cursor.close()
-        conn.close()
         return contributions
     except Exception as e:
         logger.error(f"Failed to fetch user contributions: {e}")
         return []
+    finally:
+        if conn:
+            release_db_connection(conn)
 
 def fetch_platform_stats() -> Dict:
     """Fetch platform statistics from database."""
+    conn = None
     try:
         conn = get_db_connection()
         if not conn:
@@ -278,7 +305,6 @@ def fetch_platform_stats() -> Dict:
         active_campaigns = cursor.fetchone()[0]
         
         cursor.close()
-        conn.close()
         
         return {
             'total_raised': total_raised,
@@ -294,7 +320,12 @@ def fetch_platform_stats() -> Dict:
             'successful_projects': 1247,
             'active_campaigns': 89
         }
+    finally:
+        if conn:
+            release_db_connection(conn)
 
+
+# ... (rest of the file remains the same until AUTHENTICATION PAGES)
 # ================================
 # API INTEGRATION
 # ================================
@@ -693,9 +724,8 @@ def render_authenticated_sidebar():
     # FULL navigation for authenticated users
     nav_items = [
         ("house-fill", "Home", "home"),
-        ("search", "Browse Campaigns", "browse"),
-        ("plus-circle-fill", "Create Campaign", "create"),
-        ("speedometer2", "Dashboard", "dashboard"),
+        ("search", "Browse Campaigns", "explore"),
+        ("plus-circle-fill", "Create Campaign", "campaign"),
         ("person-circle", "Profile", "profile"),
         ("question-circle-fill", "Help", "help"),
         ("box-arrow-right", "Logout", "logout")
@@ -744,7 +774,7 @@ def render_user_stats_section():
         stats_items = [
             ("rocket-takeoff", "Campaigns Created", campaigns_created),
             ("bookmark-star", "Campaigns Backed", campaigns_backed),
-            ("currency-dollar", "Total Contributed", f"${total_contributed:,.2f}")
+            ("currency-dollar", "Total Contributed", f"₹{total_contributed:,.2f}")
         ]
         
         for icon_name, label, value in stats_items:
@@ -771,39 +801,60 @@ def render_user_stats_section():
 
 def render_login_content():
     """Render login page with OAuth integration."""
-    
-    st.markdown(f"""
-    <div style="text-align: center; margin: 40px 0;">
-        <h1 style="color: #333; font-size: 36px; margin-bottom: 15px;">
-            {get_colored_icon_b64('shield-lock-fill', 42, '#4CAF50')} Welcome to Haven
-        </h1>
-        <p style="font-size: 20px; color: #666; max-width: 600px; margin: 0 auto;">
-            Your gateway to innovative crowdfunding projects
-        </p>
-        <p style="font-size: 16px; color: #999; margin-top: 10px;">
-            Please login to access the platform
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Check backend health
-    backend_status = check_backend_health()
-    if not backend_status["online"]:
-        st.error(f"🚨 Backend service is currently unavailable. Status: {backend_status.get('status', 'unknown')}")
-        st.info("💡 Please try again in a few moments or contact support if the issue persists.")
-        return
-    
-    # Center the login form
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        # OAuth login section
-        st.markdown(f"### {get_colored_icon_b64('box-arrow-in-right', 28, '#4CAF50')} Sign In")
+    st.markdown("""
+        <style>
+        .login-container {
+            background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            margin: 2rem auto;
+            max-width: 500px;
+        }
+        .login-header {
+            text-align: center;
+            color: #2e7d32;
+            margin-bottom: 2rem;
+        }
+        .divider {
+            text-align: center;
+            margin: 1.5rem 0;
+            position: relative;
+        }
+        .divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #ccc;
+        }
+        .divider span {
+            background: white;
+            padding: 0 1rem;
+            color: #666;
+        }
+        </style>
+        """, unsafe_allow_html=True)
         
-        # Google OAuth button
+    st.markdown("""
+        <div class="login-container">
+            <div class="login-header">
+                <h1>🏠 Welcome to HAVEN</h1>
+                <h3>Your Trusted Crowdfunding Platform</h3>
+                <p>Sign in to start your journey of making a difference</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        st.markdown("### 🔐 Sign In")
+        
         google_oauth_html = f'''
         <div style="text-align: center; margin: 20px 0;">
-            <a href="{get_oauth_login_url('google')}" target="_blank" style="
+            <a href="{get_oauth_login_url('google')}" target="_self" style="
                 display: inline-block;
                 background: #4285F4;
                 color: white;
@@ -816,19 +867,16 @@ def render_login_content():
                 box-shadow: 0 6px 20px rgba(66, 133, 244, 0.3);
                 width: 100%;
                 margin-bottom: 15px;
-                backdrop-filter: blur(10px);
-            " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(66, 133, 244, 0.4)'"
-               onmouseout="this.style.transform='translateY(0px)'; this.style.boxShadow='0 6px 20px rgba(66, 133, 244, 0.3)'">
+            ">
                 {get_bootstrap_icon_b64('google', 20)} Continue with Google
             </a>
         </div>
         '''
         st.markdown(google_oauth_html, unsafe_allow_html=True)
-        
-        # Facebook OAuth button
+
         facebook_oauth_html = f'''
         <div style="text-align: center; margin: 20px 0;">
-            <a href="{get_oauth_login_url('facebook')}" target="_blank" style="
+            <a href="{get_oauth_login_url('facebook')}" target="_self" style="
                 display: inline-block;
                 background: #1877F2;
                 color: white;
@@ -841,64 +889,71 @@ def render_login_content():
                 box-shadow: 0 6px 20px rgba(24, 119, 242, 0.3);
                 width: 100%;
                 margin-bottom: 25px;
-                backdrop-filter: blur(10px);
-            " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(24, 119, 242, 0.4)'"
-               onmouseout="this.style.transform='translateY(0px)'; this.style.boxShadow='0 6px 20px rgba(24, 119, 242, 0.3)'">
+            ">
                 {get_bootstrap_icon_b64('facebook', 20)} Continue with Facebook
             </a>
         </div>
         '''
         st.markdown(facebook_oauth_html, unsafe_allow_html=True)
+
+        st.markdown("""
+        <div class="divider">
+            <span>or</span>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        with st.form("login_form"):
+            st.markdown("#### Email & Password")
+            
+            email = st.text_input(
+                "📧 Email Address",
+                placeholder="Enter your email address",
+                help="Use the email you registered with"
+            )
+            
+            password = st.text_input(
+                "🔒 Password",
+                type="password",
+                placeholder="Enter your password",
+                help="Your secure password"
+            )
+            
+            login_submitted = st.form_submit_button(
+                "🚀 Sign In",
+                use_container_width=True,
+                type="primary"
+            )
+        
+        if login_submitted:
+            if email and password:
+                login_data = {"email": email, "password": password}
+                login_response = make_api_request("/auth/login", method="POST", data=login_data)
+                
+                if login_response.get('success'):
+                    user_data = login_response['data'].get('user', {})
+                    access_token = login_response['data'].get('access_token')
+                    refresh_token = login_response['data'].get('refresh_token')
+                    
+                    if access_token:
+                        login_user(user_data, access_token, refresh_token)
+                        st.success("✅ Logged in successfully!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Invalid response from server")
+                else:
+                    error_msg = login_response.get('error', 'Login failed')
+                    st.error(f"❌ {error_msg}")
+            else:
+                st.error("❌ Please enter both email and password")
         
         st.markdown("---")
-        st.markdown("### Or sign in with email:")
-        
-        # Email login form
-        with st.form("login_form"):
-            email = st.text_input(
-                f"{get_colored_icon_b64('envelope-fill', 18, '#666')} Email", 
-                placeholder="Enter your email address"
-            )
-            password = st.text_input(
-                f"{get_colored_icon_b64('lock-fill', 18, '#666')} Password", 
-                type="password", 
-                placeholder="Enter your password"
-            )
-            
-            col_login, col_register = st.columns(2)
-            
-            with col_login:
-                if st.form_submit_button("🔐 Sign In", use_container_width=True):
-                    if email and password:
-                        # Call backend login API
-                        login_data = {"email": email, "password": password}
-                        login_response = make_api_request("/auth/login", method="POST", data=login_data)
-                        
-                        if login_response.get('success'):
-                            user_data = login_response['data'].get('user', {})
-                            access_token = login_response['data'].get('access_token')
-                            refresh_token = login_response['data'].get('refresh_token')
-                            
-                            if access_token:
-                                login_user(user_data, access_token, refresh_token)
-                                st.success("✅ Logged in successfully!")
-                                st.rerun()
-                            else:
-                                st.error("❌ Invalid response from server")
-                        else:
-                            error_msg = login_response.get('error', 'Login failed')
-                            st.error(f"❌ {error_msg}")
-                    else:
-                        st.error("❌ Please enter both email and password")
-            
-            with col_register:
-                if st.form_submit_button("📝 Create Account", use_container_width=True):
-                    st.session_state[SESSION_KEYS['current_page']] = 'register'
-                    st.rerun()
+        if st.button("📝 Create Account", key="register_btn", use_container_width=True):
+            st.session_state.current_page = 'register'
+            st.rerun()
+
 
 def render_register_content():
     """Render registration page with backend integration."""
-    
     st.markdown(f"""
     <div style="text-align: center; margin: 40px 0;">
         <h1 style="color: #333; font-size: 36px; margin-bottom: 15px;">
@@ -907,244 +962,87 @@ def render_register_content():
         <p style="font-size: 20px; color: #666; max-width: 600px; margin: 0 auto;">
             Create your account to start crowdfunding
         </p>
-        <p style="font-size: 16px; color: #999; margin-top: 10px;">
-            Join thousands of creators and backers
-        </p>
     </div>
     """, unsafe_allow_html=True)
     
-    # Check backend health
-    backend_status = check_backend_health()
-    if not backend_status["online"]:
-        st.error(f"🚨 Backend service is currently unavailable. Status: {backend_status.get('status', 'unknown')}")
-        return
-    
-    # Center the registration form
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
-        # OAuth registration section
-        st.markdown(f"### {get_colored_icon_b64('person-plus-fill', 28, '#2196F3')} Create Account")
-        
-        # Google OAuth button
-        google_oauth_html = f'''
-        <div style="text-align: center; margin: 20px 0;">
-            <a href="{get_oauth_login_url('google')}" target="_blank" style="
-                display: inline-block;
-                background: #4285F4;
-                color: white;
-                padding: 15px 40px;
-                border-radius: 12px;
-                text-decoration: none;
-                font-weight: bold;
-                font-size: 16px;
-                transition: all 0.3s ease;
-                box-shadow: 0 6px 20px rgba(66, 133, 244, 0.3);
-                width: 100%;
-                margin-bottom: 15px;
-            " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(66, 133, 244, 0.4)'"
-               onmouseout="this.style.transform='translateY(0px)'; this.style.boxShadow='0 6px 20px rgba(66, 133, 244, 0.3)'">
-                {get_bootstrap_icon_b64('google', 20)} Sign up with Google
-            </a>
-        </div>
-        '''
-        st.markdown(google_oauth_html, unsafe_allow_html=True)
-        
-        # Facebook OAuth button
-        facebook_oauth_html = f'''
-        <div style="text-align: center; margin: 20px 0;">
-            <a href="{get_oauth_login_url('facebook')}" target="_blank" style="
-                display: inline-block;
-                background: #1877F2;
-                color: white;
-                padding: 15px 40px;
-                border-radius: 12px;
-                text-decoration: none;
-                font-weight: bold;
-                font-size: 16px;
-                transition: all 0.3s ease;
-                box-shadow: 0 6px 20px rgba(24, 119, 242, 0.3);
-                width: 100%;
-                margin-bottom: 25px;
-            " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(24, 119, 242, 0.4)'"
-               onmouseout="this.style.transform='translateY(0px)'; this.style.boxShadow='0 6px 20px rgba(24, 119, 242, 0.3)'">
-                {get_bootstrap_icon_b64('facebook', 20)} Sign up with Facebook
-            </a>
-        </div>
-        '''
-        st.markdown(facebook_oauth_html, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        st.markdown("### Or create account with email:")
-        
-        # Registration form
         with st.form("register_form"):
-            col_left, col_right = st.columns(2)
+            first_name = st.text_input("First Name")
+            last_name = st.text_input("Last Name")
+            email = st.text_input("Email")
+            password = st.text_input("Password", type="password")
+            confirm_password = st.text_input("Confirm Password", type="password")
+            agree_terms = st.checkbox("I agree to the Terms of Service and Privacy Policy")
             
-            with col_left:
-                first_name = st.text_input(
-                    f"{get_colored_icon_b64('person-fill', 18, '#666')} First Name", 
-                    placeholder="John"
-                )
-                last_name = st.text_input(
-                    f"{get_colored_icon_b64('person-fill', 18, '#666')} Last Name", 
-                    placeholder="Doe"
-                )
-                email = st.text_input(
-                    f"{get_colored_icon_b64('envelope-fill', 18, '#666')} Email", 
-                    placeholder="john@example.com"
-                )
-            
-            with col_right:
-                password = st.text_input(
-                    f"{get_colored_icon_b64('lock-fill', 18, '#666')} Password", 
-                    type="password", 
-                    placeholder="Create strong password"
-                )
-                confirm_password = st.text_input(
-                    f"{get_colored_icon_b64('lock-fill', 18, '#666')} Confirm Password", 
-                    type="password", 
-                    placeholder="Confirm your password"
-                )
-                agree_terms = st.checkbox("I agree to the Terms of Service and Privacy Policy")
-            
-            col_back, col_create = st.columns(2)
-            
-            with col_back:
-                if st.form_submit_button("← Back to Login", use_container_width=True):
-                    st.session_state[SESSION_KEYS['current_page']] = 'login'
-                    st.rerun()
-            
-            with col_create:
-                if st.form_submit_button("🎉 Create Account", use_container_width=True):
-                    if all([first_name, last_name, email, password, confirm_password, agree_terms]):
-                        if password == confirm_password:
-                            # Call registration API
-                            registration_data = {
-                                "first_name": first_name,
-                                "last_name": last_name,
-                                "email": email,
-                                "password": password
-                            }
-                            
-                            register_response = make_api_request("/auth/register", method="POST", data=registration_data)
-                            
-                            if register_response.get('success'):
-                                st.success("✅ Account created successfully! Please login.")
-                                st.session_state[SESSION_KEYS['current_page']] = 'login'
-                                st.rerun()
-                            else:
-                                error_msg = register_response.get('error', 'Registration failed')
-                                st.error(f"❌ {error_msg}")
+            if st.form_submit_button("🎉 Create Account", use_container_width=True):
+                if all([first_name, last_name, email, password, confirm_password, agree_terms]):
+                    if password == confirm_password:
+                        registration_data = {
+                            "first_name": first_name,
+                            "last_name": last_name,
+                            "email": email,
+                            "password": password
+                        }
+                        register_response = make_api_request("/auth/register", method="POST", data=registration_data)
+                        if register_response.get('success'):
+                            st.success("✅ Account created successfully! Please login.")
+                            st.session_state[SESSION_KEYS['current_page']] = 'login'
+                            st.rerun()
                         else:
-                            st.error("❌ Passwords do not match")
+                            error_msg = register_response.get('error', 'Registration failed')
+                            st.error(f"❌ {error_msg}")
                     else:
-                        st.error("❌ Please fill all fields and agree to terms")
+                        st.error("❌ Passwords do not match")
+                else:
+                    st.error("❌ Please fill all fields and agree to terms")
+        st.markdown("---")
+        if st.button("← Back to Login", use_container_width=True):
+            st.session_state.current_page = 'login'
+            st.rerun()
 
 # ================================
 # AUTHENTICATED CONTENT PAGES
 # ================================
 
 def render_home_content():
-    """Render home page with real platform data from database."""
-    
-    # Welcome section
+    """Render home page with content from pages/home.py."""
     user_name = st.session_state.get(SESSION_KEYS['user_data'], {}).get('first_name', 'User')
-    
-    welcome_html = f'''
-    <div style="text-align: center; margin: 40px 0;">
-        <h2 style="color: #333; font-size: 32px; margin-bottom: 15px;">
-            {get_colored_icon_b64("star-fill", 36, "#4CAF50")} Welcome back, {user_name}!
-        </h2>
-        <p style="font-size: 18px; color: #666; max-width: 600px; margin: 0 auto;">
-            Your personal crowdfunding command center. Manage campaigns, track contributions, and discover amazing projects.
-        </p>
-    </div>
-    '''
-    st.markdown(welcome_html, unsafe_allow_html=True)
-    
-    # Platform metrics with real data from database
-    st.markdown("### 📊 Platform Statistics")
-    
-    # Fetch real platform stats
-    platform_stats = fetch_platform_stats()
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    # Real metrics from database
-    metrics = [
-        ("currency-dollar", "Total Raised", f"${platform_stats.get('total_raised', 0):,.0f}", "#4CAF50"),
-        ("people-fill", "Active Users", f"{platform_stats.get('active_users', 0):,}", "#2196F3"),
-        ("trophy-fill", "Successful Projects", f"{platform_stats.get('successful_projects', 0):,}", "#FF9800"),
-        ("lightning-charge-fill", "Active Campaigns", f"{platform_stats.get('active_campaigns', 0):,}", "#9C27B0")
-    ]
-    
-    for i, (icon, label, value, color) in enumerate(metrics):
-        with [col1, col2, col3, col4][i]:
-            metric_html = f'''
-            <div style="background: white; padding: 25px; border-radius: 15px; 
-                        box-shadow: 0 8px 25px rgba(0,0,0,0.1); text-align: center; 
-                        border-left: 5px solid {color}; margin-bottom: 20px;
-                        transition: transform 0.3s ease; cursor: pointer;"
-                 onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='0 12px 35px rgba(0,0,0,0.15)'"
-                 onmouseout="this.style.transform='translateY(0px)'; this.style.boxShadow='0 8px 25px rgba(0,0,0,0.1)'">
-                <div style="font-size: 28px; margin-bottom: 15px;">
-                    {get_colored_icon_b64(icon, 40, color)}
-                </div>
-                <div style="font-size: 28px; font-weight: bold; color: {color}; margin-bottom: 8px;">
-                    {value}
-                </div>
-                <div style="color: #666; font-size: 14px; font-weight: 500;">
-                    {label}
-                </div>
-            </div>
-            '''
-            st.markdown(metric_html, unsafe_allow_html=True)
-    
-    # Quick actions section
-    st.markdown("---")
-    
-    action_header_html = f'''
-    <div style="text-align: center; margin: 40px 0;">
-        <h3 style="color: #333; font-size: 24px;">
-            {get_colored_icon_b64("fire", 28, "#FF5722")} Quick Actions
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%); 
+                padding: 2rem; border-radius: 10px; margin-bottom: 2rem; text-align: center;">
+        <h1 style="color: #2e7d32; font-size: 3rem; margin-bottom: 1rem;">
+            🏠 Welcome to HAVEN, {user_name}!
+        </h1>
+        <h3 style="color: #388e3c; margin-bottom: 2rem;">
+            Empowering Communities Through Crowdfunding
         </h3>
     </div>
-    '''
-    st.markdown(action_header_html, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns(3)
-    
-    actions = [
-        ("plus-circle-fill", "Start a Campaign", "Launch your innovative project", "create", "#4CAF50"),
-        ("search", "Discover Projects", "Browse amazing campaigns", "browse", "#2196F3"),
-        ("speedometer2", "View Dashboard", "Manage your activities", "dashboard", "#FF9800")
-    ]
-    
-    for i, (icon, title, desc, page, color) in enumerate(actions):
-        with [col1, col2, col3][i]:
-            action_html = f'''
-            <div style="background: white; padding: 30px; border-radius: 15px; 
-                        box-shadow: 0 8px 25px rgba(0,0,0,0.1); text-align: center; 
-                        margin-bottom: 20px; transition: transform 0.3s ease;
-                        border-top: 4px solid {color}; cursor: pointer;"
-                 onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='0 12px 35px rgba(0,0,0,0.15)'"
-                 onmouseout="this.style.transform='translateY(0px)'; this.style.boxShadow='0 8px 25px rgba(0,0,0,0.1)'">
-                <div style="font-size: 48px; margin-bottom: 20px;">
-                    {get_colored_icon_b64(icon, 56, color)}
-                </div>
-                <h4 style="margin-bottom: 15px; color: #333; font-size: 20px;">{title}</h4>
-                <p style="color: #666; margin-bottom: 25px; line-height: 1.6;">{desc}</p>
-            </div>
-            '''
-            st.markdown(action_html, unsafe_allow_html=True)
-            
-            if st.button(f"🚀 {title}", key=f"action_{page}", use_container_width=True):
-                st.session_state[SESSION_KEYS['current_page']] = page
-                st.rerun()
+    with col1:
+        if st.button("🚀 Start Campaign", key="start_campaign", use_container_width=True):
+            st.session_state.current_page = 'campaign'
+            st.rerun()
+    with col2:
+        if st.button("🌟 Explore", key="explore_projects", use_container_width=True):
+            st.session_state.current_page = 'explore'
+            st.rerun()
+    with col3:
+        if st.button("❤️ Donate", key="support_causes", use_container_width=True):
+            st.session_state.current_page = 'explore'
+            st.rerun()
 
-# [Additional content pages would continue here - browse, create, dashboard, profile, help]
-# For brevity, I'm including the key structure. The full implementation would include all pages.
+def render_explore_content():
+    st.markdown("## Browse Campaigns (Implementation continues...)")
+
+def render_campaign_content():
+    st.markdown("## Create Campaign (Implementation continues...)")
+
+def render_profile_content():
+    st.markdown("## Profile (Implementation continues...)")
 
 # ================================
 # PAGE ROUTING WITH STRICT AUTHENTICATION
@@ -1155,39 +1053,29 @@ def render_page_content():
     
     current_page = st.session_state.get(SESSION_KEYS['current_page'], 'login')
     
-    # Handle OAuth callback if present
     handle_oauth_callback()
     
-    # STRICT AUTHENTICATION: Only login/register for unauthenticated users
     if not is_authenticated():
-        # Force unauthenticated users to login/register pages only
         if current_page not in ['login', 'register']:
             st.session_state[SESSION_KEYS['current_page']] = 'login'
             current_page = 'login'
         
-        # Render authentication pages
         if current_page == 'login':
             render_login_content()
         elif current_page == 'register':
             render_register_content()
     else:
-        # Authenticated users get full access
-        if current_page == 'home':
-            render_home_content()
-        elif current_page == 'browse':
-            st.markdown("## Browse Campaigns (Implementation continues...)")
-        elif current_page == 'create':
-            st.markdown("## Create Campaign (Implementation continues...)")
-        elif current_page == 'dashboard':
-            st.markdown("## Dashboard (Implementation continues...)")
-        elif current_page == 'profile':
-            st.markdown("## Profile (Implementation continues...)")
-        elif current_page == 'help':
-            st.markdown("## Help (Implementation continues...)")
-        else:
-            # Default to home for authenticated users
-            st.session_state[SESSION_KEYS['current_page']] = 'home'
-            render_home_content()
+        page_map = {
+            'home': render_home_content,
+            'explore': render_explore_content,
+            'campaign': render_campaign_content,
+            'profile': render_profile_content,
+            'help': lambda: st.markdown("## Help Page"),
+        }
+        
+        page_function = page_map.get(current_page, render_home_content)
+        page_function()
+
 
 # ================================
 # MAIN APPLICATION
@@ -1195,11 +1083,6 @@ def render_page_content():
 
 def render_main_header():
     """Render main header with authentication and backend status."""
-    
-    # Check backend connectivity and database
-    backend_status = check_backend_health()
-    db_status = test_database_connection()
-    
     st.markdown(f"""
     <style>
     .main-header {{
@@ -1210,111 +1093,21 @@ def render_main_header():
         color: white;
         text-align: center;
         box-shadow: 0 8px 32px rgba(76, 175, 80, 0.3);
-        backdrop-filter: blur(10px);
-    }}
-    
-    .header-title {{
-        font-size: 32px;
-        font-weight: bold;
-        margin-bottom: 10px;
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }}
-    
-    .header-subtitle {{
-        font-size: 18px;
-        opacity: 0.9;
-        margin-bottom: 20px;
-    }}
-    
-    .status-indicators {{
-        display: flex;
-        justify-content: center;
-        gap: 20px;
-        margin-top: 15px;
-        flex-wrap: wrap;
-    }}
-    
-    .status-item {{
-        display: flex;
-        align-items: center;
-        background: rgba(255, 255, 255, 0.2);
-        padding: 8px 16px;
-        border-radius: 25px;
-        font-size: 14px;
-        font-weight: 500;
-        backdrop-filter: blur(15px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }}
-    
-    .status-online {{
-        background: rgba(76, 175, 80, 0.3);
-        border-color: rgba(76, 175, 80, 0.5);
-    }}
-    
-    .status-offline {{
-        background: rgba(244, 67, 54, 0.3);
-        border-color: rgba(244, 67, 54, 0.5);
     }}
     </style>
     """, unsafe_allow_html=True)
     
-    # Different headers for authenticated vs unauthenticated
     if is_authenticated():
         user_name = st.session_state.get(SESSION_KEYS['user_data'], {}).get('first_name', 'User')
         header_title = f"{get_bootstrap_icon_b64('house-fill', 36)} Welcome back, {user_name}!"
-        header_subtitle = "Your personal crowdfunding command center"
     else:
         header_title = f"{get_bootstrap_icon_b64('shield-lock-fill', 36)} Haven Platform"
-        header_subtitle = "Please login to access the crowdfunding platform"
-    
-    # Status indicators
-    backend_class = "status-online" if backend_status["online"] else "status-offline"
-    backend_icon = "wifi" if backend_status["online"] else "wifi-off"
-    backend_text = "Backend Online" if backend_status["online"] else "Backend Offline"
-    
-    db_class = "status-online" if db_status else "status-offline"
-    db_icon = "database-check" if db_status else "database-x"
-    db_text = "Database Connected" if db_status else "Database Offline"
-    
-    auth_status = "Authenticated" if is_authenticated() else "Guest"
-    auth_icon = "shield-check" if is_authenticated() else "shield-x"
-    
-    # Main header with comprehensive status
-    header_html = f'''
-    <div class="main-header">
-        <div class="header-title">{header_title}</div>
-        <div class="header-subtitle">{header_subtitle}</div>
-        <div class="status-indicators">
-            <div class="status-item {backend_class}">
-                {get_bootstrap_icon_b64(backend_icon, 16)} {backend_text}
-            </div>
-            <div class="status-item {db_class}">
-                {get_bootstrap_icon_b64(db_icon, 16)} {db_text}
-            </div>
-            <div class="status-item">
-                {get_bootstrap_icon_b64(auth_icon, 16)} {auth_status}
-            </div>
-            <div class="status-item">
-                {get_bootstrap_icon_b64("patch-check-fill", 16)} Production v1.0
-            </div>
-        </div>
-    </div>
-    '''
-    
-    st.markdown(header_html, unsafe_allow_html=True)
-    
-    # Show connectivity warnings if needed
-    if not backend_status["online"]:
-        st.error(f"🚨 **Backend service is currently unavailable.** Status: {backend_status.get('status', 'unknown')}")
-        st.info("💡 Some features may be limited. Please try again later.")
-    
-    if not db_status:
-        st.warning("⚠️ **Database connectivity issues detected.** Some data may not be current.")
+
+    st.markdown(f'<div class="main-header"><h1>{header_title}</h1></div>', unsafe_allow_html=True)
+
 
 def main():
     """Main application with clean environment variable usage."""
-    
-    # Page configuration
     st.set_page_config(
         page_title="Haven - Crowdfunding Platform",
         page_icon="🏠",
@@ -1322,176 +1115,22 @@ def main():
         initial_sidebar_state="expanded"
     )
     
-    # Initialize session
     initialize_session()
     
-    # Global CSS styling for production
     st.markdown("""
     <style>
-    /* Hide default Streamlit elements */
-    .stApp > header {
-        display: none;
-    }
-    
-    .stDeployButton {
-        display: none;
-    }
-    
-    #MainMenu {
-        visibility: hidden;
-    }
-    
-    footer {
-        visibility: hidden;
-    }
-    
-    /* Global styling */
-    .main .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-        max-width: 1200px;
-    }
-    
-    /* Custom scrollbar */
-    ::-webkit-scrollbar {
-        width: 8px;
-    }
-    
-    ::-webkit-scrollbar-track {
-        background: #f1f1f1;
-        border-radius: 4px;
-    }
-    
-    ::-webkit-scrollbar-thumb {
-        background: #4CAF50;
-        border-radius: 4px;
-    }
-    
-    ::-webkit-scrollbar-thumb:hover {
-        background: #45a049;
-    }
-    
-    /* Improve button styling */
-    .stButton > button {
-        transition: all 0.3s ease;
-        border-radius: 8px;
-        font-weight: 500;
-        border: none;
-    }
-    
-    .stButton > button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
-    
-    /* Form styling */
-    .stTextInput > div > div > input,
-    .stTextArea > div > div > textarea,
-    .stSelectbox > div > div > select {
-        border-radius: 8px;
-        border: 2px solid #e0e0e0;
-        transition: border-color 0.3s ease;
-    }
-    
-    .stTextInput > div > div > input:focus,
-    .stTextArea > div > div > textarea:focus,
-    .stSelectbox > div > div > select:focus {
-        border-color: #4CAF50;
-        box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
-    }
-    
-    /* Tab styling */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 8px;
-        padding: 12px 20px;
-        font-weight: 500;
-        transition: all 0.3s ease;
-    }
-    
-    /* Loading and success animations */
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    
-    .main > div {
-        animation: fadeIn 0.5s ease-in-out;
-    }
-    
-    /* Responsive design */
-    @media (max-width: 768px) {
-        .status-indicators {
-            flex-direction: column;
-            align-items: center;
-        }
-        
-        .header-title {
-            font-size: 24px !important;
-        }
-        
-        .header-subtitle {
-            font-size: 16px !important;
-        }
-    }
+    .stApp > header { display: none; }
+    #MainMenu { visibility: hidden; }
+    footer { visibility: hidden; }
     </style>
     """, unsafe_allow_html=True)
     
-    # STRICT SIDEBAR RENDERING
     if is_authenticated():
-        # Full navigation for authenticated users
         render_authenticated_sidebar()
     else:
-        # ONLY login/register for unauthenticated users
         render_auth_only_sidebar()
     
-    # Render main header with comprehensive status
-    render_main_header()
-    
-    # Render page content with strict authentication checks
     render_page_content()
-    
-    # Footer with comprehensive information
-    st.markdown("---")
-    
-    if is_authenticated():
-        user_data = st.session_state.get(SESSION_KEYS['user_data'], {})
-        user_name = user_data.get('first_name', 'User')
-        user_email = user_data.get('email', 'user@example.com')
-        
-        footer_html = f'''
-        <div style="text-align: center; color: #666; padding: 20px;">
-            <p>© 2024 Haven Crowdfunding Platform. All rights reserved.</p>
-            <p style="color: #4CAF50;">
-                {get_colored_icon_b64("heart-fill", 16, "#4CAF50")} Empowering innovation, one project at a time.
-            </p>
-            <p style="font-size: 12px; color: #999;">
-                Backend: {BACKEND_URL or 'Not configured'} | 
-                Database: {"🟢 Connected" if test_database_connection() else "🔴 Offline"} |
-                User: {user_name} ({user_email})
-            </p>
-        </div>
-        '''
-    else:
-        footer_html = f'''
-        <div style="text-align: center; color: #666; padding: 20px;">
-            <p>© 2024 Haven Crowdfunding Platform. All rights reserved.</p>
-            <p style="color: #999;">
-                {get_colored_icon_b64("shield-lock-fill", 16, "#999")} Please login to access platform features.
-            </p>
-            <p style="font-size: 12px; color: #999;">
-                Backend: {BACKEND_URL or 'Not configured'} | 
-                Database: {"🟢 Connected" if test_database_connection() else "🔴 Offline"} |
-                Environment: Production
-            </p>
-        </div>
-        '''
-    
-    st.markdown(footer_html, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
-
