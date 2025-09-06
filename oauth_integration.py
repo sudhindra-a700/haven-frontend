@@ -145,7 +145,7 @@ class OAuthManager:
         """Handle OAuth callback parameters from URL"""
         try:
             # Check for OAuth callback parameters in URL
-            query_params = st.experimental_get_query_params()
+            query_params = st.query_params()
             
             if "auth" in query_params:
                 auth_status = query_params["auth"][0]
@@ -176,7 +176,7 @@ class OAuthManager:
                                 del st.session_state.oauth_state
                             
                             # Clear URL parameters
-                            st.experimental_set_query_params()
+                            st.query_params.clear()
                             
                             st.success(f"✅ Successfully signed in with {decoded_token.get('provider', 'OAuth')}!")
                             st.balloons()
