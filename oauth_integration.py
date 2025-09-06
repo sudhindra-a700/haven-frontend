@@ -1,12 +1,8 @@
-""" FIXED OAuth Integration for HAVEN Crowdfunding Platform Frontend
+""" 
+Updated OAuth Integration for HAVEN Crowdfunding Platform Frontend
 
-This file contains the corrected OAuth implementation that fixes:
-1. Proper API endpoint usage for OAuth initiation
-2. Popup-based OAuth flow with proper communication
-3. JWT token handling and storage
-4. Authentication state management
-5. Automatic redirect to main application after successful OAuth
-6. Error handling and user feedback
+This file contains the corrected OAuth implementation that works with the new backend API
+and properly handles the popup-based OAuth flow for Streamlit applications.
 """
 
 import streamlit as st
@@ -15,6 +11,7 @@ import os
 import logging
 import time
 import jwt
+import json
 from typing import Dict, Any, Optional
 from urllib.parse import urlparse, parse_qs
 
@@ -22,10 +19,10 @@ from urllib.parse import urlparse, parse_qs
 logger = logging.getLogger(__name__)
 
 class OAuthManager:
-    """OAuth Manager for handling Google and Facebook authentication"""
+    """OAuth Manager for handling Google and Facebook authentication with Streamlit"""
     
     def __init__(self):
-        # Use corrected environment variable names
+        # Use environment variables with fallbacks
         self.backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
         self.frontend_url = os.getenv("FRONTEND_URL", "http://localhost:8501")
         self.google_client_id = os.getenv("GOOGLE_CLIENT_ID")
@@ -44,14 +41,12 @@ class OAuthManager:
             if response.status_code == 200:
                 return response.json()
             else:
-                st.error(f"❌ Cannot connect to authentication server. Please check if the backend is running.")
-                return {"oauth_enabled": False}
+                return {"oauth_enabled": False, "error": f"Backend returned {response.status_code}"}
         except requests.exceptions.ConnectionError:
-            st.error(f"❌ Cannot connect to authentication server. Please check if the backend is running.")
-            return {"oauth_enabled": False}
+            return {"oauth_enabled": False, "error": "Cannot connect to backend"}
         except Exception as e:
             logger.error(f"Auth status check failed: {str(e)}")
-            return {"oauth_enabled": False}
+            return {"oauth_enabled": False, "error": str(e)}
 
     def test_backend_connection(self) -> bool:
         """Test connection to backend"""
@@ -63,13 +58,8 @@ class OAuthManager:
             return False
 
     def initiate_google_login(self, user_type: str = "individual") -> Optional[str]:
-        """
-        FIXED: Initiate Google OAuth login
-        - Gets OAuth URL from backend API
-        - Returns URL for popup window
-        """
+        """Get Google OAuth URL from backend API"""
         try:
-            # Use fixed API endpoint path
             endpoint = f"{self.backend_url}/api/v1/auth/google/login"
             
             response = requests.get(
@@ -99,7 +89,7 @@ class OAuthManager:
                 return None
                 
         except requests.exceptions.ConnectionError:
-            st.error(f"❌ Cannot connect to authentication server. Please check if the backend is running.")
+            st.error(f"❌ Cannot connect to authentication server at {self.backend_url}")
             return None
         except requests.exceptions.Timeout:
             st.error(f"❌ Authentication server timeout. Please try again.")
@@ -110,13 +100,8 @@ class OAuthManager:
             return None
 
     def initiate_facebook_login(self, user_type: str = "individual") -> Optional[str]:
-        """
-        FIXED: Initiate Facebook OAuth login
-        - Gets OAuth URL from backend API
-        - Returns URL for popup window
-        """
+        """Get Facebook OAuth URL from backend API"""
         try:
-            # Use fixed API endpoint path
             endpoint = f"{self.backend_url}/api/v1/auth/facebook/login"
             
             response = requests.get(
@@ -146,7 +131,7 @@ class OAuthManager:
                 return None
                 
         except requests.exceptions.ConnectionError:
-            st.error(f"❌ Cannot connect to authentication server. Please check if the backend is running.")
+            st.error(f"❌ Cannot connect to authentication server at {self.backend_url}")
             return None
         except requests.exceptions.Timeout:
             st.error(f"❌ Authentication server timeout. Please try again.")
@@ -157,12 +142,7 @@ class OAuthManager:
             return None
 
     def handle_oauth_callback(self) -> bool:
-        """
-        FIXED: Handle OAuth callback parameters from URL
-        - Processes callback parameters
-        - Stores JWT tokens
-        - Updates authentication state
-        """
+        """Handle OAuth callback parameters from URL"""
         try:
             # Check for OAuth callback parameters in URL
             query_params = st.experimental_get_query_params()
@@ -200,6 +180,9 @@ class OAuthManager:
                             
                             st.success(f"✅ Successfully signed in with {decoded_token.get('provider', 'OAuth')}!")
                             st.balloons()
+                            
+                            # Set current page to dashboard
+                            st.session_state.current_page = "dashboard"
                             
                             # Trigger page rerun to update UI
                             time.sleep(2)
@@ -246,38 +229,24 @@ class OAuthManager:
     def logout(self):
         """Logout current user"""
         # Clear authentication state
-        if hasattr(st.session_state, 'authenticated'):
-            del st.session_state.authenticated
-        if hasattr(st.session_state, 'jwt_token'):
-            del st.session_state.jwt_token
-        if hasattr(st.session_state, 'user_data'):
-            del st.session_state.user_data
-        if hasattr(st.session_state, 'oauth_state'):
-            del st.session_state.oauth_state
+        for key in ['authenticated', 'jwt_token', 'user_data', 'oauth_state', 'current_page']:
+            if hasattr(st.session_state, key):
+                delattr(st.session_state, key)
         
         st.success("✅ Successfully logged out!")
         st.experimental_rerun()
 
 def render_oauth_buttons(user_type: str = "individual"):
-    """
-    FIXED: Render OAuth login buttons with proper styling and error handling
-    - Improved user experience
-    - Better error messages
-    - Popup window support
-    """
+    """Render OAuth login buttons with improved Streamlit integration"""
     oauth_manager = OAuthManager()
     
     # Check OAuth configuration
     config_status = oauth_manager.check_oauth_config()
     
-    if not config_status["oauth_enabled"]:
+    if not config_status.get("oauth_enabled", False):
         st.warning("⚠️ OAuth authentication is currently disabled")
-        st.info("💡 Please ensure the backend service is running and accessible")
-        return
-    
-    # Test backend connection
-    if not oauth_manager.test_backend_connection():
-        st.error("❌ Cannot connect to authentication server")
+        if "error" in config_status:
+            st.error(f"Error: {config_status['error']}")
         st.info("💡 Please ensure the backend service is running and accessible")
         return
     
@@ -288,7 +257,7 @@ def render_oauth_buttons(user_type: str = "individual"):
     col1, col2 = st.columns(2)
     
     with col1:
-        if config_status["google_configured"]:
+        if config_status.get("google_configured", False):
             if st.button(
                 "🔍 Continue with Google",
                 key=f"google_login_{user_type}",
@@ -322,29 +291,61 @@ def render_oauth_buttons(user_type: str = "individual"):
                         # Display clickable link
                         st.markdown(f"🔗 **[Click here to login with Google]({auth_url})**")
                         
-                        # JavaScript to open popup (if browser supports it)
-                        st.components.v1.html(f"""
+                        # JavaScript to open popup and handle response
+                        popup_html = f"""
                         <script>
                         function openGoogleLogin() {{
-                            window.open('{auth_url}', 'google_login', 'width=500,height=600,scrollbars=yes,resizable=yes');
+                            const popup = window.open('{auth_url}', 'google_login', 'width=500,height=600,scrollbars=yes,resizable=yes');
+                            
+                            // Listen for messages from popup
+                            window.addEventListener('message', function(event) {{
+                                if (event.data.type === 'OAUTH_SUCCESS') {{
+                                    popup.close();
+                                    // Redirect to success URL with token
+                                    const token = event.data.data.token;
+                                    window.location.href = window.location.origin + '?auth=success&token=' + encodeURIComponent(token);
+                                }} else if (event.data.type === 'OAUTH_ERROR') {{
+                                    popup.close();
+                                    // Redirect to error URL
+                                    const error = event.data.data.error;
+                                    window.location.href = window.location.origin + '?auth=error&provider=google&message=' + encodeURIComponent(error);
+                                }}
+                            }});
+                            
+                            // Check if popup was closed manually
+                            const checkClosed = setInterval(function() {{
+                                if (popup.closed) {{
+                                    clearInterval(checkClosed);
+                                    console.log('Popup was closed');
+                                }}
+                            }}, 1000);
                         }}
                         </script>
                         <button onclick="openGoogleLogin()" style="
                             background-color: #4285f4;
                             color: white;
                             border: none;
-                            padding: 10px 20px;
-                            border-radius: 5px;
+                            padding: 12px 24px;
+                            border-radius: 6px;
                             cursor: pointer;
                             font-size: 16px;
+                            font-weight: 500;
                             margin-top: 10px;
-                        ">🔍 Open in Popup Window</button>
-                        """, height=80)
+                            width: 100%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 8px;
+                        ">
+                            <span>🔍</span> Open Google Login Popup
+                        </button>
+                        """
+                        st.components.v1.html(popup_html, height=80)
         else:
             st.caption("🔍 Google OAuth not configured")
     
     with col2:
-        if config_status["facebook_configured"]:
+        if config_status.get("facebook_configured", False):
             if st.button(
                 "📘 Continue with Facebook",
                 key=f"facebook_login_{user_type}",
@@ -378,34 +379,61 @@ def render_oauth_buttons(user_type: str = "individual"):
                         # Display clickable link
                         st.markdown(f"🔗 **[Click here to login with Facebook]({auth_url})**")
                         
-                        # JavaScript to open popup (if browser supports it)
-                        st.components.v1.html(f"""
+                        # JavaScript to open popup and handle response
+                        popup_html = f"""
                         <script>
                         function openFacebookLogin() {{
-                            window.open('{auth_url}', 'facebook_login', 'width=500,height=600,scrollbars=yes,resizable=yes');
+                            const popup = window.open('{auth_url}', 'facebook_login', 'width=500,height=600,scrollbars=yes,resizable=yes');
+                            
+                            // Listen for messages from popup
+                            window.addEventListener('message', function(event) {{
+                                if (event.data.type === 'OAUTH_SUCCESS') {{
+                                    popup.close();
+                                    // Redirect to success URL with token
+                                    const token = event.data.data.token;
+                                    window.location.href = window.location.origin + '?auth=success&token=' + encodeURIComponent(token);
+                                }} else if (event.data.type === 'OAUTH_ERROR') {{
+                                    popup.close();
+                                    // Redirect to error URL
+                                    const error = event.data.data.error;
+                                    window.location.href = window.location.origin + '?auth=error&provider=facebook&message=' + encodeURIComponent(error);
+                                }}
+                            }});
+                            
+                            // Check if popup was closed manually
+                            const checkClosed = setInterval(function() {{
+                                if (popup.closed) {{
+                                    clearInterval(checkClosed);
+                                    console.log('Popup was closed');
+                                }}
+                            }}, 1000);
                         }}
                         </script>
                         <button onclick="openFacebookLogin()" style="
                             background-color: #1877f2;
                             color: white;
                             border: none;
-                            padding: 10px 20px;
-                            border-radius: 5px;
+                            padding: 12px 24px;
+                            border-radius: 6px;
                             cursor: pointer;
                             font-size: 16px;
+                            font-weight: 500;
                             margin-top: 10px;
-                        ">📘 Open in Popup Window</button>
-                        """, height=80)
+                            width: 100%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 8px;
+                        ">
+                            <span>📘</span> Open Facebook Login Popup
+                        </button>
+                        """
+                        st.components.v1.html(popup_html, height=80)
         else:
             st.caption("📘 Facebook OAuth not configured")
 
 def check_authentication_status():
-    """
-    FIXED: Check and handle authentication status
-    - Processes OAuth callbacks
-    - Manages authentication state
-    - Redirects authenticated users
-    """
+    """Check and handle authentication status"""
     oauth_manager = OAuthManager()
     
     # Handle OAuth callback if present
@@ -416,51 +444,12 @@ def check_authentication_status():
         user_data = oauth_manager.get_user_data()
         
         if user_data:
-            # Display welcome message
-            st.success(f"✅ Welcome back, {user_data.get('name', 'User')}!")
-            
-            # Show user info
-            with st.expander("👤 User Information"):
-                st.write(f"**Name:** {user_data.get('name', 'N/A')}")
-                st.write(f"**Email:** {user_data.get('email', 'N/A')}")
-                st.write(f"**Provider:** {user_data.get('provider', 'N/A').title()}")
-                st.write(f"**User Type:** {user_data.get('user_type', 'N/A').title()}")
-            
-            # Logout button
-            if st.button("🚪 Logout", type="secondary"):
-                oauth_manager.logout()
-            
-            # MAIN FIX: Redirect to main application
-            st.markdown("---")
-            st.markdown("### 🎉 Authentication Successful!")
-            st.markdown("You are now logged in and can access the main application.")
-            
-            # Add navigation buttons to main application pages
-            st.markdown("### 📱 Navigate to:")
-            
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                if st.button("🏠 Dashboard", use_container_width=True):
-                    st.switch_page("pages/dashboard.py")
-            
-            with col2:
-                if st.button("💰 Campaigns", use_container_width=True):
-                    st.switch_page("pages/campaigns.py")
-            
-            with col3:
-                if st.button("👤 Profile", use_container_width=True):
-                    st.switch_page("pages/profile.py")
-            
             return True
     
     return False
 
-# Authentication decorator for protected pages
 def require_authentication():
-    """
-    Decorator to require authentication for protected pages
-    """
+    """Decorator to require authentication for protected pages"""
     oauth_manager = OAuthManager()
     
     if not oauth_manager.is_authenticated():
@@ -475,19 +464,39 @@ def require_authentication():
     
     return oauth_manager.get_user_data()
 
-# Main authentication flow function
 def main_auth_flow():
-    """
-    FIXED: Main authentication flow
-    - Handles OAuth callbacks
-    - Manages authentication state
-    - Provides login interface
-    """
+    """Main authentication flow for standalone use"""
     st.title("🔐 HAVEN Authentication")
     
     # Check authentication status first
     if check_authentication_status():
         # User is authenticated, show main application access
+        st.success("✅ You are authenticated!")
+        
+        oauth_manager = OAuthManager()
+        user_data = oauth_manager.get_user_data()
+        
+        if user_data:
+            st.write(f"Welcome, {user_data.get('name', 'User')}!")
+            
+            # Navigation buttons
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                if st.button("🏠 Dashboard", use_container_width=True):
+                    st.session_state.current_page = "dashboard"
+                    st.experimental_rerun()
+            
+            with col2:
+                if st.button("💰 Campaigns", use_container_width=True):
+                    st.session_state.current_page = "campaigns"
+                    st.experimental_rerun()
+            
+            with col3:
+                if st.button("👤 Profile", use_container_width=True):
+                    st.session_state.current_page = "profile"
+                    st.experimental_rerun()
+        
         return
     
     # User is not authenticated, show login options
@@ -503,14 +512,6 @@ def main_auth_flow():
     
     # Render OAuth buttons
     render_oauth_buttons(user_type)
-    
-    # Alternative login methods
-    st.markdown("---")
-    st.markdown("### 📧 Alternative Login")
-    st.info("Traditional email/password login is also available")
-    
-    if st.button("📧 Login with Email", use_container_width=True):
-        st.switch_page("pages/email_login.py")
 
 if __name__ == "__main__":
     main_auth_flow()
