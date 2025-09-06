@@ -172,7 +172,7 @@ class AuthenticationManager:
                     st.session_state.user_type = user_type
                     
                     # Clear OAuth parameters
-                    st.experimental_set_query_params()
+                    st.query_params.clear()
                     
                     return user_data
                     
