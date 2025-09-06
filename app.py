@@ -480,11 +480,11 @@ def handle_oauth_callback():
 
 def render_auth_only_sidebar():
     """Render sidebar for unauthenticated users - STRICT ACCESS CONTROL."""
-    st.sidebar.markdown('<div class="auth-nav-title">🏠 Haven Platform</div>', unsafe_allow_html=True)
-    if st.sidebar.button("Login", use_container_width=True):
+    st.markdown('<div class="auth-nav-title">🏠 Haven Platform</div>', unsafe_allow_html=True)
+    if st.button("Login", use_container_width=True):
         st.session_state.current_page = 'login'
         st.rerun()
-    if st.sidebar.button("Register", use_container_width=True):
+    if st.button("Register", use_container_width=True):
         st.session_state.current_page = 'register'
         st.rerun()
 
@@ -492,7 +492,7 @@ def render_authenticated_sidebar():
     """Render full sidebar for authenticated users with real data."""
     user_data = st.session_state.get(SESSION_KEYS['user_data'], {})
     user_name = user_data.get('first_name', user_data.get('name', 'User'))
-    st.sidebar.markdown(f"### Welcome, {user_name}!")
+    st.markdown(f"### Welcome, {user_name}!")
     
     nav_items = {
         "Home": "home",
@@ -501,12 +501,12 @@ def render_authenticated_sidebar():
         "Profile": "profile"
     }
     for label, page_key in nav_items.items():
-        if st.sidebar.button(label, use_container_width=True):
+        if st.button(label, use_container_width=True):
             st.session_state.current_page = page_key
             st.rerun()
     
-    st.sidebar.markdown("---")
-    if st.sidebar.button("Logout", use_container_width=True):
+    st.markdown("---")
+    if st.button("Logout", use_container_width=True):
         logout_user()
 
 # ================================
@@ -767,26 +767,20 @@ def main():
         /* Hide footer */
         footer {visibility: hidden;}
         
-        /* Hide automatic page navigation in sidebar */
-        .stSidebar > div:first-child > div:first-child > div:first-child {display: none !important;}
-        section[data-testid="stSidebar"] > div:first-child > div:first-child > div:first-child {display: none !important;}
+        /* Hide automatic page navigation in sidebar - more specific targeting */
+        section[data-testid="stSidebar"] nav[data-testid="stSidebarNav"] {display: none !important;}
+        .stSidebar nav {display: none !important;}
         
-        /* Hide various navigation elements */
+        /* Hide specific navigation elements but preserve buttons */
         [data-testid="stSidebarNav"] {display: none !important;}
         .css-1d391kg {display: none !important;}
         .css-1rs6os {display: none !important;}
         .css-17eq0hr {display: none !important;}
-        .css-1544g2n {display: none !important;}
-        .e1fqkh3o4 {display: none !important;}
-        .css-hxt7ib {display: none !important;}
-        .css-1v0mbdj {display: none !important;}
         
-        /* Hide any automatic page links */
-        .stSidebar .element-container:first-child {display: none !important;}
-        .stSidebar > div > div > div > div:first-child {display: none !important;}
-        
-        /* Ensure our custom sidebar content is visible */
-        .stSidebar .element-container:not(:first-child) {display: block !important;}
+        /* Only hide the first navigation container if it contains automatic links */
+        .stSidebar > div > div > div > div:first-child > div:first-child {
+            display: none !important;
+        }
     </style>
     """, unsafe_allow_html=True)
 
