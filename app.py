@@ -1,4 +1,4 @@
-# Haven Crowdfunding Platform - Clean Production Version
+# Haven Crowdfunding Platform - Complete Production Version with SVG OAuth Icons
 # Uses Render Environment Group variables (no hardcoded values)
 
 import streamlit as st
@@ -112,6 +112,32 @@ def get_colored_icon_b64(icon_name: str, size: int = 24, color: str = "#4CAF50")
 
     logger.warning(f"Colored icon not found at path: {svg_path}")
     return f'<span style="color: {color};">●</span>'
+
+# NEW: SVG ICON LOADER FOR OAUTH BUTTONS
+@st.cache_data
+def get_svg_icon(icon_name: str) -> str:
+    """Get SVG icon as base64 data URL for OAuth buttons"""
+    try:
+        # Try to read from assets folder
+        icon_path = f"assets/{icon_name}"
+        if os.path.exists(icon_path):
+            with open(icon_path, "r", encoding="utf-8") as f:
+                svg_content = f.read()
+            # Convert to base64 data URL
+            svg_b64 = base64.b64encode(svg_content.encode()).decode()
+            return f"data:image/svg+xml;base64,{svg_b64}"
+    except Exception as e:
+        logger.warning(f"Could not load {icon_name}: {str(e)}")
+    
+    # Fallback SVG icons if files not found
+    if icon_name == "google.svg":
+        # Google's official colors and design
+        return """data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEwLjIgOC4xVjEySDEzLjlDMTMuNyAxMy4xIDEzLjEgMTMuOSAxMi4yIDE0LjNMMTUuMSAxNi42QzE3IDE0LjkgMTggMTIuNiAxOCAxMEMxOCA5LjQgMTcuOSA4LjggMTcuOCA4LjFIMTAuMloiIGZpbGw9IiM0Mjg1RjQiLz4KPHBhdGggZD0iTTEwIDIwQzEyLjcgMjAgMTQuOSAxOS4xIDE2LjUgMTcuM0wxMy42IDE1QzEyLjggMTUuNSAxMS44IDE1LjggMTAgMTUuOEM3LjEgMTUuOCA0LjcgMTMuNyA0IDE0LjlMMSAxNy4yQzIuNyAxOC43IDYuMiAyMCAxMCAyMFoiIGZpbGw9IiMzNEE4NTMiLz4KPHBhdGggZD0iTTQgMTAuOUM0IDEwLjMgNC4xIDkuNyA0LjMgOS4xTDEuMiA2LjhDMC40IDguMyAwIDkuMSAwIDEwQzAgMTAuOSAwLjQgMTEuNyAxLjIgMTMuMkw0LjMgMTAuOUg0WiIgZmlsbD0iI0ZCQkMwNSIvPgo8cGF0aCBkPSJNMTAgNC4yQzExLjUgNC4yIDEyLjggNC44IDEzLjggNS43TDE2LjMgMy4yQzE0LjkgMS45IDEyLjcgMSAxMCAxQzYuMiAxIDIuNyAyLjMgMS4yIDMuOEw0LjMgNi4xQzUgMi45IDcuMyAwLjggMTAgNC4yWiIgZmlsbD0iI0VBNDMzNSIvPgo8L3N2Zz4K"""
+    elif icon_name == "facebook.svg":
+        # Facebook's official colors and design
+        return """data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIwIDEwQzIwIDQuNDggMTUuNTIgMCAxMCAwUzAgNC40OCAwIDEwQzAgMTQuODQgMy42NiAxOC44NyA4LjQ0IDE5Ljc1VjEyLjg0SDUuOVYxMEg4LjQ0VjcuNzlDOC40NCA1LjU3IDkuOTMgNC4yMiAxMS45NiA0LjIyQzEyLjk2IDQuMjIgMTMuOTkgNC40IDE0IDQuNlY2Ljg4SDEyLjg0QzExLjcyIDYuODggMTEuNDQgNy41MSAxMS40NCA4LjI5VjEwSDE0TDEzLjU2IDEyLjg0SDExLjQ0VjE5Ljc1QzE2LjM0IDE4Ljg3IDIwIDE0Ljg0IDIwIDEwWiIgZmlsbD0iIzE4NzdGMiIvPgo8L3N2Zz4K"""
+    
+    return ""
 
 def create_icon_button(icon_name: str, label: str, key: str, size: int = 18, 
                       color: str = "#ffffff", help_text: Optional[str] = None) -> bool:
@@ -581,16 +607,16 @@ def render_authenticated_sidebar():
 # AUTHENTICATION PAGES
 # ================================
 
-# UPDATED LOGIN PAGE - MINIMAL CHANGES
+# UPDATED LOGIN PAGE WITH SVG OAUTH BUTTONS
 def render_login_content():
-    """Render login page with fixed OAuth integration."""
+    """Render login page with SVG OAuth integration."""
     st.header("Welcome to Haven")
     st.subheader("Please sign in to continue")
 
     # Add OAuth callback handling at the top
     handle_oauth_callback()
 
-    # OAuth buttons with popup support
+    # OAuth buttons with SVG icons
     st.markdown("### 🔐 Social Login")
     
     # Check if backend is available
@@ -598,119 +624,103 @@ def render_login_content():
     if not health.get("online", False):
         st.warning("⚠️ Authentication service is currently unavailable")
     else:
-        col1, col2 = st.columns(2)
+        # Google OAuth Button with SVG icon
+        google_auth_url = get_oauth_login_url("google", "individual")
+        if google_auth_url:
+            google_icon = get_svg_icon("google.svg")
+            google_button_html = f"""
+            <script>
+            function openGoogleLogin() {{
+                const popup = window.open('{google_auth_url}', 'google_login', 'width=500,height=600,scrollbars=yes,resizable=yes');
+                
+                // Listen for messages from popup
+                window.addEventListener('message', function(event) {{
+                    if (event.data.type === 'OAUTH_SUCCESS') {{
+                        popup.close();
+                        const token = event.data.data.token;
+                        window.location.href = window.location.origin + '?auth=success&token=' + encodeURIComponent(token);
+                    }} else if (event.data.type === 'OAUTH_ERROR') {{
+                        popup.close();
+                        const error = event.data.data.error;
+                        window.location.href = window.location.origin + '?auth=error&provider=google&message=' + encodeURIComponent(error);
+                    }}
+                }}, false);
+            }}
+            </script>
+            
+            <button onclick="openGoogleLogin()" style="
+                background-color: #EA4335;
+                color: white;
+                border: none;
+                padding: 15px 20px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 16px;
+                font-weight: 500;
+                margin-bottom: 10px;
+                width: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 12px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                transition: background-color 0.2s ease;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            " onmouseover="this.style.backgroundColor='#d93025'" onmouseout="this.style.backgroundColor='#EA4335'">
+                <img src="{google_icon}" alt="Google" style="width: 20px; height: 20px; background: white; border-radius: 3px; padding: 2px;">
+                Sign in With Google
+            </button>
+            """
+            st.components.v1.html(google_button_html, height=70)
         
-        with col1:
-            if st.button("🔍 Continue with Google", key="google_oauth_login", use_container_width=True, type="primary"):
-                with st.spinner("🔄 Connecting to Google..."):
-                    auth_url = get_oauth_login_url("google", "individual")
-                    
-                    if auth_url:
-                        st.success("✅ Google login URL generated!")
-                        
-                        # Display instructions
-                        with st.expander("📋 Login Instructions", expanded=True):
-                            st.markdown("""
-                            **How to complete Google login:**
-                            1. Click the link below to open Google authentication
-                            2. Sign in with your Google account
-                            3. You will be redirected back automatically
-                            """)
-                        
-                        # Display clickable link
-                        st.markdown(f"🔗 **[Click here to login with Google]({auth_url})**")
-                        
-                        # JavaScript popup button
-                        popup_html = f"""
-                        <script>
-                        function openGoogleLogin() {{
-                            const popup = window.open('{auth_url}', 'google_login', 'width=500,height=600,scrollbars=yes,resizable=yes');
-                            
-                            // Listen for popup messages
-                            window.addEventListener('message', function(event) {{
-                                if (event.data.type === 'OAUTH_SUCCESS') {{
-                                    popup.close();
-                                    const token = event.data.data.token;
-                                    window.location.href = window.location.origin + '?auth=success&token=' + encodeURIComponent(token);
-                                }} else if (event.data.type === 'OAUTH_ERROR') {{
-                                    popup.close();
-                                    const error = event.data.data.error;
-                                    window.location.href = window.location.origin + '?auth=error&provider=google&message=' + encodeURIComponent(error);
-                                }}
-                            }});
-                        }}
-                        </script>
-                        <button onclick="openGoogleLogin()" style="
-                            background-color: #4285f4;
-                            color: white;
-                            border: none;
-                            padding: 12px 24px;
-                            border-radius: 6px;
-                            cursor: pointer;
-                            font-size: 16px;
-                            width: 100%;
-                            margin-top: 10px;
-                        ">🔍 Open Google Login Popup</button>
-                        """
-                        st.components.v1.html(popup_html, height=80)
-                    else:
-                        st.error("❌ Failed to generate Google login URL")
-        
-        with col2:
-            if st.button("📘 Continue with Facebook", key="facebook_oauth_login", use_container_width=True, type="primary"):
-                with st.spinner("🔄 Connecting to Facebook..."):
-                    auth_url = get_oauth_login_url("facebook", "individual")
-                    
-                    if auth_url:
-                        st.success("✅ Facebook login URL generated!")
-                        
-                        # Display instructions
-                        with st.expander("📋 Login Instructions", expanded=True):
-                            st.markdown("""
-                            **How to complete Facebook login:**
-                            1. Click the link below to open Facebook authentication
-                            2. Sign in with your Facebook account
-                            3. You will be redirected back automatically
-                            """)
-                        
-                        # Display clickable link
-                        st.markdown(f"🔗 **[Click here to login with Facebook]({auth_url})**")
-                        
-                        # JavaScript popup button
-                        popup_html = f"""
-                        <script>
-                        function openFacebookLogin() {{
-                            const popup = window.open('{auth_url}', 'facebook_login', 'width=500,height=600,scrollbars=yes,resizable=yes');
-                            
-                            // Listen for popup messages
-                            window.addEventListener('message', function(event) {{
-                                if (event.data.type === 'OAUTH_SUCCESS') {{
-                                    popup.close();
-                                    const token = event.data.data.token;
-                                    window.location.href = window.location.origin + '?auth=success&token=' + encodeURIComponent(token);
-                                }} else if (event.data.type === 'OAUTH_ERROR') {{
-                                    popup.close();
-                                    const error = event.data.data.error;
-                                    window.location.href = window.location.origin + '?auth=error&provider=facebook&message=' + encodeURIComponent(error);
-                                }}
-                            }});
-                        }}
-                        </script>
-                        <button onclick="openFacebookLogin()" style="
-                            background-color: #1877f2;
-                            color: white;
-                            border: none;
-                            padding: 12px 24px;
-                            border-radius: 6px;
-                            cursor: pointer;
-                            font-size: 16px;
-                            width: 100%;
-                            margin-top: 10px;
-                        ">📘 Open Facebook Login Popup</button>
-                        """
-                        st.components.v1.html(popup_html, height=80)
-                    else:
-                        st.error("❌ Failed to generate Facebook login URL")
+        # Facebook OAuth Button with SVG icon
+        facebook_auth_url = get_oauth_login_url("facebook", "individual")
+        if facebook_auth_url:
+            facebook_icon = get_svg_icon("facebook.svg")
+            facebook_button_html = f"""
+            <script>
+            function openFacebookLogin() {{
+                const popup = window.open('{facebook_auth_url}', 'facebook_login', 'width=500,height=600,scrollbars=yes,resizable=yes');
+                
+                // Listen for messages from popup
+                window.addEventListener('message', function(event) {{
+                    if (event.data.type === 'OAUTH_SUCCESS') {{
+                        popup.close();
+                        const token = event.data.data.token;
+                        window.location.href = window.location.origin + '?auth=success&token=' + encodeURIComponent(token);
+                    }} else if (event.data.type === 'OAUTH_ERROR') {{
+                        popup.close();
+                        const error = event.data.data.error;
+                        window.location.href = window.location.origin + '?auth=error&provider=facebook&message=' + encodeURIComponent(error);
+                    }}
+                }}, false);
+            }}
+            </script>
+            
+            <button onclick="openFacebookLogin()" style="
+                background-color: #1877F2;
+                color: white;
+                border: none;
+                padding: 15px 20px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 16px;
+                font-weight: 500;
+                margin-bottom: 10px;
+                width: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 12px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                transition: background-color 0.2s ease;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            " onmouseover="this.style.backgroundColor='#166fe5'" onmouseout="this.style.backgroundColor='#1877F2'">
+                <img src="{facebook_icon}" alt="Facebook" style="width: 20px; height: 20px; background: white; border-radius: 3px; padding: 2px;">
+                Sign in With Facebook
+            </button>
+            """
+            st.components.v1.html(facebook_button_html, height=70)
 
     st.markdown("---")
     st.markdown("### 📧 Email Login")
