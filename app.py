@@ -534,9 +534,174 @@ def render_login_content():
             pass
 
 def render_register_content():
-    """Render registration page."""
+    """Render registration page with Individual/Organization options."""
     st.header("Create your Haven Account")
-    # ... form ...
+    st.subheader("Join the Haven crowdfunding community")
+    
+    # User type selection
+    user_type = st.radio(
+        "Registration Type",
+        ["Individual", "Organization"],
+        horizontal=True,
+        help="Select whether you're registering as an individual or organization"
+    )
+    
+    with st.form("registration_form"):
+        if user_type == "Individual":
+            st.subheader("Individual Registration")
+            
+            # Individual fields
+            col1, col2 = st.columns(2)
+            with col1:
+                first_name = st.text_input("First Name *", placeholder="Enter your first name")
+            with col2:
+                last_name = st.text_input("Last Name *", placeholder="Enter your last name")
+            
+            email = st.text_input("Email ID *", placeholder="Enter your email address")
+            phone = st.text_input("Phone Number *", placeholder="Enter your 10-digit phone number")
+            aadhar = st.text_input("Aadhar Card Number *", placeholder="Enter your 12-digit Aadhar number", max_chars=12)
+            
+            password = st.text_input("Password *", type="password", placeholder="Create a strong password")
+            confirm_password = st.text_input("Confirm Password *", type="password", placeholder="Confirm your password")
+            
+        else:  # Organization
+            st.subheader("Organization Registration")
+            
+            # Organization fields
+            org_name = st.text_input("Organization Name *", placeholder="Enter organization name")
+            org_email = st.text_input("Organization Email ID *", placeholder="Enter organization email")
+            org_phone = st.text_input("Organization Phone Number *", placeholder="Enter organization phone number")
+            
+            # Certificate upload
+            st.write("Certificate of Authentication (India) *")
+            certificate_file = st.file_uploader(
+                "Upload Certificate",
+                type=['pdf', 'jpg', 'jpeg', 'png'],
+                help="Upload your organization's certificate of authentication"
+            )
+            
+            # Contact person details
+            st.write("**Contact Person Details**")
+            col1, col2 = st.columns(2)
+            with col1:
+                contact_first_name = st.text_input("Contact Person First Name *")
+            with col2:
+                contact_last_name = st.text_input("Contact Person Last Name *")
+            
+            contact_email = st.text_input("Contact Person Email *", placeholder="Contact person's email")
+            
+            password = st.text_input("Password *", type="password", placeholder="Create a strong password")
+            confirm_password = st.text_input("Confirm Password *", type="password", placeholder="Confirm your password")
+        
+        # Terms and conditions
+        terms_accepted = st.checkbox("I agree to the Terms and Conditions and Privacy Policy *")
+        
+        # Submit button
+        submitted = st.form_submit_button("Create Account", use_container_width=True)
+        
+        if submitted:
+            # Validation
+            errors = []
+            
+            if user_type == "Individual":
+                if not first_name or not last_name:
+                    errors.append("First name and last name are required")
+                if not email or "@" not in email:
+                    errors.append("Valid email address is required")
+                if not phone or len(phone) != 10 or not phone.isdigit():
+                    errors.append("Valid 10-digit phone number is required")
+                if not aadhar or len(aadhar) != 12 or not aadhar.isdigit():
+                    errors.append("Valid 12-digit Aadhar number is required")
+            else:
+                if not org_name:
+                    errors.append("Organization name is required")
+                if not org_email or "@" not in org_email:
+                    errors.append("Valid organization email is required")
+                if not org_phone:
+                    errors.append("Organization phone number is required")
+                if not certificate_file:
+                    errors.append("Certificate of authentication is required")
+                if not contact_first_name or not contact_last_name:
+                    errors.append("Contact person name is required")
+                if not contact_email or "@" not in contact_email:
+                    errors.append("Valid contact person email is required")
+            
+            # Common validations
+            if not password or len(password) < 8:
+                errors.append("Password must be at least 8 characters long")
+            if password != confirm_password:
+                errors.append("Passwords do not match")
+            if not terms_accepted:
+                errors.append("You must accept the terms and conditions")
+            
+            if errors:
+                for error in errors:
+                    st.error(error)
+            else:
+                # Prepare registration data
+                if user_type == "Individual":
+                    registration_data = {
+                        "user_type": "individual",
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "email": email,
+                        "phone": phone,
+                        "aadhar": aadhar,
+                        "password": password
+                    }
+                else:
+                    registration_data = {
+                        "user_type": "organization",
+                        "org_name": org_name,
+                        "org_email": org_email,
+                        "org_phone": org_phone,
+                        "contact_first_name": contact_first_name,
+                        "contact_last_name": contact_last_name,
+                        "contact_email": contact_email,
+                        "password": password,
+                        "certificate": certificate_file.name if certificate_file else None
+                    }
+                
+                # API call to register user
+                try:
+                    response = make_api_request(
+                        endpoint="/auth/register",
+                        method="POST",
+                        data=registration_data
+                    )
+                    
+                    if response.get("success"):
+                        st.success("Registration successful! Please check your email for verification.")
+                        st.info("Redirecting to login page...")
+                        # Redirect to login after successful registration
+                        st.session_state.current_page = 'login'
+                        st.rerun()
+                    else:
+                        st.error(f"Registration failed: {response.get('error', 'Unknown error')}")
+                        
+                except Exception as e:
+                    st.error(f"Registration failed: {str(e)}")
+    
+    # Link to login page
+    st.markdown("---")
+    st.markdown("Already have an account?")
+    if st.button("Sign In Instead", use_container_width=True):
+        st.session_state.current_page = 'login'
+        st.rerun()
+    
+    # OAuth registration options (if enabled)
+    if os.getenv("ENABLE_OAUTH", "false").lower() == "true":
+        st.markdown("---")
+        st.markdown("Or register with:")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            google_login_url = get_oauth_login_url("google")
+            st.markdown(f'<a href="{google_login_url}" target="_self" style="text-decoration: none;"><button style="width: 100%; padding: 10px; background-color: #4285f4; color: white; border: none; border-radius: 5px; cursor: pointer;">Continue with Google</button></a>', unsafe_allow_html=True)
+        
+        with col2:
+            facebook_login_url = get_oauth_login_url("facebook")
+            st.markdown(f'<a href="{facebook_login_url}" target="_self" style="text-decoration: none;"><button style="width: 100%; padding: 10px; background-color: #1877f2; color: white; border: none; border-radius: 5px; cursor: pointer;">Continue with Facebook</button></a>', unsafe_allow_html=True)
 
 # ================================
 # AUTHENTICATED CONTENT PAGES
