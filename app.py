@@ -750,11 +750,45 @@ def render_page_content():
 
 def main():
     """Main application."""
-    st.set_page_config(page_title="Haven", layout="wide")
+    st.set_page_config(
+        page_title="Haven", 
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
     
     initialize_session()
     
-    st.markdown("""<style> #MainMenu {visibility: hidden;} footer {visibility: hidden;} </style>""", unsafe_allow_html=True)
+    # Hide Streamlit's automatic page navigation and menu
+    st.markdown("""
+    <style>
+        /* Hide main menu */
+        #MainMenu {visibility: hidden;}
+        
+        /* Hide footer */
+        footer {visibility: hidden;}
+        
+        /* Hide automatic page navigation in sidebar */
+        .stSidebar > div:first-child > div:first-child > div:first-child {display: none !important;}
+        section[data-testid="stSidebar"] > div:first-child > div:first-child > div:first-child {display: none !important;}
+        
+        /* Hide various navigation elements */
+        [data-testid="stSidebarNav"] {display: none !important;}
+        .css-1d391kg {display: none !important;}
+        .css-1rs6os {display: none !important;}
+        .css-17eq0hr {display: none !important;}
+        .css-1544g2n {display: none !important;}
+        .e1fqkh3o4 {display: none !important;}
+        .css-hxt7ib {display: none !important;}
+        .css-1v0mbdj {display: none !important;}
+        
+        /* Hide any automatic page links */
+        .stSidebar .element-container:first-child {display: none !important;}
+        .stSidebar > div > div > div > div:first-child {display: none !important;}
+        
+        /* Ensure our custom sidebar content is visible */
+        .stSidebar .element-container:not(:first-child) {display: block !important;}
+    </style>
+    """, unsafe_allow_html=True)
 
     with st.sidebar:
         if is_authenticated():
