@@ -1,5 +1,5 @@
-# Haven Crowdfunding Platform - Complete Production Version with SVG OAuth Icons
-# Uses Render Environment Group variables (no hardcoded values)
+# Haven Crowdfunding Platform - DIAGNOSTIC VERSION
+# This version includes detailed logging and error messages to identify OAuth issues
 
 import streamlit as st
 import requests
@@ -11,12 +11,16 @@ import psycopg2.pool
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 import logging
-import time  # ADDED FOR OAUTH FIX
-import jwt   # ADDED FOR OAUTH FIX
+import time
+import jwt
 
 # ================================
-# PRODUCTION CONFIGURATION
+# DIAGNOSTIC CONFIGURATION
 # ================================
+
+# Enable detailed logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # Environment variables from Render Environment Group
 BACKEND_URL = os.getenv("BACKEND_URL")
@@ -29,6 +33,13 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 
 # Derived configuration
 API_BASE = f"{BACKEND_URL}/api/v1" if BACKEND_URL else None
+
+# DIAGNOSTIC: Show environment variables (safely)
+st.sidebar.markdown("### 🔧 Diagnostic Info")
+st.sidebar.markdown(f"**Backend URL**: {BACKEND_URL[:30] + '...' if BACKEND_URL and len(BACKEND_URL) > 30 else BACKEND_URL or 'NOT SET'}")
+st.sidebar.markdown(f"**API Base**: {API_BASE[:30] + '...' if API_BASE and len(API_BASE) > 30 else API_BASE or 'NOT SET'}")
+st.sidebar.markdown(f"**Google Client ID**: {'SET' if GOOGLE_CLIENT_ID else 'NOT SET'}")
+st.sidebar.markdown(f"**Facebook App ID**: {'SET' if FACEBOOK_APP_ID else 'NOT SET'}")
 
 # Validate required environment variables
 required_env_vars = {
@@ -43,7 +54,6 @@ missing_vars = [var for var, value in required_env_vars.items() if not value]
 if missing_vars:
     st.error(f"❌ Missing required environment variables: {', '.join(missing_vars)}")
     st.info("💡 Please check your Render Environment Group configuration")
-    st.stop()
 
 # Session state keys
 SESSION_KEYS = {
@@ -56,383 +66,143 @@ SESSION_KEYS = {
     'login_timestamp': 'login_timestamp'
 }
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 # ================================
-# BOOTSTRAP ICON UTILITIES
+# DIAGNOSTIC FUNCTIONS
 # ================================
 
-@st.cache_data
-def get_bootstrap_icon_b64(icon_name: str, size: int = 18, color: str = "#ffffff") -> str:
-    """Convert Bootstrap SVG icon to base64 for reliable display in production."""
-    try:
-        script_dir = os.path.dirname(__file__)
-        svg_path = os.path.join(script_dir, "assets", f"{icon_name}.svg")
-    except NameError:
-        svg_path = os.path.join("assets", f"{icon_name}.svg")
-
-    if os.path.exists(svg_path):
-        try:
-            with open(svg_path, "rb") as f:
-                svg_data = f.read()
-            b64_svg = base64.b64encode(svg_data).decode()
-            return f'''<img src="data:image/svg+xml;base64,{b64_svg}" 
-                       width="{size}" height="{size}" 
-                       style="vertical-align: middle; margin-right: 8px; 
-                              filter: brightness(0) saturate(100%) invert(100%);">'''
-        except Exception as e:
-            logger.warning(f"Failed to load icon {icon_name} from {svg_path}: {e}")
-            return f'<span style="margin-right: 8px; color: {color};">●</span>'
+def diagnostic_backend_test():
+    """Test backend connectivity with detailed diagnostics"""
+    st.sidebar.markdown("### 🔍 Backend Tests")
     
-    logger.warning(f"Icon not found at path: {svg_path}")
-    return f'<span style="margin-right: 8px; color: {color};">●</span>'
-
-@st.cache_data
-def get_colored_icon_b64(icon_name: str, size: int = 24, color: str = "#4CAF50") -> str:
-    """Get colored Bootstrap icon for main content areas."""
-    try:
-        script_dir = os.path.dirname(__file__)
-        svg_path = os.path.join(script_dir, "assets", f"{icon_name}.svg")
-    except NameError:
-        svg_path = os.path.join("assets", f"{icon_name}.svg")
-
-    if os.path.exists(svg_path):
-        try:
-            with open(svg_path, "r") as f:
-                svg_content = f.read()
-            # Inject fill color into SVG
-            svg_colored = svg_content.replace('<svg ', f'<svg fill="{color}" ')
-            b64_svg = base64.b64encode(svg_colored.encode("utf-8")).decode()
-            return f'<img src="data:image/svg+xml;base64,{b64_svg}" width="{size}" height="{size}" style="vertical-align: middle;">'
-        except Exception as e:
-            logger.warning(f"Failed to load colored icon {icon_name} from {svg_path}: {e}")
-            return f'<span style="color: {color};">●</span>'
-
-    logger.warning(f"Colored icon not found at path: {svg_path}")
-    return f'<span style="color: {color};">●</span>'
-
-# NEW: SVG ICON LOADER FOR OAUTH BUTTONS
-@st.cache_data
-def get_svg_icon(icon_name: str) -> str:
-    """Get SVG icon as base64 data URL for OAuth buttons"""
-    try:
-        # Try to read from assets folder
-        icon_path = f"assets/{icon_name}"
-        if os.path.exists(icon_path):
-            with open(icon_path, "r", encoding="utf-8") as f:
-                svg_content = f.read()
-            # Convert to base64 data URL
-            svg_b64 = base64.b64encode(svg_content.encode()).decode()
-            return f"data:image/svg+xml;base64,{svg_b64}"
-    except Exception as e:
-        logger.warning(f"Could not load {icon_name}: {str(e)}")
-    
-    # Fallback SVG icons if files not found
-    if icon_name == "google.svg":
-        # Google's official colors and design
-        return """data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEwLjIgOC4xVjEySDEzLjlDMTMuNyAxMy4xIDEzLjEgMTMuOSAxMi4yIDE0LjNMMTUuMSAxNi42QzE3IDE0LjkgMTggMTIuNiAxOCAxMEMxOCA5LjQgMTcuOSA4LjggMTcuOCA4LjFIMTAuMloiIGZpbGw9IiM0Mjg1RjQiLz4KPHBhdGggZD0iTTEwIDIwQzEyLjcgMjAgMTQuOSAxOS4xIDE2LjUgMTcuM0wxMy42IDE1QzEyLjggMTUuNSAxMS44IDE1LjggMTAgMTUuOEM3LjEgMTUuOCA0LjcgMTMuNyA0IDE0LjlMMSAxNy4yQzIuNyAxOC43IDYuMiAyMCAxMCAyMFoiIGZpbGw9IiMzNEE4NTMiLz4KPHBhdGggZD0iTTQgMTAuOUM0IDEwLjMgNC4xIDkuNyA0LjMgOS4xTDEuMiA2LjhDMC40IDguMyAwIDkuMSAwIDEwQzAgMTAuOSAwLjQgMTEuNyAxLjIgMTMuMkw0LjMgMTAuOUg0WiIgZmlsbD0iI0ZCQkMwNSIvPgo8cGF0aCBkPSJNMTAgNC4yQzExLjUgNC4yIDEyLjggNC44IDEzLjggNS43TDE2LjMgMy4yQzE0LjkgMS45IDEyLjcgMSAxMCAxQzYuMiAxIDIuNyAyLjMgMS4yIDMuOEw0LjMgNi4xQzUgMi45IDcuMyAwLjggMTAgNC4yWiIgZmlsbD0iI0VBNDMzNSIvPgo8L3N2Zz4K"""
-    elif icon_name == "facebook.svg":
-        # Facebook's official colors and design
-        return """data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIwIDEwQzIwIDQuNDggMTUuNTIgMCAxMCAwUzAgNC40OCAwIDEwQzAgMTQuODQgMy42NiAxOC44NyA4LjQ0IDE5Ljc1VjEyLjg0SDUuOVYxMEg4LjQ0VjcuNzlDOC40NCA1LjU3IDkuOTMgNC4yMiAxMS45NiA0LjIyQzEyLjk2IDQuMjIgMTMuOTkgNC40IDE0IDQuNlY2Ljg4SDEyLjg0QzExLjcyIDYuODggMTEuNDQgNy41MSAxMS40NCA4LjI5VjEwSDE0TDEzLjU2IDEyLjg0SDExLjQ0VjE5Ljc1QzE2LjM0IDE4Ljg3IDIwIDE0Ljg0IDIwIDEwWiIgZmlsbD0iIzE4NzdGMiIvPgo8L3N2Zz4K"""
-    
-    return ""
-
-def create_icon_button(icon_name: str, label: str, key: str, size: int = 18, 
-                      color: str = "#ffffff", help_text: Optional[str] = None) -> bool:
-    """Create clickable icon button with professional styling."""
-    icon_html = get_bootstrap_icon_b64(icon_name, size, color)
-    button_html = f'''
-    <div style="margin: 5px 0; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 10px; padding: 12px 15px; color: white; transition: all 0.3s ease; width: 100%; text-align: left; font-size: 14px; font-weight: 500; display: flex; align-items: center; backdrop-filter: blur(10px);">
-        {icon_html}
-        <span style="flex: 1;">{label}</span>
-    </div>
-    '''
-    st.markdown(button_html, unsafe_allow_html=True)
-    return st.button(label, key=key, help=help_text or f"Navigate to {label}", use_container_width=True)
-
-# ================================
-# DATABASE UTILITIES (WITH CONNECTION POOLING)
-# ================================
-
-@st.cache_resource
-def get_db_connection_pool():
-    """Create and cache a database connection pool."""
-    try:
-        pool = psycopg2.pool.SimpleConnectionPool(1, 10, dsn=DATABASE_URL)
-        logger.info("Database connection pool created successfully.")
-        return pool
-    except psycopg2.OperationalError as e:
-        st.error(f"🚨 Database connection failed: {e}")
-        logger.error(f"Database connection failed: {e}")
-        return None
-
-def get_db_connection():
-    """Get a connection from the pool."""
-    pool = get_db_connection_pool()
-    if pool:
-        return pool.getconn()
-    return None
-
-def release_db_connection(conn):
-    """Return a connection to the pool."""
-    pool = get_db_connection_pool()
-    if pool and conn:
-        pool.putconn(conn)
-
-def test_database_connection() -> bool:
-    """Test database connectivity."""
-    conn = None
-    try:
-        conn = get_db_connection()
-        if conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1")
-            result = cursor.fetchone()
-            cursor.close()
-            return result is not None
-    except Exception as e:
-        logger.error(f"Database test failed: {e}")
-        return False
-    finally:
-        if conn:
-            release_db_connection(conn)
-    return False
-
-def fetch_user_campaigns(user_id: str) -> List[Dict]:
-    """Fetch user's campaigns from database using a pooled connection."""
-    conn = None
-    try:
-        conn = get_db_connection()
-        if not conn:
-            return []
-        
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, title, short_description, goal_amount, current_amount, 
-                   status, created_at, end_date, category
-            FROM campaigns 
-            WHERE creator_id = %s 
-            ORDER BY created_at DESC
-        """, (user_id,))
-        
-        campaigns = []
-        for row in cursor.fetchall():
-            campaigns.append({
-                'id': row[0],
-                'title': row[1],
-                'short_description': row[2],
-                'goal_amount': row[3],
-                'current_amount': row[4] or 0,
-                'status': row[5],
-                'created_at': row[6],
-                'end_date': row[7],
-                'category': row[8]
-            })
-        
-        cursor.close()
-        return campaigns
-    except Exception as e:
-        logger.error(f"Failed to fetch user campaigns: {e}")
-        return []
-    finally:
-        if conn:
-            release_db_connection(conn)
-
-def fetch_user_contributions(user_id: str) -> List[Dict]:
-    """Fetch user's contributions from database."""
-    conn = None
-    try:
-        conn = get_db_connection()
-        if not conn:
-            return []
-        
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT c.title, d.amount, d.created_at, d.status
-            FROM donations d
-            JOIN campaigns c ON d.campaign_id = c.id
-            WHERE d.donor_id = %s
-            ORDER BY d.created_at DESC
-        """, (user_id,))
-        
-        contributions = []
-        for row in cursor.fetchall():
-            contributions.append({
-                'campaign_title': row[0],
-                'amount': row[1],
-                'date': row[2].strftime('%Y-%m-%d') if row[2] else 'Unknown',
-                'status': row[3]
-            })
-        
-        cursor.close()
-        return contributions
-    except Exception as e:
-        logger.error(f"Failed to fetch user contributions: {e}")
-        return []
-    finally:
-        if conn:
-            release_db_connection(conn)
-
-def fetch_platform_stats() -> Dict:
-    """Fetch platform statistics from database."""
-    conn = None
-    try:
-        conn = get_db_connection()
-        if not conn:
-            return {}
-        
-        cursor = conn.cursor()
-        
-        # Total raised
-        cursor.execute("SELECT COALESCE(SUM(current_amount), 0) FROM campaigns")
-        total_raised = cursor.fetchone()[0]
-        
-        # Active users
-        cursor.execute("SELECT COUNT(DISTINCT id) FROM users WHERE is_active = true")
-        active_users = cursor.fetchone()[0]
-        
-        # Successful projects
-        cursor.execute("SELECT COUNT(*) FROM campaigns WHERE status = 'completed' AND current_amount >= goal_amount")
-        successful_projects = cursor.fetchone()[0]
-        
-        # Active campaigns
-        cursor.execute("SELECT COUNT(*) FROM campaigns WHERE status = 'active'")
-        active_campaigns = cursor.fetchone()[0]
-        
-        cursor.close()
-        
-        return {
-            'total_raised': total_raised,
-            'active_users': active_users,
-            'successful_projects': successful_projects,
-            'active_campaigns': active_campaigns
-        }
-    except Exception as e:
-        logger.error(f"Failed to fetch platform stats: {e}")
-        return {
-            'total_raised': 2500000,  # Fallback values
-            'active_users': 15432,
-            'successful_projects': 1247,
-            'active_campaigns': 89
-        }
-    finally:
-        if conn:
-            release_db_connection(conn)
-
-# ================================
-# API INTEGRATION
-# ================================
-
-def make_api_request(endpoint: str, method: str = "GET", data: Dict = None, 
-                    auth_required: bool = False, timeout: int = 10) -> Dict[str, Any]:
-    """Make API request to FastAPI backend with proper error handling."""
-    
-    if not API_BASE:
-        return {"success": False, "error": "Backend URL not configured"}
-    
-    url = f"{API_BASE}{endpoint}"
-    headers = {"Content-Type": "application/json"}
-    
-    # Add authentication if required and available
-    if auth_required and st.session_state.get(SESSION_KEYS['access_token']):
-        headers["Authorization"] = f"Bearer {st.session_state[SESSION_KEYS['access_token']]}"
-    
-    try:
-        if method == "GET":
-            response = requests.get(url, headers=headers, timeout=timeout)
-        elif method == "POST":
-            response = requests.post(url, headers=headers, json=data, timeout=timeout)
-        elif method == "PUT":
-            response = requests.put(url, headers=headers, json=data, timeout=timeout)
-        elif method == "DELETE":
-            response = requests.delete(url, headers=headers, timeout=timeout)
-        else:
-            return {"success": False, "error": f"Unsupported HTTP method: {method}"}
-        
-        # Handle different response status codes
-        if response.status_code == 200:
-            try:
-                return {"success": True, "data": response.json()}
-            except json.JSONDecodeError:
-                return {"success": True, "data": response.text}
-        elif response.status_code == 401:
-            # Handle authentication errors
-            logout_user()
-            return {"success": False, "error": "Authentication required", "code": 401}
-        elif response.status_code == 403:
-            return {"success": False, "error": "Access forbidden", "code": 403}
-        elif response.status_code == 404:
-            return {"success": False, "error": "Resource not found", "code": 404}
-        elif response.status_code == 422:
-            return {"success": False, "error": "Validation error", "details": response.text, "code": 422}
-        else:
-            return {"success": False, "error": f"API Error: {response.status_code}", 
-                   "details": response.text, "code": response.status_code}
-    
-    except requests.exceptions.ConnectionError:
-        return {"success": False, "error": "Backend service unavailable", "code": "CONNECTION_ERROR"}
-    except requests.exceptions.Timeout:
-        return {"success": False, "error": "Request timeout", "code": "TIMEOUT"}
-    except requests.exceptions.RequestException as e:
-        return {"success": False, "error": f"Request failed: {str(e)}", "code": "REQUEST_ERROR"}
-    except Exception as e:
-        return {"success": False, "error": f"Unexpected error: {str(e)}", "code": "UNKNOWN_ERROR"}
-
-def check_backend_health() -> Dict[str, Any]:
-    """Check backend service health and connectivity."""
     if not BACKEND_URL:
-        return {"online": False, "status": "not_configured", "error": "Backend URL not set"}
+        st.sidebar.error("❌ Backend URL not configured")
+        return False
     
     try:
+        # Test basic connectivity
+        st.sidebar.info("Testing basic connectivity...")
         response = requests.get(f"{BACKEND_URL}/health", timeout=5)
         if response.status_code == 200:
-            return {"online": True, "status": "healthy", "response_time": response.elapsed.total_seconds()}
+            st.sidebar.success("✅ Backend is reachable")
         else:
-            return {"online": False, "status": f"unhealthy_{response.status_code}", "response_time": None}
+            st.sidebar.warning(f"⚠️ Backend returned {response.status_code}")
     except Exception as e:
-        return {"online": False, "status": "unreachable", "error": str(e), "response_time": None}
+        st.sidebar.error(f"❌ Backend unreachable: {str(e)}")
+        return False
+    
+    # Test OAuth endpoints
+    if API_BASE:
+        try:
+            st.sidebar.info("Testing Google OAuth endpoint...")
+            response = requests.get(f"{API_BASE}/auth/google/login", params={"user_type": "individual"}, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                if "auth_url" in data:
+                    st.sidebar.success("✅ Google OAuth endpoint working")
+                else:
+                    st.sidebar.error("❌ Google OAuth response missing auth_url")
+                    st.sidebar.json(data)
+            else:
+                st.sidebar.error(f"❌ Google OAuth failed: {response.status_code}")
+                st.sidebar.text(response.text)
+        except Exception as e:
+            st.sidebar.error(f"❌ Google OAuth error: {str(e)}")
+        
+        try:
+            st.sidebar.info("Testing Facebook OAuth endpoint...")
+            response = requests.get(f"{API_BASE}/auth/facebook/login", params={"user_type": "individual"}, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                if "auth_url" in data:
+                    st.sidebar.success("✅ Facebook OAuth endpoint working")
+                else:
+                    st.sidebar.error("❌ Facebook OAuth response missing auth_url")
+                    st.sidebar.json(data)
+            else:
+                st.sidebar.error(f"❌ Facebook OAuth failed: {response.status_code}")
+                st.sidebar.text(response.text)
+        except Exception as e:
+            st.sidebar.error(f"❌ Facebook OAuth error: {str(e)}")
+    
+    return True
 
-# UPDATED OAUTH FUNCTION - MINIMAL CHANGE
-def get_oauth_login_url(provider: str, user_type: str = "individual") -> Optional[str]:
-    """Get OAuth login URL from backend API (FIXED VERSION)."""
+# ================================
+# OAUTH FUNCTIONS WITH DIAGNOSTICS
+# ================================
+
+def get_oauth_login_url_diagnostic(provider: str, user_type: str = "individual") -> Optional[str]:
+    """Get OAuth login URL with detailed diagnostics"""
+    st.write(f"🔍 **Diagnostic: Getting {provider} OAuth URL**")
+    
     if not API_BASE:
+        st.error("❌ API_BASE is not configured")
         return None
     
+    endpoint = f"/auth/{provider}/login"
+    url = f"{API_BASE}{endpoint}"
+    params = {"user_type": user_type}
+    
+    st.write(f"📡 Making request to: `{url}`")
+    st.write(f"📋 Parameters: `{params}`")
+    
     try:
-        # Call backend API to get OAuth URL instead of direct redirect
-        endpoint = f"/auth/{provider}/login"
-        response = requests.get(f"{API_BASE}{endpoint}", params={"user_type": user_type}, timeout=10)
+        response = requests.get(url, params=params, timeout=10)
+        st.write(f"📊 Response status: `{response.status_code}`")
         
         if response.status_code == 200:
-            data = response.json()
-            return data.get("auth_url")
+            try:
+                data = response.json()
+                st.write("📄 Response data:")
+                st.json(data)
+                
+                auth_url = data.get("auth_url")
+                if auth_url:
+                    st.success(f"✅ {provider} OAuth URL generated successfully!")
+                    return auth_url
+                else:
+                    st.error(f"❌ Response missing 'auth_url' field")
+                    return None
+            except json.JSONDecodeError as e:
+                st.error(f"❌ Invalid JSON response: {str(e)}")
+                st.text(f"Raw response: {response.text}")
+                return None
         else:
-            logger.error(f"Failed to get {provider} OAuth URL: {response.status_code}")
+            st.error(f"❌ HTTP {response.status_code} error")
+            st.text(f"Response: {response.text}")
             return None
+            
+    except requests.exceptions.ConnectionError:
+        st.error("❌ Connection error - Backend service unavailable")
+        return None
+    except requests.exceptions.Timeout:
+        st.error("❌ Request timeout")
+        return None
     except Exception as e:
-        logger.error(f"Error getting {provider} OAuth URL: {str(e)}")
+        st.error(f"❌ Unexpected error: {str(e)}")
         return None
 
-# NEW OAUTH CALLBACK HANDLER - ADDED FOR FIX
 def handle_oauth_callback():
-    """Handle OAuth callback and set authentication state (NEW FUNCTION)."""
+    """Handle OAuth callback with diagnostics"""
     try:
-        # Check for OAuth callback parameters in URL
         query_params = st.experimental_get_query_params()
+        
+        if query_params:
+            st.write("🔍 **Diagnostic: URL Parameters Found**")
+            st.json(query_params)
         
         if "auth" in query_params:
             auth_status = query_params["auth"][0]
+            st.write(f"🔍 **Diagnostic: Auth status = {auth_status}**")
             
             if auth_status == "success" and "token" in query_params:
                 jwt_token = query_params["token"][0]
+                st.write(f"🔍 **Diagnostic: JWT token received (length: {len(jwt_token)})**")
                 
                 try:
-                    # Decode JWT token (without signature verification for now)
                     decoded_token = jwt.decode(jwt_token, options={"verify_signature": False})
+                    st.write("🔍 **Diagnostic: Decoded token:**")
+                    st.json(decoded_token)
                     
-                    # Extract user data from token
                     user_data = {
                         "id": decoded_token.get("user_id"),
                         "email": decoded_token.get("email"),
@@ -442,47 +212,34 @@ def handle_oauth_callback():
                         "user_type": decoded_token.get("user_type", "individual")
                     }
                     
-                    # Login user with the token
                     login_user(user_data, jwt_token)
-                    
-                    # Clear URL parameters
                     st.experimental_set_query_params()
-                    
-                    # Show success message
                     st.success(f"✅ Successfully signed in with {decoded_token.get('provider', 'OAuth')}!")
                     st.balloons()
-                    
-                    # Redirect to home page
                     st.session_state[SESSION_KEYS['current_page']] = 'home'
-                    
-                    # Trigger page rerun
                     time.sleep(1)
                     st.experimental_rerun()
                     
-                except jwt.InvalidTokenError:
-                    st.error("❌ Invalid authentication token received")
+                except jwt.InvalidTokenError as e:
+                    st.error(f"❌ Invalid JWT token: {str(e)}")
                 except Exception as e:
-                    st.error(f"❌ Error processing authentication: {str(e)}")
+                    st.error(f"❌ Error processing token: {str(e)}")
                     
             elif auth_status == "error":
-                # Handle OAuth error
                 provider = query_params.get("provider", ["Unknown"])[0]
                 error_message = query_params.get("message", ["Unknown error"])[0]
-                
                 st.error(f"❌ {provider.title()} authentication failed: {error_message}")
-                
-                # Clear URL parameters
                 st.experimental_set_query_params()
                 
     except Exception as e:
-        logger.error(f"OAuth callback handling error: {str(e)}")
+        st.error(f"❌ OAuth callback error: {str(e)}")
 
 # ================================
-# AUTHENTICATION SYSTEM
+# SIMPLIFIED AUTHENTICATION SYSTEM
 # ================================
 
 def initialize_session():
-    """Initialize session state for authentication and user management."""
+    """Initialize session state"""
     default_values = {
         SESSION_KEYS['authenticated']: False,
         SESSION_KEYS['user_data']: None,
@@ -498,26 +255,11 @@ def initialize_session():
             st.session_state[key] = default_value
 
 def is_authenticated() -> bool:
-    """Check if user is authenticated with token validation."""
-    if not st.session_state.get(SESSION_KEYS['authenticated'], False):
-        return False
-    
-    # Check if token exists
-    if not st.session_state.get(SESSION_KEYS['access_token']):
-        return False
-    
-    # Check token expiration (if login timestamp exists)
-    login_time = st.session_state.get(SESSION_KEYS['login_timestamp'])
-    if login_time:
-        # Token expires after 24 hours
-        if datetime.now() - login_time > timedelta(hours=24):
-            logout_user()
-            return False
-    
-    return True
+    """Check if user is authenticated"""
+    return st.session_state.get(SESSION_KEYS['authenticated'], False)
 
 def login_user(user_data: Dict, access_token: str, refresh_token: str = None):
-    """Login user and set session state."""
+    """Login user and set session state"""
     st.session_state[SESSION_KEYS['authenticated']] = True
     st.session_state[SESSION_KEYS['user_data']] = user_data
     st.session_state[SESSION_KEYS['access_token']] = access_token
@@ -525,202 +267,153 @@ def login_user(user_data: Dict, access_token: str, refresh_token: str = None):
     st.session_state[SESSION_KEYS['user_id']] = user_data.get('id')
     st.session_state[SESSION_KEYS['login_timestamp']] = datetime.now()
     st.session_state[SESSION_KEYS['current_page']] = 'home'
-    
-    logger.info(f"User logged in: {user_data.get('email', 'Unknown')}")
 
 def logout_user():
-    """Logout user and clear session state."""
-    user_email = st.session_state.get(SESSION_KEYS['user_data'], {}).get('email', 'Unknown')
-    
-    # Clear all session state
+    """Logout user"""
     for key in SESSION_KEYS.values():
         if key in st.session_state:
             del st.session_state[key]
-    
-    # Reset to login page
     st.session_state[SESSION_KEYS['current_page']] = 'login'
     st.session_state[SESSION_KEYS['authenticated']] = False
-    
-    logger.info(f"User logged out: {user_email}")
     st.success("✅ Successfully logged out!")
     st.rerun()
 
 def get_current_user() -> Optional[Dict]:
-    """Get current authenticated user data."""
+    """Get current authenticated user data"""
     if is_authenticated():
         return st.session_state.get(SESSION_KEYS['user_data'])
     return None
 
 # ================================
-# UI COMPONENTS
+# DIAGNOSTIC LOGIN PAGE
 # ================================
 
-def render_auth_only_sidebar():
-    """Render sidebar for non-authenticated users."""
-    st.markdown("### 🏠 Haven")
-    st.markdown("*Crowdfunding Platform*")
-    
-    st.markdown("---")
-    
-    # Navigation for auth pages
-    auth_pages = {
-        "Sign In": "login",
-        "Register": "register"
-    }
-    
-    for label, page_key in auth_pages.items():
-        if st.button(label, use_container_width=True):
-            st.session_state.current_page = page_key
-            st.rerun()
-
-def render_authenticated_sidebar():
-    """Render sidebar for authenticated users."""
-    user_data = get_current_user()
-    if not user_data:
-        return
-    
-    # User profile section
-    st.markdown("### 👤 Profile")
-    st.markdown(f"**{user_data.get('first_name', 'User')} {user_data.get('last_name', '')}**")
-    st.markdown(f"📧 {user_data.get('email', 'No email')}")
-    
-    st.markdown("---")
-    
-    # Navigation menu
-    st.markdown("### 📱 Navigation")
-    nav_items = {
-        "Home": "home",
-        "Explore": "explore",
-        "Campaigns": "campaign",
-        "Profile": "profile"
-    }
-    for label, page_key in nav_items.items():
-        if st.button(label, use_container_width=True):
-            st.session_state.current_page = page_key
-            st.rerun()
-    
-    st.markdown("---")
-    if st.button("Logout", use_container_width=True):
-        logout_user()
-
-# ================================
-# AUTHENTICATION PAGES
-# ================================
-
-# UPDATED LOGIN PAGE WITH SVG OAUTH BUTTONS
-def render_login_content():
-    """Render login page with SVG OAuth integration."""
-    st.header("Welcome to Haven")
+def render_diagnostic_login_content():
+    """Render diagnostic login page"""
+    st.header("Welcome to Haven - DIAGNOSTIC MODE")
     st.subheader("Please sign in to continue")
-
-    # Add OAuth callback handling at the top
+    
+    # Run diagnostics
+    diagnostic_backend_test()
+    
+    # Add OAuth callback handling
     handle_oauth_callback()
 
-    # OAuth buttons with SVG icons
-    st.markdown("### 🔐 Social Login")
+    # OAuth buttons section
+    st.markdown("### 🔐 Social Login - DIAGNOSTIC MODE")
     
-    # Check if backend is available
-    health = check_backend_health()
-    if not health.get("online", False):
-        st.warning("⚠️ Authentication service is currently unavailable")
-    else:
-        # Google OAuth Button with SVG icon
-        google_auth_url = get_oauth_login_url("google", "individual")
-        if google_auth_url:
-            google_icon = get_svg_icon("google.svg")
-            google_button_html = f"""
-            <script>
-            function openGoogleLogin() {{
-                const popup = window.open('{google_auth_url}', 'google_login', 'width=500,height=600,scrollbars=yes,resizable=yes');
-                
-                // Listen for messages from popup
-                window.addEventListener('message', function(event) {{
-                    if (event.data.type === 'OAUTH_SUCCESS') {{
-                        popup.close();
-                        const token = event.data.data.token;
-                        window.location.href = window.location.origin + '?auth=success&token=' + encodeURIComponent(token);
-                    }} else if (event.data.type === 'OAUTH_ERROR') {{
-                        popup.close();
-                        const error = event.data.data.error;
-                        window.location.href = window.location.origin + '?auth=error&provider=google&message=' + encodeURIComponent(error);
-                    }}
-                }}, false);
-            }}
-            </script>
-            
-            <button onclick="openGoogleLogin()" style="
-                background-color: #EA4335;
-                color: white;
-                border: none;
-                padding: 15px 20px;
-                border-radius: 8px;
-                cursor: pointer;
-                font-size: 16px;
-                font-weight: 500;
-                margin-bottom: 10px;
-                width: 100%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 12px;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                transition: background-color 0.2s ease;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            " onmouseover="this.style.backgroundColor='#d93025'" onmouseout="this.style.backgroundColor='#EA4335'">
-                <img src="{google_icon}" alt="Google" style="width: 20px; height: 20px; background: white; border-radius: 3px; padding: 2px;">
-                Sign in With Google
-            </button>
-            """
-            st.components.v1.html(google_button_html, height=70)
+    # Show detailed OAuth testing
+    st.markdown("#### 🔍 OAuth URL Generation Test")
+    
+    # Test Google OAuth
+    st.markdown("**Testing Google OAuth:**")
+    google_auth_url = get_oauth_login_url_diagnostic("google", "individual")
+    
+    if google_auth_url:
+        st.markdown(f"🔗 **Google OAuth URL Generated:**")
+        st.code(google_auth_url)
         
-        # Facebook OAuth Button with SVG icon
-        facebook_auth_url = get_oauth_login_url("facebook", "individual")
-        if facebook_auth_url:
-            facebook_icon = get_svg_icon("facebook.svg")
-            facebook_button_html = f"""
-            <script>
-            function openFacebookLogin() {{
-                const popup = window.open('{facebook_auth_url}', 'facebook_login', 'width=500,height=600,scrollbars=yes,resizable=yes');
-                
-                // Listen for messages from popup
-                window.addEventListener('message', function(event) {{
-                    if (event.data.type === 'OAUTH_SUCCESS') {{
-                        popup.close();
-                        const token = event.data.data.token;
-                        window.location.href = window.location.origin + '?auth=success&token=' + encodeURIComponent(token);
-                    }} else if (event.data.type === 'OAUTH_ERROR') {{
-                        popup.close();
-                        const error = event.data.data.error;
-                        window.location.href = window.location.origin + '?auth=error&provider=facebook&message=' + encodeURIComponent(error);
-                    }}
-                }}, false);
-            }}
-            </script>
+        # Create working button
+        google_button_html = f"""
+        <script>
+        function openGoogleLogin() {{
+            const popup = window.open('{google_auth_url}', 'google_login', 'width=500,height=600,scrollbars=yes,resizable=yes');
             
-            <button onclick="openFacebookLogin()" style="
-                background-color: #1877F2;
-                color: white;
-                border: none;
-                padding: 15px 20px;
-                border-radius: 8px;
-                cursor: pointer;
-                font-size: 16px;
-                font-weight: 500;
-                margin-bottom: 10px;
-                width: 100%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 12px;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                transition: background-color 0.2s ease;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            " onmouseover="this.style.backgroundColor='#166fe5'" onmouseout="this.style.backgroundColor='#1877F2'">
-                <img src="{facebook_icon}" alt="Facebook" style="width: 20px; height: 20px; background: white; border-radius: 3px; padding: 2px;">
-                Sign in With Facebook
-            </button>
-            """
-            st.components.v1.html(facebook_button_html, height=70)
+            window.addEventListener('message', function(event) {{
+                if (event.data.type === 'OAUTH_SUCCESS') {{
+                    popup.close();
+                    const token = event.data.data.token;
+                    window.location.href = window.location.origin + '?auth=success&token=' + encodeURIComponent(token);
+                }} else if (event.data.type === 'OAUTH_ERROR') {{
+                    popup.close();
+                    const error = event.data.data.error;
+                    window.location.href = window.location.origin + '?auth=error&provider=google&message=' + encodeURIComponent(error);
+                }}
+            }}, false);
+        }}
+        </script>
+        
+        <button onclick="openGoogleLogin()" style="
+            background-color: #EA4335;
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 10px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            transition: background-color 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        " onmouseover="this.style.backgroundColor='#d93025'" onmouseout="this.style.backgroundColor='#EA4335'">
+            G Sign in With Google
+        </button>
+        """
+        st.components.v1.html(google_button_html, height=70)
+    else:
+        st.error("❌ Google OAuth URL generation failed")
+    
+    st.markdown("---")
+    
+    # Test Facebook OAuth
+    st.markdown("**Testing Facebook OAuth:**")
+    facebook_auth_url = get_oauth_login_url_diagnostic("facebook", "individual")
+    
+    if facebook_auth_url:
+        st.markdown(f"🔗 **Facebook OAuth URL Generated:**")
+        st.code(facebook_auth_url)
+        
+        # Create working button
+        facebook_button_html = f"""
+        <script>
+        function openFacebookLogin() {{
+            const popup = window.open('{facebook_auth_url}', 'facebook_login', 'width=500,height=600,scrollbars=yes,resizable=yes');
+            
+            window.addEventListener('message', function(event) {{
+                if (event.data.type === 'OAUTH_SUCCESS') {{
+                    popup.close();
+                    const token = event.data.data.token;
+                    window.location.href = window.location.origin + '?auth=success&token=' + encodeURIComponent(token);
+                }} else if (event.data.type === 'OAUTH_ERROR') {{
+                    popup.close();
+                    const error = event.data.data.error;
+                    window.location.href = window.location.origin + '?auth=error&provider=facebook&message=' + encodeURIComponent(error);
+                }}
+            }}, false);
+        }}
+        </script>
+        
+        <button onclick="openFacebookLogin()" style="
+            background-color: #1877F2;
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 10px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            transition: background-color 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        " onmouseover="this.style.backgroundColor='#166fe5'" onmouseout="this.style.backgroundColor='#1877F2'">
+            f Sign in With Facebook
+        </button>
+        """
+        st.components.v1.html(facebook_button_html, height=70)
+    else:
+        st.error("❌ Facebook OAuth URL generation failed")
 
     st.markdown("---")
     st.markdown("### 📧 Email Login")
@@ -730,268 +423,83 @@ def render_login_content():
         password = st.text_input("Password", type="password")
         submitted = st.form_submit_button("Login")
         if submitted:
-            # Handle email login (your existing logic)
-            pass
-
-def render_register_content():
-    """Render registration page with Individual/Organization options."""
-    st.header("Create your Haven Account")
-    st.subheader("Join the Haven crowdfunding community")
-    
-    # Add OAuth callback handling
-    handle_oauth_callback()
-    
-    # User type selection
-    user_type = st.radio(
-        "Registration Type",
-        ["Individual", "Organization"],
-        horizontal=True,
-        help="Select whether you're registering as an individual or organization"
-    )
-    
-    with st.form("registration_form"):
-        if user_type == "Individual":
-            st.subheader("Individual Registration")
-            
-            # Individual fields
-            col1, col2 = st.columns(2)
-            with col1:
-                first_name = st.text_input("First Name *", placeholder="Enter your first name")
-            with col2:
-                last_name = st.text_input("Last Name *", placeholder="Enter your last name")
-            
-            email = st.text_input("Email ID *", placeholder="Enter your email address")
-            phone = st.text_input("Phone Number *", placeholder="Enter your 10-digit phone number")
-            aadhar = st.text_input("Aadhar Card Number *", placeholder="Enter your 12-digit Aadhar number", max_chars=12)
-            
-            password = st.text_input("Password *", type="password", placeholder="Create a strong password")
-            confirm_password = st.text_input("Confirm Password *", type="password", placeholder="Confirm your password")
-            
-        else:  # Organization
-            st.subheader("Organization Registration")
-            
-            # Organization fields
-            org_name = st.text_input("Organization Name *", placeholder="Enter organization name")
-            org_email = st.text_input("Organization Email ID *", placeholder="Enter organization email")
-            org_phone = st.text_input("Organization Phone Number *", placeholder="Enter organization phone number")
-            
-            # Certificate upload
-            st.write("Certificate of Authentication (India) *")
-            certificate_file = st.file_uploader(
-                "Upload Certificate",
-                type=['pdf', 'jpg', 'jpeg', 'png'],
-                help="Upload your organization's certificate of authentication"
-            )
-            
-            # Contact person details
-            st.write("**Contact Person Details**")
-            col1, col2 = st.columns(2)
-            with col1:
-                contact_first_name = st.text_input("Contact Person First Name *")
-            with col2:
-                contact_last_name = st.text_input("Contact Person Last Name *")
-            
-            contact_email = st.text_input("Contact Person Email *", placeholder="Contact person's email")
-            
-            password = st.text_input("Password *", type="password", placeholder="Create a strong password")
-            confirm_password = st.text_input("Confirm Password *", type="password", placeholder="Confirm your password")
-        
-        # Terms and conditions
-        terms_accepted = st.checkbox("I agree to the Terms and Conditions and Privacy Policy *")
-        
-        # Submit button
-        submitted = st.form_submit_button("Create Account", use_container_width=True)
-        
-        if submitted:
-            # Validation
-            errors = []
-            
-            if user_type == "Individual":
-                if not first_name or not last_name:
-                    errors.append("First name and last name are required")
-                if not email or "@" not in email:
-                    errors.append("Valid email address is required")
-                if not phone or len(phone) != 10 or not phone.isdigit():
-                    errors.append("Valid 10-digit phone number is required")
-                if not aadhar or len(aadhar) != 12 or not aadhar.isdigit():
-                    errors.append("Valid 12-digit Aadhar number is required")
-            else:
-                if not org_name:
-                    errors.append("Organization name is required")
-                if not org_email or "@" not in org_email:
-                    errors.append("Valid organization email is required")
-                if not org_phone:
-                    errors.append("Organization phone number is required")
-                if not certificate_file:
-                    errors.append("Certificate of authentication is required")
-                if not contact_first_name or not contact_last_name:
-                    errors.append("Contact person name is required")
-                if not contact_email or "@" not in contact_email:
-                    errors.append("Valid contact person email is required")
-            
-            # Common validations
-            if not password or len(password) < 8:
-                errors.append("Password must be at least 8 characters long")
-            if password != confirm_password:
-                errors.append("Passwords do not match")
-            if not terms_accepted:
-                errors.append("You must accept the terms and conditions")
-            
-            if errors:
-                for error in errors:
-                    st.error(error)
-            else:
-                # Prepare registration data
-                if user_type == "Individual":
-                    registration_data = {
-                        "user_type": "individual",
-                        "first_name": first_name,
-                        "last_name": last_name,
-                        "email": email,
-                        "phone": phone,
-                        "aadhar": aadhar,
-                        "password": password
-                    }
-                else:
-                    registration_data = {
-                        "user_type": "organization",
-                        "org_name": org_name,
-                        "org_email": org_email,
-                        "org_phone": org_phone,
-                        "contact_first_name": contact_first_name,
-                        "contact_last_name": contact_last_name,
-                        "contact_email": contact_email,
-                        "password": password,
-                        "certificate": certificate_file.name if certificate_file else None
-                    }
-                
-                # API call to register user
-                try:
-                    response = make_api_request(
-                        endpoint="/auth/register",
-                        method="POST",
-                        data=registration_data
-                    )
-                    
-                    if response.get("success"):
-                        st.success("Registration successful! Please check your email for verification.")
-                        st.info("Redirecting to login page...")
-                        # Redirect to login after successful registration
-                        st.session_state.current_page = 'login'
-                        st.rerun()
-                    else:
-                        st.error(f"Registration failed: {response.get('error', 'Unknown error')}")
-                        
-                except Exception as e:
-                    st.error(f"Registration failed: {str(e)}")
-    
-    # Link to login page
-    st.markdown("---")
-    st.markdown("Already have an account?")
-    if st.button("Sign In Instead", use_container_width=True):
-        st.session_state.current_page = 'login'
-        st.rerun()
+            st.info("Email login not implemented in diagnostic mode")
 
 # ================================
-# AUTHENTICATED CONTENT PAGES
+# SIMPLE AUTHENTICATED PAGES
 # ================================
 
 def render_home_content():
-    """Render home page for authenticated users."""
+    """Render home page"""
     user_name = st.session_state.get(SESSION_KEYS['user_data'], {}).get('first_name', 'User')
     st.title(f"Welcome back, {user_name}!")
+    st.success("🎉 OAuth authentication successful!")
     
-    # Platform stats
-    stats = fetch_platform_stats()
-    
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Total Raised", f"${stats.get('total_raised', 0):,}")
-    with col2:
-        st.metric("Active Users", f"{stats.get('active_users', 0):,}")
-    with col3:
-        st.metric("Successful Projects", f"{stats.get('successful_projects', 0):,}")
-    with col4:
-        st.metric("Active Campaigns", f"{stats.get('active_campaigns', 0):,}")
-
-def render_explore_content():
-    st.title("Explore Campaigns")
-    st.info("Campaign exploration feature coming soon!")
-
-def render_campaign_content():
-    st.title("Create or Manage Campaigns")
-    st.info("Campaign management feature coming soon!")
-
-def render_profile_content():
-    st.title("Your Profile")
+    st.markdown("### User Data:")
     user_data = get_current_user()
     if user_data:
         st.json(user_data)
 
+def render_register_content():
+    """Render registration page"""
+    st.header("Create your Haven Account")
+    st.info("Registration page - not implemented in diagnostic mode")
+
 # ================================
-# PAGE ROUTING & MAIN APP
+# SIDEBAR
+# ================================
+
+def render_sidebar():
+    """Render sidebar"""
+    if is_authenticated():
+        user_data = get_current_user()
+        if user_data:
+            st.sidebar.markdown("### 👤 Profile")
+            st.sidebar.markdown(f"**{user_data.get('first_name', 'User')} {user_data.get('last_name', '')}**")
+            st.sidebar.markdown(f"📧 {user_data.get('email', 'No email')}")
+            
+            if st.sidebar.button("Logout", use_container_width=True):
+                logout_user()
+    else:
+        st.sidebar.markdown("### 🏠 Haven")
+        st.sidebar.markdown("*Diagnostic Mode*")
+        
+        if st.sidebar.button("Sign In", use_container_width=True):
+            st.session_state.current_page = 'login'
+            st.rerun()
+        if st.sidebar.button("Register", use_container_width=True):
+            st.session_state.current_page = 'register'
+            st.rerun()
+
+# ================================
+# MAIN APP
 # ================================
 
 def render_page_content():
-    """Render content based on authentication status."""
+    """Render content based on authentication status"""
     current_page = st.session_state.get(SESSION_KEYS['current_page'], 'login')
     
     if not is_authenticated():
-        page_map = {'login': render_login_content, 'register': render_register_content}
-        render_func = page_map.get(current_page, render_login_content)
-        render_func()
+        if current_page == 'register':
+            render_register_content()
+        else:
+            render_diagnostic_login_content()
     else:
-        page_map = {
-            'home': render_home_content,
-            'explore': render_explore_content,
-            'campaign': render_campaign_content,
-            'profile': render_profile_content
-        }
-        render_func = page_map.get(current_page, render_home_content)
-        render_func()
+        render_home_content()
 
 def main():
-    """Main application."""
+    """Main application"""
     st.set_page_config(
-        page_title="Haven", 
+        page_title="Haven - Diagnostic Mode", 
         layout="wide",
         initial_sidebar_state="expanded"
     )
     
     initialize_session()
     
-    # Hide Streamlit's automatic page navigation and menu
-    st.markdown("""
-    <style>
-        /* Hide main menu */
-        #MainMenu {visibility: hidden;}
-        
-        /* Hide footer */
-        footer {visibility: hidden;}
-        
-        /* Hide automatic page navigation in sidebar - more specific targeting */
-        section[data-testid="stSidebar"] nav[data-testid="stSidebarNav"] {display: none !important;}
-        .stSidebar nav {display: none !important;}
-        
-        /* Hide specific navigation elements but preserve buttons */
-        [data-testid="stSidebarNav"] {display: none !important;}
-        .css-1d391kg {display: none !important;}
-        .css-1rs6os {display: none !important;}
-        .css-17eq0hr {display: none !important;}
-        
-        /* Only hide the first navigation container if it contains automatic links */
-        .stSidebar > div > div > div > div:first-child > div:first-child {
-            display: none !important;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
     with st.sidebar:
-        if is_authenticated():
-            render_authenticated_sidebar()
-        else:
-            render_auth_only_sidebar()
-            
+        render_sidebar()
+        
     render_page_content()
 
 if __name__ == "__main__":
